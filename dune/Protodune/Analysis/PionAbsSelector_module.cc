@@ -26,10 +26,12 @@
 #include "lardataobj/RecoBase/Track.h"
 #include "lardataobj/AnalysisBase/ParticleID.h"
 #include "lardataobj/RawData/TriggerData.h"
+#include "nusimdata/SimulationBase/MCTruth.h"
 #include "nusimdata/SimulationBase/MCParticle.h"
 #include "lardataobj/Simulation/SimChannel.h"
 #include "larcore/Geometry/Geometry.h"
 #include "dunetpc/dune/Protodune/Analysis/TrajectoryInterpExtrapAlg.h"
+#include "dunetpc/dune/Protodune/Analysis/MCBeamOrCosmicAlg.h"
 #include "larsim/MCCheater/BackTrackerService.h"
 
 //ROOT includes
@@ -47,7 +49,7 @@
 #define DEFAULTNEG -999999
 #define DEFAULTPOS 999999
 #define MAXTOFS 10
-#define MAXTRACKS 100
+#define MAXTRACKS 1000
 #define MAXDAUGHTER 25
 #define MAXIDES 150000
 #define MAXZINT 95
@@ -187,6 +189,8 @@ private:
 
   //parameters read from fcl file
   art::InputTag fTruePartLabel; //The name of the module that produced simb::MCParticle objects
+  art::InputTag fBeamTruthTag; //The name of the module that produced beam simb::MCTruth objects
+  art::InputTag fCosmicTruthTag; //The name of the module that produced cosmic simb::MCTruth objects
   art::InputTag fSimChanLabel; //The name of the module that produced sim::SimChannel objects
   art::InputTag fTrackLabel; //The name of the module that produced recob::Track objects
   art::InputTag fCaloLabel; //The name of the module that produced anab::Calorimetry objects
@@ -331,8 +335,9 @@ private:
   Float_t trackTrueEndKin[MAXTRACKS];
   Float_t trackTrueTrajLen[MAXTRACKS];
   Float_t trackTrueChargePurity[MAXTRACKS];
-  Float_t trackTrueChargeEfficiencyColPln[MAXTRACKS];
-  Float_t trackTrueChargeEfficiencyIndPln[MAXTRACKS];
+  Float_t trackTrueChargeEfficiencyU[MAXTRACKS];
+  Float_t trackTrueChargeEfficiencyV[MAXTRACKS];
+  Float_t trackTrueChargeEfficiencyZ[MAXTRACKS];
 
   Float_t trackTrueStartX[MAXTRACKS];
   Float_t trackTrueStartY[MAXTRACKS];
@@ -503,6 +508,36 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     }
   }
 
+  std::vector<art::Ptr<simb::MCTruth>> beamTruthVec;
+  if(!e.isRealData())
+  {
+    art::Handle<std::vector<simb::MCTruth> > beamTruthHand;
+    e.getByLabel(fBeamTruthTag,beamTruthHand);
+    if(beamTruthHand.isValid())
+    {
+      art::fill_ptr_vector(beamTruthVec, beamTruthHand);
+    }
+  }
+
+  std::vector<art::Ptr<simb::MCTruth>> cosmicTruthVec;
+  if(!e.isRealData())
+  {
+    art::Handle<std::vector<simb::MCTruth> > cosmicTruthHand;
+    e.getByLabel(fCosmicTruthTag,cosmicTruthHand);
+    if(cosmicTruthHand.isValid())
+    {
+      art::fill_ptr_vector(cosmicTruthVec, cosmicTruthHand);
+    }
+  }
+
+  const auto beamMatchedParticles = art::FindManyP<simb::MCParticle>(beamTruthVec, e, fTruePartLabel);
+  const auto cosmicMatchedParticles = art::FindManyP<simb::MCParticle>(cosmicTruthVec, e, fTruePartLabel);
+  pdana::MCBeamOrCosmicAlg* beamOrCosmic;
+  if(!e.isRealData())
+  {
+    beamOrCosmic = new pdana::MCBeamOrCosmicAlg(e,fTruePartLabel,fBeamTruthTag,fCosmicTruthTag);
+  }
+
 //  std::vector<art::Ptr<sim::SimChannel>> simChanVec;
 //  if(!e.isRealData())
 //  {
@@ -608,13 +643,59 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     triggerBits = triggerHandle->at(0).TriggerBits();
   }
 
+  // Look at beam MCTruth
+  for(const auto& truth:(beamTruthVec))
+  {
+    const size_t nParticles = truth->NParticles();
+    std::cout << "N beam truth particles: "<< nParticles << std::endl;
+    for(size_t iParticle = 0; iParticle < nParticles; iParticle++)
+    {
+        const simb::MCParticle & particle = truth->GetParticle(iParticle);
+        if (particle.PdgCode() > 1000000000) continue;
+        if (particle.PdgCode() == 22) continue;
+        std::cout << "  TrackId: " << particle.TrackId() 
+                    << " PDG: " << particle.PdgCode() 
+                    << " P: " << particle.Momentum().Vect().Mag() 
+                    << std::endl;
+    }
+  }
+  // Look at cosmic MCTruth
+  for(const auto& truth:(cosmicTruthVec))
+  {
+    const size_t nParticles = truth->NParticles();
+    std::cout << "N cosmic truth particles: "<< nParticles << std::endl;
+    for(size_t iParticle = 0; iParticle < nParticles; iParticle++)
+    {
+        const simb::MCParticle & particle = truth->GetParticle(iParticle);
+        if (particle.PdgCode() > 1000000000) continue;
+        if (particle.PdgCode() == 22) continue;
+        std::cout << "  TrackId: " << particle.TrackId() 
+                    << " PDG: " << particle.PdgCode() 
+                    << " P: " << particle.Momentum().Vect().Mag() 
+                    << std::endl;
+    }
+  }
+
   //Get MCParticle Variables
   art::Ptr<simb::MCParticle> primaryParticle;
   for(const auto& truth:(truePartVec))
   {
+    std::cout << "MCParticle: TrackId: " << truth->TrackId() 
+                << " PDG: " << truth->PdgCode() 
+                << " P: " << truth->Momentum().Vect().Mag() 
+                << " Process: " << truth->Process()
+                << " Beam: " << beamOrCosmic->isBeam(truth)
+                << std::endl;
     if(truth->Process() == "primary")
     {
       primaryParticle = truth;
+      //if (truth->PdgCode() < 1000000000 && truth->PdgCode() != 22 )
+      //{
+      //  std::cout << "Primary MCParticle: TrackId: " << truth->TrackId() 
+      //              << " PDG: " << truth->PdgCode() 
+      //              << " P: " << truth->Momentum().Vect().Mag() 
+      //              << std::endl;
+      //}
     }
     if (truth->PdgCode() != 2112 && truth->PdgCode() < 1000000000)
     {
@@ -628,6 +709,40 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
             <<" end: " << truth->EndX() << ", " << truth->EndY() << ", " << truth->EndZ()
             <<" Process: " << truth->Process()
             <<" EndProcess: " << truth->EndProcess();
+    }
+  }
+
+  std::cout << "N Total Particles: " << truePartVec.size() << std::endl;
+  for(size_t iTruth = 0; iTruth < beamTruthVec.size(); iTruth++)
+  {
+    const auto matchedParticles = beamMatchedParticles.at(iTruth);
+    std::cout << "N Beam Matched Particles: " << matchedParticles.size() << std::endl;
+    for(size_t iParticle = 0; iParticle < matchedParticles.size(); iParticle++)
+    {
+        const art::Ptr<simb::MCParticle> particle = matchedParticles.at(iParticle);
+        if (particle->PdgCode() > 1000000000) continue;
+        if (particle->PdgCode() == 22) continue;
+        std::cout << "Beam matched MCParticle: TrackId: " << particle->TrackId() 
+                    << " PDG: " << particle->PdgCode() 
+                    << " P: " << particle->Momentum().Vect().Mag() 
+                    << " Process: " << particle->Process()
+                    << std::endl;
+    }
+  }
+  for(size_t iTruth = 0; iTruth < cosmicTruthVec.size(); iTruth++)
+  {
+    const auto matchedParticles = cosmicMatchedParticles.at(iTruth);
+    std::cout << "N Cosmic Matched Particles: " << matchedParticles.size() << std::endl;
+    for(size_t iParticle = 0; iParticle < matchedParticles.size(); iParticle++)
+    {
+        const art::Ptr<simb::MCParticle> particle = matchedParticles.at(iParticle);
+        if (particle->PdgCode() > 1000000000) continue;
+        if (particle->PdgCode() == 22) continue;
+        std::cout << "Cosmic matched MCParticle: TrackId: " << particle->TrackId() 
+                    << " PDG: " << particle->PdgCode() 
+                    << " P: " << particle->Momentum().Vect().Mag() 
+                    << " Process: " << particle->Process()
+                    << std::endl;
     }
   }
 
@@ -1021,10 +1136,12 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
         std::set<int> setOfTrackIDs = bt->GetSetOfTrackIds(trackHits);
 	    std::vector< art::Ptr<recob::Hit> > trackHitsU;
 	    std::vector< art::Ptr<recob::Hit> > trackHitsV;
+	    std::vector< art::Ptr<recob::Hit> > trackHitsZ;
         for (const auto & trackHit : trackHits)
         {
             if (trackHit->View() == geo::kU) trackHitsU.push_back(trackHit);
             else if (trackHit->View() == geo::kV) trackHitsV.push_back(trackHit);
+            else if (trackHit->View() == geo::kZ) trackHitsZ.push_back(trackHit);
         }
         for (const auto & trackID : setOfTrackIDs)
         {
@@ -1044,10 +1161,12 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
           trackTrueID[iTrack] = TrackID;
           thisTrackIDSet.insert(TrackID);
           // In LArIAT, view V is collection, U is induction.
-          trackTrueChargeEfficiencyColPln[iTrack] = bt->HitChargeCollectionEfficiency(
-                                  thisTrackIDSet,trackHitsV,allHitsVec,geo::kV);
-          trackTrueChargeEfficiencyIndPln[iTrack] = bt->HitChargeCollectionEfficiency(
+          trackTrueChargeEfficiencyU[iTrack] = bt->HitChargeCollectionEfficiency(
                                   thisTrackIDSet,trackHitsU,allHitsVec,geo::kU);
+          trackTrueChargeEfficiencyV[iTrack] = bt->HitChargeCollectionEfficiency(
+                                  thisTrackIDSet,trackHitsV,allHitsVec,geo::kV);
+          trackTrueChargeEfficiencyZ[iTrack] = bt->HitChargeCollectionEfficiency(
+                                  thisTrackIDSet,trackHitsZ,allHitsVec,geo::kZ);
 
           // Find the MCParticle corresponding to this trackID
           art::Ptr<simb::MCParticle> particle;
@@ -1093,27 +1212,26 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
           trackTrueEndY[iTrack] = particle->EndY();
           trackTrueEndZ[iTrack] = particle->EndZ();
 
-          std::cout << "Truth matching info: " << std::endl;
-          std::cout << "  iTrack:                 " << iTrack << std::endl;
-          std::cout << "  ID:                     " << trackTrueID[iTrack] << std::endl;
-          std::cout << "  MotherID:               " << trackTrueMotherID[iTrack] << std::endl;
-          std::cout << "  PDG:                    " << trackTruePdg[iTrack] << std::endl;
-          std::cout << "  KE:                     " << trackTrueKin[iTrack] << std::endl;
-          std::cout << "  EndKE:                  " << trackTrueEndKin[iTrack] << std::endl;
-          std::cout << "  TrajLen                 " << trackTrueTrajLen[iTrack] << std::endl;
-          std::cout << "  ChargePurity:           " << trackTrueChargePurity[iTrack] << std::endl;
-          std::cout << "  ChargeEfficiencyColPln: " << trackTrueChargeEfficiencyColPln[iTrack] << std::endl;
-          std::cout << "  ChargeEfficiencyIndPln: " << trackTrueChargeEfficiencyIndPln[iTrack] << std::endl;
-          std::cout << "  BT ChargePurity:        " << bt->HitChargeCollectionPurity(thisTrackIDSet,trackHits) << std::endl;
-          std::cout << "  BT HitPurity:           " << bt->HitCollectionPurity(thisTrackIDSet,trackHits) << std::endl;
-          std::cout << "  BT ChargeEfficiency U:  " << bt->HitChargeCollectionEfficiency(thisTrackIDSet,trackHitsU,allHitsVec,geo::kU) << std::endl;
-          std::cout << "  BT HitEfficiency U:     " << bt->HitCollectionEfficiency(thisTrackIDSet,trackHitsU,allHitsVec,geo::kU) << std::endl;
-          std::cout << "  BT ChargeEfficiency V:  " << bt->HitChargeCollectionEfficiency(thisTrackIDSet,trackHitsV,allHitsVec,geo::kV) << std::endl;
-          std::cout << "  BT HitEfficiency V:     " << bt->HitCollectionEfficiency(thisTrackIDSet,trackHitsV,allHitsVec,geo::kV) << std::endl;
-          std::cout <<"   Process:                " << particle->Process() << std::endl;
-          std::cout <<"   EndProcess:             " << particle->EndProcess() << std::endl;
-          std::cout <<"   Momentum:               " << particle->Momentum().Vect().Mag() << std::endl;
-          std::cout <<"   EndMomentum:            " << particle->EndMomentum().Vect().Mag() << std::endl;
+          //std::cout << "Truth matching info: " << std::endl;
+          //std::cout << "  iTrack:                 " << iTrack << std::endl;
+          //std::cout << "  ID:                     " << trackTrueID[iTrack] << std::endl;
+          //std::cout << "  MotherID:               " << trackTrueMotherID[iTrack] << std::endl;
+          //std::cout << "  PDG:                    " << trackTruePdg[iTrack] << std::endl;
+          //std::cout << "  KE:                     " << trackTrueKin[iTrack] << std::endl;
+          //std::cout << "  EndKE:                  " << trackTrueEndKin[iTrack] << std::endl;
+          //std::cout << "  TrajLen                 " << trackTrueTrajLen[iTrack] << std::endl;
+          //std::cout << "  ChargePurity:           " << trackTrueChargePurity[iTrack] << std::endl;
+          //std::cout << "  ChargeEfficiencyU:      " << trackTrueChargeEfficiencyU[iTrack] << std::endl;
+          //std::cout << "  ChargeEfficiencyV:      " << trackTrueChargeEfficiencyV[iTrack] << std::endl;
+          //std::cout << "  ChargeEfficiencyZ:      " << trackTrueChargeEfficiencyZ[iTrack] << std::endl;
+          //std::cout << "  HitPurity:              " << bt->HitCollectionPurity(thisTrackIDSet,trackHits) << std::endl;
+          //std::cout << "  HitEfficiencyU:         " << bt->HitCollectionEfficiency(thisTrackIDSet,trackHitsU,allHitsVec,geo::kU) << std::endl;
+          //std::cout << "  HitEfficiencyV:         " << bt->HitCollectionEfficiency(thisTrackIDSet,trackHitsV,allHitsVec,geo::kV) << std::endl;
+          //std::cout << "  HitEfficiencyZ:         " << bt->HitCollectionEfficiency(thisTrackIDSet,trackHitsZ,allHitsVec,geo::kZ) << std::endl;
+          //std::cout <<"   Process:                " << particle->Process() << std::endl;
+          //std::cout <<"   EndProcess:             " << particle->EndProcess() << std::endl;
+          //std::cout <<"   Momentum:               " << particle->Momentum().Vect().Mag() << std::endl;
+          //std::cout <<"   EndMomentum:            " << particle->EndMomentum().Vect().Mag() << std::endl;
 
         } // if TrackID >= 0
         else
@@ -1390,6 +1508,8 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   }
   tree->Fill();
 
+  if(beamOrCosmic != NULL) delete beamOrCosmic;
+
 } // analyze function
 
 void lana::PionAbsSelector::beginJob()
@@ -1505,8 +1625,9 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("trackTrueEndKin",&trackTrueEndKin,"trackTrueEndKin[nTracks]/F");
   tree->Branch("trackTrueTrajLen",&trackTrueTrajLen,"trackTrueTrajLen[nTracks]/F");
   tree->Branch("trackTrueChargePurity",&trackTrueChargePurity,"trackTrueChargePurity[nTracks]/F");
-  tree->Branch("trackTrueChargeEfficiencyColPln",&trackTrueChargeEfficiencyColPln,"trackTrueChargeEfficiencyColPln[nTracks]/F");
-  tree->Branch("trackTrueChargeEfficiencyIndPln",&trackTrueChargeEfficiencyIndPln,"trackTrueChargeEfficiencyIndPln[nTracks]/F");
+  tree->Branch("trackTrueChargeEfficiencyU",&trackTrueChargeEfficiencyU,"trackTrueChargeEfficiencyU[nTracks]/F");
+  tree->Branch("trackTrueChargeEfficiencyV",&trackTrueChargeEfficiencyV,"trackTrueChargeEfficiencyV[nTracks]/F");
+  tree->Branch("trackTrueChargeEfficiencyZ",&trackTrueChargeEfficiencyZ,"trackTrueChargeEfficiencyZ[nTracks]/F");
   tree->Branch("trackTrueStartX",&trackTrueStartX,"trackTrueStartX[nTracks]/F");
   tree->Branch("trackTrueStartY",&trackTrueStartY,"trackTrueStartY[nTracks]/F");
   tree->Branch("trackTrueStartZ",&trackTrueStartZ,"trackTrueStartZ[nTracks]/F");
@@ -1649,6 +1770,8 @@ void lana::PionAbsSelector::reconfigure(fhicl::ParameterSet const & p)
 {
   // Implementation of optional member function here.
   fTruePartLabel = p.get<art::InputTag>("TruePartLabel");
+  fBeamTruthTag = p.get<art::InputTag>("BeamTruthTag");
+  fCosmicTruthTag = p.get<art::InputTag>("CosmicTruthTag");
   fSimChanLabel = p.get<art::InputTag>("SimChanLabel");
   fTrackLabel = p.get<art::InputTag>("TrackLabel");
   fCaloLabel = p.get<art::InputTag>("CaloLabel");
@@ -1992,8 +2115,9 @@ void lana::PionAbsSelector::ResetTreeVars()
     trackTrueEndKin[iTrack] = DEFAULTNEG;
     trackTrueTrajLen[iTrack] = DEFAULTNEG;
     trackTrueChargePurity[iTrack] = DEFAULTNEG;
-    trackTrueChargeEfficiencyColPln[iTrack] = DEFAULTNEG;
-    trackTrueChargeEfficiencyIndPln[iTrack] = DEFAULTNEG;
+    trackTrueChargeEfficiencyU[iTrack] = DEFAULTNEG;
+    trackTrueChargeEfficiencyV[iTrack] = DEFAULTNEG;
+    trackTrueChargeEfficiencyZ[iTrack] = DEFAULTNEG;
     trackTrueStartX[iTrack] = DEFAULTNEG;
     trackTrueStartY[iTrack] = DEFAULTNEG;
     trackTrueStartZ[iTrack] = DEFAULTNEG;
