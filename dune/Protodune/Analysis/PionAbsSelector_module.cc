@@ -46,11 +46,12 @@
 #include <algorithm> //for std::sort
 #include <cmath>
 
-#define DEFAULTNEG -999999
-#define DEFAULTPOS 999999
+#define DEFAULTNEG -99999999
+#define DEFAULTPOS 99999999
 #define MAXTOFS 10
 #define MAXTRACKS 1000
 #define MAXDAUGHTER 25
+#define MAXMCPARTS 10000
 #define MAXIDES 150000
 #define MAXZINT 95
 #define MAXLINT 20
@@ -293,6 +294,28 @@ private:
   Float_t trueXFrontTPC; // the starting trajectory projected to the TPC, x coord
   Float_t trueYFrontTPC; // the starting trajectory projected to the TPC, y coord
 
+  UInt_t nMCParts;
+  bool mcPartIsBeam[MAXMCPARTS];
+  bool mcPartIsPrimary[MAXMCPARTS];
+  Int_t mcPartTrackID[MAXMCPARTS];
+  Int_t mcPartPDG[MAXMCPARTS];
+  Float_t mcPartStartX[MAXMCPARTS];
+  Float_t mcPartStartY[MAXMCPARTS];
+  Float_t mcPartStartZ[MAXMCPARTS];
+  Float_t mcPartEndX[MAXMCPARTS];
+  Float_t mcPartEndY[MAXMCPARTS];
+  Float_t mcPartEndZ[MAXMCPARTS];
+  Float_t mcPartStartTheta[MAXMCPARTS];
+  Float_t mcPartStartPhi[MAXMCPARTS];
+  Float_t mcPartXFrontTPC[MAXMCPARTS];
+  Float_t mcPartYFrontTPC[MAXMCPARTS];
+  Float_t mcPartStartMom[MAXMCPARTS];
+  Float_t mcPartStartE[MAXMCPARTS];
+  Float_t mcPartStartKin[MAXMCPARTS];
+  Float_t mcPartEndMom[MAXMCPARTS];
+  Float_t mcPartEndE[MAXMCPARTS];
+  Float_t mcPartEndKin[MAXMCPARTS];
+
   UInt_t nIDEs;
   Int_t simIDETrackID[MAXIDES]; // track ID matching to true particles
   Float_t simIDENumElectrons[MAXIDES]; // number of electrons at wire for this time tick
@@ -331,6 +354,7 @@ private:
   Int_t trackTrueID[MAXTRACKS];
   Int_t trackTrueMotherID[MAXTRACKS];
   Int_t trackTruePdg[MAXTRACKS];
+  bool trackTrueIsBeam[MAXTRACKS];
   Float_t trackTrueKin[MAXTRACKS];
   Float_t trackTrueEndKin[MAXTRACKS];
   Float_t trackTrueTrajLen[MAXTRACKS];
@@ -508,30 +532,6 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     }
   }
 
-  std::vector<art::Ptr<simb::MCTruth>> beamTruthVec;
-  if(!e.isRealData())
-  {
-    art::Handle<std::vector<simb::MCTruth> > beamTruthHand;
-    e.getByLabel(fBeamTruthTag,beamTruthHand);
-    if(beamTruthHand.isValid())
-    {
-      art::fill_ptr_vector(beamTruthVec, beamTruthHand);
-    }
-  }
-
-  std::vector<art::Ptr<simb::MCTruth>> cosmicTruthVec;
-  if(!e.isRealData())
-  {
-    art::Handle<std::vector<simb::MCTruth> > cosmicTruthHand;
-    e.getByLabel(fCosmicTruthTag,cosmicTruthHand);
-    if(cosmicTruthHand.isValid())
-    {
-      art::fill_ptr_vector(cosmicTruthVec, cosmicTruthHand);
-    }
-  }
-
-  const auto beamMatchedParticles = art::FindManyP<simb::MCParticle>(beamTruthVec, e, fTruePartLabel);
-  const auto cosmicMatchedParticles = art::FindManyP<simb::MCParticle>(cosmicTruthVec, e, fTruePartLabel);
   pdana::MCBeamOrCosmicAlg* beamOrCosmic;
   if(!e.isRealData())
   {
@@ -643,108 +643,64 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     triggerBits = triggerHandle->at(0).TriggerBits();
   }
 
-  // Look at beam MCTruth
-  for(const auto& truth:(beamTruthVec))
-  {
-    const size_t nParticles = truth->NParticles();
-    std::cout << "N beam truth particles: "<< nParticles << std::endl;
-    for(size_t iParticle = 0; iParticle < nParticles; iParticle++)
-    {
-        const simb::MCParticle & particle = truth->GetParticle(iParticle);
-        if (particle.PdgCode() > 1000000000) continue;
-        if (particle.PdgCode() == 22) continue;
-        std::cout << "  TrackId: " << particle.TrackId() 
-                    << " PDG: " << particle.PdgCode() 
-                    << " P: " << particle.Momentum().Vect().Mag() 
-                    << std::endl;
-    }
-  }
-  // Look at cosmic MCTruth
-  for(const auto& truth:(cosmicTruthVec))
-  {
-    const size_t nParticles = truth->NParticles();
-    std::cout << "N cosmic truth particles: "<< nParticles << std::endl;
-    for(size_t iParticle = 0; iParticle < nParticles; iParticle++)
-    {
-        const simb::MCParticle & particle = truth->GetParticle(iParticle);
-        if (particle.PdgCode() > 1000000000) continue;
-        if (particle.PdgCode() == 22) continue;
-        std::cout << "  TrackId: " << particle.TrackId() 
-                    << " PDG: " << particle.PdgCode() 
-                    << " P: " << particle.Momentum().Vect().Mag() 
-                    << std::endl;
-    }
-  }
-
   //Get MCParticle Variables
   art::Ptr<simb::MCParticle> primaryParticle;
   for(const auto& truth:(truePartVec))
   {
-    std::cout << "MCParticle: TrackId: " << truth->TrackId() 
-                << " PDG: " << truth->PdgCode() 
-                << " P: " << truth->Momentum().Vect().Mag() 
-                << " Process: " << truth->Process()
-                << " Beam: " << beamOrCosmic->isBeam(truth)
-                << std::endl;
-    if(truth->Process() == "primary")
-    {
-      primaryParticle = truth;
-      //if (truth->PdgCode() < 1000000000 && truth->PdgCode() != 22 )
-      //{
-      //  std::cout << "Primary MCParticle: TrackId: " << truth->TrackId() 
-      //              << " PDG: " << truth->PdgCode() 
-      //              << " P: " << truth->Momentum().Vect().Mag() 
-      //              << std::endl;
-      //}
-    }
     if (truth->PdgCode() != 2112 && truth->PdgCode() < 1000000000)
     {
-        mf::LogInfo("MCParticle") << std::fixed << std::setprecision(1) 
-            << "TrackId: "<<truth->TrackId()
-            <<" MotherId: "<<truth->Mother()
-            <<" PDG "<< truth->PdgCode()
-            <<" KE "<<1000*(truth->E()-truth->Mass()) 
-            <<" len: " << truth->Trajectory().TotalLength() 
-            <<" start: " << truth->Vx() << ", " << truth->Vy() << ", " << truth->Vz()
-            <<" end: " << truth->EndX() << ", " << truth->EndY() << ", " << truth->EndZ()
-            <<" Process: " << truth->Process()
-            <<" EndProcess: " << truth->EndProcess();
-    }
-  }
+      bool isBeam = beamOrCosmic->isBeam(truth);
+      if(primaryParticle.isNull() && truth->Process() == "primary" && isBeam)
+      {
+        primaryParticle = truth;
+      }
+      mf::LogInfo("MCParticle") << std::fixed << std::setprecision(1) 
+          << "TrackId: "<<truth->TrackId()
+          <<" MotherId: "<<truth->Mother()
+          <<" PDG "<< truth->PdgCode()
+          <<" KE "<<1000*(truth->E()-truth->Mass()) 
+          <<" len: " << truth->Trajectory().TotalLength() 
+          <<" start: " << truth->Vx() << ", " << truth->Vy() << ", " << truth->Vz()
+          <<" end: " << truth->EndX() << ", " << truth->EndY() << ", " << truth->EndZ()
+          <<" Process: " << truth->Process()
+          <<" EndProcess: " << truth->EndProcess();
 
-  std::cout << "N Total Particles: " << truePartVec.size() << std::endl;
-  for(size_t iTruth = 0; iTruth < beamTruthVec.size(); iTruth++)
-  {
-    const auto matchedParticles = beamMatchedParticles.at(iTruth);
-    std::cout << "N Beam Matched Particles: " << matchedParticles.size() << std::endl;
-    for(size_t iParticle = 0; iParticle < matchedParticles.size(); iParticle++)
-    {
-        const art::Ptr<simb::MCParticle> particle = matchedParticles.at(iParticle);
-        if (particle->PdgCode() > 1000000000) continue;
-        if (particle->PdgCode() == 22) continue;
-        std::cout << "Beam matched MCParticle: TrackId: " << particle->TrackId() 
-                    << " PDG: " << particle->PdgCode() 
-                    << " P: " << particle->Momentum().Vect().Mag() 
-                    << " Process: " << particle->Process()
-                    << std::endl;
-    }
-  }
-  for(size_t iTruth = 0; iTruth < cosmicTruthVec.size(); iTruth++)
-  {
-    const auto matchedParticles = cosmicMatchedParticles.at(iTruth);
-    std::cout << "N Cosmic Matched Particles: " << matchedParticles.size() << std::endl;
-    for(size_t iParticle = 0; iParticle < matchedParticles.size(); iParticle++)
-    {
-        const art::Ptr<simb::MCParticle> particle = matchedParticles.at(iParticle);
-        if (particle->PdgCode() > 1000000000) continue;
-        if (particle->PdgCode() == 22) continue;
-        std::cout << "Cosmic matched MCParticle: TrackId: " << particle->TrackId() 
-                    << " PDG: " << particle->PdgCode() 
-                    << " P: " << particle->Momentum().Vect().Mag() 
-                    << " Process: " << particle->Process()
-                    << std::endl;
-    }
-  }
+      if (nMCParts >= MAXMCPARTS)
+      {
+        mf::LogError("MCParticle") << "Too many MCParticles in event to record.";
+        continue;
+      }
+
+      mcPartIsBeam[nMCParts] = isBeam;
+      mcPartIsPrimary[nMCParts] = truth->Process() == "primary";
+      mcPartTrackID[nMCParts] = truth->TrackId();
+      mcPartPDG[nMCParts] = truth->PdgCode();
+      mcPartStartX[nMCParts] = truth->Vx();
+      mcPartStartY[nMCParts] = truth->Vy();
+      mcPartStartZ[nMCParts] = truth->Vz();
+      mcPartEndX[nMCParts] = truth->EndX();
+      mcPartEndY[nMCParts] = truth->EndY();
+      mcPartEndZ[nMCParts] = truth->EndZ();
+      mcPartStartTheta[nMCParts] = truth->Momentum().Theta();
+      mcPartStartPhi[nMCParts] = truth->Momentum().Phi();
+      mcPartStartMom[nMCParts] = 1000.*truth->Momentum().Vect().Mag();
+      mcPartStartE[nMCParts] = 1000.*truth->E();
+      mcPartStartKin[nMCParts] = 1000.*(truth->E()-truth->Mass());
+      mcPartEndMom[nMCParts] = 1000.*truth->EndMomentum().Vect().Mag();
+      mcPartEndE[nMCParts] = 1000.*truth->EndE();
+      mcPartEndKin[nMCParts] = 1000.*(truth->EndE()-truth->Mass());
+
+      const double sinTheta = sin(truth->Momentum().Theta());
+      const double phi = truth->Momentum().Phi();
+      const double r = -mcPartStartZ[nMCParts]/truth->Momentum().CosTheta();
+      const double dx = r*sinTheta*cos(phi);
+      const double dy = r*sinTheta*sin(phi);
+
+      mcPartXFrontTPC[nMCParts] = mcPartStartX[nMCParts] + dx;
+      mcPartYFrontTPC[nMCParts] = mcPartStartY[nMCParts] + dy;
+      nMCParts++;
+    } // if not neturon or nucleus
+  } // for true (mcPart)
 
   TVector3 trueStartPos;
   TVector3 trueEndPos;
@@ -1200,6 +1156,7 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
           // This is where you can do some analysis of the true particle and compare it to the reco
           trackTrueMotherID[iTrack] = particle->Mother();
           trackTruePdg[iTrack] = particle->PdgCode();
+          trackTrueIsBeam[iTrack] = beamOrCosmic->isBeam(particle);
           trackTrueKin[iTrack] = 1000*(particle->E()-particle->Mass());
           trackTrueEndKin[iTrack] = 1000*(particle->EndE()-particle->Mass());
           trackTrueTrajLen[iTrack] = particle->Trajectory().TotalLength();
@@ -1217,6 +1174,7 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
           //std::cout << "  ID:                     " << trackTrueID[iTrack] << std::endl;
           //std::cout << "  MotherID:               " << trackTrueMotherID[iTrack] << std::endl;
           //std::cout << "  PDG:                    " << trackTruePdg[iTrack] << std::endl;
+          //std::cout << "  IsBeam:                 " << trackTrueIsBeam[iTrack] << std::endl;
           //std::cout << "  KE:                     " << trackTrueKin[iTrack] << std::endl;
           //std::cout << "  EndKE:                  " << trackTrueEndKin[iTrack] << std::endl;
           //std::cout << "  TrajLen                 " << trackTrueTrajLen[iTrack] << std::endl;
@@ -1583,16 +1541,38 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("trueXFrontTPC",&trueXFrontTPC,"trueXFrontTPC/F");
   tree->Branch("trueYFrontTPC",&trueYFrontTPC,"trueYFrontTPC/F");
 
-  tree->Branch("nIDEs",&nIDEs,"nIDEs/i");
-  tree->Branch("simIDETrackID",&simIDETrackID,"simIDETrackID[nIDEs]/I");
-  tree->Branch("simIDENumElectrons",&simIDENumElectrons,"simIDENumElectrons[nIDEs]/F");
-  tree->Branch("simIDEEnergy",&simIDEEnergy,"simIDEEnergy[nIDEs]/F");
-  tree->Branch("simIDEX",&simIDEX,"simIDEX[nIDEs]/F");
-  tree->Branch("simIDEY",&simIDEY,"simIDEY[nIDEs]/F");
-  tree->Branch("simIDEZ",&simIDEZ,"simIDEZ[nIDEs]/F");
-  tree->Branch("simIDETDC",&simIDETDC,"simIDETDC[nIDEs]/i");
-  tree->Branch("simIDEIsPrimary",&simIDEIsPrimary,"simIDEIsPrimary[nIDEs]/O");
-  tree->Branch("simIDEIsCollection",&simIDEIsCollection,"simIDEIsCollection[nIDEs]/O");
+  tree->Branch("nMCParts",&nMCParts,"nMCParts/i");
+  tree->Branch("mcPartIsBeam",&mcPartIsBeam,"mcPartIsBeam[nMCParts]/O");
+  tree->Branch("mcPartIsPrimary",&mcPartIsPrimary,"mcPartIsPrimary[nMCParts]/O");
+  tree->Branch("mcPartTrackID",&mcPartTrackID,"mcPartTrackID[nMCParts]/I");
+  tree->Branch("mcPartPDG",&mcPartPDG,"mcPartPDG[nMCParts]/I");
+  tree->Branch("mcPartStartX",&mcPartStartX,"mcPartStartX[nMCParts]/F");
+  tree->Branch("mcPartStartY",&mcPartStartY,"mcPartStartY[nMCParts]/F");
+  tree->Branch("mcPartStartZ",&mcPartStartZ,"mcPartStartZ[nMCParts]/F");
+  tree->Branch("mcPartEndX",&mcPartEndX,"mcPartEndX[nMCParts]/F");
+  tree->Branch("mcPartEndY",&mcPartEndY,"mcPartEndY[nMCParts]/F");
+  tree->Branch("mcPartEndZ",&mcPartEndZ,"mcPartEndZ[nMCParts]/F");
+  tree->Branch("mcPartStartTheta",&mcPartStartTheta,"mcPartStartTheta[nMCParts]/F");
+  tree->Branch("mcPartStartPhi",&mcPartStartPhi,"mcPartStartPhi[nMCParts]/F");
+  tree->Branch("mcPartXFrontTPC",&mcPartXFrontTPC,"mcPartXFrontTPC[nMCParts]/F");
+  tree->Branch("mcPartYFrontTPC",&mcPartYFrontTPC,"mcPartYFrontTPC[nMCParts]/F");
+  tree->Branch("mcPartStartMom",&mcPartStartMom,"mcPartStartMom[nMCParts]/F");
+  tree->Branch("mcPartStartE",&mcPartStartE,"mcPartStartE[nMCParts]/F");
+  tree->Branch("mcPartStartKin",&mcPartStartKin,"mcPartStartKin[nMCParts]/F");
+  tree->Branch("mcPartEndMom",&mcPartEndMom,"mcPartEndMom[nMCParts]/F");
+  tree->Branch("mcPartEndE",&mcPartEndE,"mcPartEndE[nMCParts]/F");
+  tree->Branch("mcPartEndKin",&mcPartEndKin,"mcPartEndKin[nMCParts]/F");
+
+  //tree->Branch("nIDEs",&nIDEs,"nIDEs/i");
+  //tree->Branch("simIDETrackID",&simIDETrackID,"simIDETrackID[nIDEs]/I");
+  //tree->Branch("simIDENumElectrons",&simIDENumElectrons,"simIDENumElectrons[nIDEs]/F");
+  //tree->Branch("simIDEEnergy",&simIDEEnergy,"simIDEEnergy[nIDEs]/F");
+  //tree->Branch("simIDEX",&simIDEX,"simIDEX[nIDEs]/F");
+  //tree->Branch("simIDEY",&simIDEY,"simIDEY[nIDEs]/F");
+  //tree->Branch("simIDEZ",&simIDEZ,"simIDEZ[nIDEs]/F");
+  //tree->Branch("simIDETDC",&simIDETDC,"simIDETDC[nIDEs]/i");
+  //tree->Branch("simIDEIsPrimary",&simIDEIsPrimary,"simIDEIsPrimary[nIDEs]/O");
+  //tree->Branch("simIDEIsCollection",&simIDEIsCollection,"simIDEIsCollection[nIDEs]/O");
   
   tree->Branch("nTracks",&nTracks,"nTracks/i");
   tree->Branch("nTracksInFirstZ",&nTracksInFirstZ,("nTracksInFirstZ["+std::to_string(MAXZINT)+"]/i").c_str());
@@ -1621,6 +1601,7 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("trackTrueID",&trackTrueID,"trackTrueID[nTracks]/I");
   tree->Branch("trackTrueMotherID",&trackTrueMotherID,"trackTrueMotherID[nTracks]/I");
   tree->Branch("trackTruePdg",&trackTruePdg,"trackTruePdg[nTracks]/I");
+  tree->Branch("trackTrueIsBeam",&trackTrueIsBeam,"trackTrueIsBeam[nTracks]/O");
   tree->Branch("trackTrueKin",&trackTrueKin,"trackTrueKin[nTracks]/F");
   tree->Branch("trackTrueEndKin",&trackTrueEndKin,"trackTrueEndKin[nTracks]/F");
   tree->Branch("trackTrueTrajLen",&trackTrueTrajLen,"trackTrueTrajLen[nTracks]/F");
@@ -1848,7 +1829,7 @@ const art::Ptr<recob::Track> lana::PionAbsSelector::MatchRecoToTruthOrWCTrack(co
   }
   else
   {
-    if(trueXFrontTPC < -1000.) return art::Ptr<recob::Track>();
+    if(trueXFrontTPC < -90000000.) return art::Ptr<recob::Track>();
     xTrue = trueXFrontTPC;
     yTrue = trueYFrontTPC;
     phiTrue = trueStartPhi;
@@ -1938,11 +1919,11 @@ const art::Ptr<recob::Track> lana::PionAbsSelector::MatchRecoToTruthOrWCTrack(co
 
 void lana::PionAbsSelector::SetXYFrontOfPrimaryMCParticle() 
 {
-  if(trueStartTheta < -1.
-    || trueStartX < -1000.
-    || trueStartY < -1000.
-    || trueStartZ < -1000.
-    || trueStartPhi < -10.)
+  if(trueStartTheta < -90000000.
+    || trueStartX < -90000000.
+    || trueStartY < -90000000.
+    || trueStartZ < -90000000.
+    || trueStartPhi < -90000000.)
   {
     throw cet::exception("TruthNotSet","truth variables uninitialized");
   }
@@ -2053,6 +2034,31 @@ void lana::PionAbsSelector::ResetTreeVars()
   trueXFrontTPC = DEFAULTNEG;
   trueYFrontTPC = DEFAULTNEG;
 
+  nMCParts = 0;
+  for(size_t i=0; i < MAXMCPARTS; i++)
+  {
+    mcPartIsBeam[i] = false;
+    mcPartTrackID[i] = DEFAULTNEG;
+    mcPartIsPrimary[i] = false;
+    mcPartPDG[i] = DEFAULTNEG;
+    mcPartStartX[i] = DEFAULTNEG;
+    mcPartStartY[i] = DEFAULTNEG;
+    mcPartStartZ[i] = DEFAULTNEG;
+    mcPartEndX[i] = DEFAULTNEG;
+    mcPartEndY[i] = DEFAULTNEG;
+    mcPartEndZ[i] = DEFAULTNEG;
+    mcPartStartTheta[i] = DEFAULTNEG;
+    mcPartStartPhi[i] = DEFAULTNEG;
+    mcPartXFrontTPC[i] = DEFAULTNEG;
+    mcPartYFrontTPC[i] = DEFAULTNEG;
+    mcPartStartMom[i] = DEFAULTNEG;
+    mcPartStartE[i] = DEFAULTNEG;
+    mcPartStartKin[i] = DEFAULTNEG;
+    mcPartEndMom[i] = DEFAULTNEG;
+    mcPartEndE[i] = DEFAULTNEG;
+    mcPartEndKin[i] = DEFAULTNEG;
+  }
+
   nIDEs = 0;
   for(size_t iIDE=0; iIDE < MAXIDES; iIDE++)
   {
@@ -2111,6 +2117,7 @@ void lana::PionAbsSelector::ResetTreeVars()
     trackTrueID[iTrack] = DEFAULTNEG;
     trackTrueMotherID[iTrack] = DEFAULTNEG;
     trackTruePdg[iTrack] = DEFAULTNEG;
+    trackTrueIsBeam[iTrack] = false;
     trackTrueKin[iTrack] = DEFAULTNEG;
     trackTrueEndKin[iTrack] = DEFAULTNEG;
     trackTrueTrajLen[iTrack] = DEFAULTNEG;
