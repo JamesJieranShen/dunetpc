@@ -32,6 +32,7 @@
 #include "larcore/Geometry/Geometry.h"
 #include "dunetpc/dune/LSU/TrajectoryInterpExtrapAlg.h"
 #include "dunetpc/dune/LSU/MCBeamOrCosmicAlg.h"
+#include "dunetpc/dune/LSU/PlaneIntersectionFinder.h"
 #include "larsim/MCCheater/BackTrackerService.h"
 
 //ROOT includes
@@ -2045,11 +2046,9 @@ void lana::PionAbsSelector::GetXYFront(const art::Ptr<recob::Track> track, float
     startPos = TVector3(trackEndPos);
     direction = TVector3(track->DirectionAtPoint(nPoints-1));
   }
-  const double r = startPos.Z()/direction.CosTheta();
-  const double dx = r*sin(direction.Theta())*cos(direction.Phi());
-  const double dy = r*sin(direction.Theta())*sin(direction.Phi());
-  xFront = startPos.X() + dx;
-  yFront = startPos.Y() + dy;
+  const TVector3 intersectionPoint = lsu::lineZPlane(0.,startPos,direction);
+  xFront = intersectionPoint.X();
+  yFront = intersectionPoint.Y();
 }
 
 void lana::PionAbsSelector::ResetTreeVars() 
