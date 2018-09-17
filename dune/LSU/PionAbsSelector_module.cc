@@ -35,8 +35,8 @@
 #include "larsim/MCCheater/BackTrackerService.h"
 
 //ROOT includes
-#include "TH1D.h"
-#include "TH2D.h"
+#include "TH1F.h"
+#include "TH2F.h"
 #include "TFile.h"
 #include "TTree.h"
 
@@ -60,6 +60,8 @@
 #define MPROTON 938.2720813 // MeV/c^2
 #define KINLOSTBEFORETPC 0.0 //MeV; from LArIAT pion total cross section group
 #define KINLOSTBEFORETPCPROTON 0.0 //MeV; from LArIAT pion total cross section group
+
+#define setHistTitles(hist,xtitle,ytitle) hist->GetXaxis()->SetTitle(xtitle); hist->GetYaxis()->SetTitle(ytitle);
 
 namespace lana {
   class PionAbsSelector;
@@ -275,9 +277,11 @@ private:
   Float_t trueStartX;  // primary MCParticle start position in cm
   Float_t trueStartY;
   Float_t trueStartZ;
+  Float_t trueStartT; // ns
   Float_t trueEndX; // primary MCParticle end position in cm
   Float_t trueEndY;
   Float_t trueEndZ;
+  Float_t trueEndT; // ns
   Float_t trueStartTheta; // primary MCParticle initial theta radians
   Float_t trueStartPhi; // primary MCParticle initial phi radians
   Float_t trueStartMom; // primary MCParticle initial momentum MeV/c
@@ -302,9 +306,11 @@ private:
   Float_t mcPartStartX[MAXMCPARTS];
   Float_t mcPartStartY[MAXMCPARTS];
   Float_t mcPartStartZ[MAXMCPARTS];
+  Float_t mcPartStartT[MAXMCPARTS];
   Float_t mcPartEndX[MAXMCPARTS];
   Float_t mcPartEndY[MAXMCPARTS];
   Float_t mcPartEndZ[MAXMCPARTS];
+  Float_t mcPartEndT[MAXMCPARTS];
   Float_t mcPartStartTheta[MAXMCPARTS];
   Float_t mcPartStartPhi[MAXMCPARTS];
   Float_t mcPartXFrontTPC[MAXMCPARTS];
@@ -366,9 +372,11 @@ private:
   Float_t trackTrueStartX[MAXTRACKS];
   Float_t trackTrueStartY[MAXTRACKS];
   Float_t trackTrueStartZ[MAXTRACKS];
+  Float_t trackTrueStartT[MAXTRACKS];
   Float_t trackTrueEndX[MAXTRACKS];
   Float_t trackTrueEndY[MAXTRACKS];
   Float_t trackTrueEndZ[MAXTRACKS];
+  Float_t trackTrueEndT[MAXTRACKS];
 
   Int_t iBestMatch;
   Float_t trackMatchDeltaX[MAXTRACKS];
@@ -477,6 +485,16 @@ private:
 
   /////////////////////////////
   //Histograms
+
+  TH2F* deltaXYTPCBeamlineHist;
+  TH2F* deltaXYTPCBeamlineOnlyBeamPrimariesHist;
+  TH2F* deltaXYTPCBeamlineOnlyBeamPrimariesInFlangeHist;
+  TH2F* deltaXYTPCBeamlineOnlyInFlangeHist;
+
+  TH1F* deltaAngleTPCBeamlineHist;
+  TH1F* deltaAngleTPCBeamlineOnlyBeamPrimariesHist;
+  TH1F* deltaAngleTPCBeamlineOnlyBeamPrimariesInFlangeHist;
+  TH1F* deltaAngleTPCBeamlineOnlyInFlangeHist;
 
   art::ServiceHandle<cheat::BackTrackerService> bt;
  
@@ -649,7 +667,11 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   {
     if (truth->PdgCode() != 2112 && truth->PdgCode() < 1000000000)
     {
-      bool isBeam = beamOrCosmic->isBeam(truth);
+      bool isBeam = false;
+      if (beamOrCosmic)
+      {
+        isBeam= beamOrCosmic->isBeam(truth);
+      }
       if(primaryParticle.isNull() && truth->Process() == "primary" && isBeam)
       {
         primaryParticle = truth;
@@ -678,9 +700,11 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       mcPartStartX[nMCParts] = truth->Vx();
       mcPartStartY[nMCParts] = truth->Vy();
       mcPartStartZ[nMCParts] = truth->Vz();
+      mcPartStartT[nMCParts] = truth->T();
       mcPartEndX[nMCParts] = truth->EndX();
       mcPartEndY[nMCParts] = truth->EndY();
       mcPartEndZ[nMCParts] = truth->EndZ();
+      mcPartEndT[nMCParts] = truth->EndT();
       mcPartStartTheta[nMCParts] = truth->Momentum().Theta();
       mcPartStartPhi[nMCParts] = truth->Momentum().Phi();
       mcPartStartMom[nMCParts] = 1000.*truth->Momentum().Vect().Mag();
@@ -722,12 +746,14 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     trueStartX = trueStartPos.X();
     trueStartY = trueStartPos.Y();
     trueStartZ = trueStartPos.Z();
+    trueStartT = primaryParticle->T();
     xWC4Hit = trueStartPos.X();
     yWC4Hit = trueStartPos.Y();
     zWC4Hit = trueStartPos.Z();
     trueEndX = trueEndPos.X();
     trueEndY = trueEndPos.Y();
     trueEndZ = trueEndPos.Z();
+    trueEndT = primaryParticle->EndT();
     trueStartTheta = trueStartMomVec4.Vect().Theta();
     trueStartPhi = trueStartMomVec4.Vect().Phi();
     thetaWC = trueStartMomVec4.Vect().Theta();
@@ -1156,7 +1182,10 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
           // This is where you can do some analysis of the true particle and compare it to the reco
           trackTrueMotherID[iTrack] = particle->Mother();
           trackTruePdg[iTrack] = particle->PdgCode();
-          trackTrueIsBeam[iTrack] = beamOrCosmic->isBeam(particle);
+          if (beamOrCosmic)
+          {
+            trackTrueIsBeam[iTrack] = beamOrCosmic->isBeam(particle);
+          }
           trackTrueKin[iTrack] = 1000*(particle->E()-particle->Mass());
           trackTrueEndKin[iTrack] = 1000*(particle->EndE()-particle->Mass());
           trackTrueTrajLen[iTrack] = particle->Trajectory().TotalLength();
@@ -1164,10 +1193,12 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
           trackTrueStartX[iTrack] = particle->Vx();
           trackTrueStartY[iTrack] = particle->Vy();
           trackTrueStartZ[iTrack] = particle->Vz();
+          trackTrueStartT[iTrack] = particle->T();
 
           trackTrueEndX[iTrack] = particle->EndX();
           trackTrueEndY[iTrack] = particle->EndY();
           trackTrueEndZ[iTrack] = particle->EndZ();
+          trackTrueEndT[iTrack] = particle->EndT();
 
           //std::cout << "Truth matching info: " << std::endl;
           //std::cout << "  iTrack:                 " << iTrack << std::endl;
@@ -1466,6 +1497,41 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   }
   tree->Fill();
 
+  for (size_t iTrack=0; iTrack < nTracks; iTrack++)
+  {
+    for (size_t iMCPart=0; iMCPart < nMCParts; iMCPart++)
+    {
+      const float dx = trackXFront[iTrack] - mcPartXFrontTPC[iMCPart];
+      const float dy = trackYFront[iTrack] - mcPartYFrontTPC[iMCPart];
+      TVector3 trackDir;
+      TVector3 mcPartDir;
+      trackDir.SetMagThetaPhi(1.,trackStartTheta[iTrack],trackStartPhi[iTrack]);
+      mcPartDir.SetMagThetaPhi(1.,mcPartStartTheta[iTrack],trackStartPhi[iTrack]);
+      const float dAngle = trackDir.Angle(mcPartDir)*180./CLHEP::pi;
+      deltaXYTPCBeamlineHist->Fill(dx,dy);
+      deltaAngleTPCBeamlineHist->Fill(dAngle);
+      const bool mcPartInFlange = sqrt(pow(mcPartXFrontTPC[iMCPart]-fFlangeCenterX,2)
+                                        +pow(mcPartYFrontTPC[iMCPart]-fFlangeCenterY,2));
+      const bool trackInFlange = sqrt(pow(trackXFront[iTrack]-fFlangeCenterX,2)
+                                        +pow(trackYFront[iTrack]-fFlangeCenterY,2));
+      if (mcPartIsBeam[iMCPart] && mcPartIsPrimary[iMCPart])
+      {
+        deltaXYTPCBeamlineOnlyBeamPrimariesHist->Fill(dx,dy);
+        deltaAngleTPCBeamlineOnlyBeamPrimariesHist->Fill(dAngle);
+        if (mcPartInFlange && trackInFlange)
+        {
+          deltaXYTPCBeamlineOnlyBeamPrimariesInFlangeHist->Fill(dx,dy);
+          deltaAngleTPCBeamlineOnlyBeamPrimariesInFlangeHist->Fill(dAngle);
+        }
+      }
+      if (mcPartInFlange && trackInFlange)
+      {
+        deltaXYTPCBeamlineOnlyInFlangeHist->Fill(dx,dy);
+        deltaAngleTPCBeamlineOnlyInFlangeHist->Fill(dAngle);
+      }
+    } // for iMCPart
+  } // for iTrack
+
   if(beamOrCosmic != NULL) delete beamOrCosmic;
 
 } // analyze function
@@ -1522,9 +1588,11 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("trueStartX",&trueStartX,"trueStartX/F");
   tree->Branch("trueStartY",&trueStartY,"trueStartY/F");
   tree->Branch("trueStartZ",&trueStartZ,"trueStartZ/F");
+  tree->Branch("trueStartT",&trueStartT,"trueStartT/F");
   tree->Branch("trueEndX",&trueEndX,"trueEndX/F");
   tree->Branch("trueEndY",&trueEndY,"trueEndY/F");
   tree->Branch("trueEndZ",&trueEndZ,"trueEndZ/F");
+  tree->Branch("trueEndT",&trueEndT,"trueEndT/F");
   tree->Branch("trueStartTheta",&trueStartTheta,"trueStartTheta/F");
   tree->Branch("trueStartPhi",&trueStartPhi,"trueStartPhi/F");
   tree->Branch("trueStartMom",&trueStartMom,"trueStartMom/F");
@@ -1549,9 +1617,11 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("mcPartStartX",&mcPartStartX,"mcPartStartX[nMCParts]/F");
   tree->Branch("mcPartStartY",&mcPartStartY,"mcPartStartY[nMCParts]/F");
   tree->Branch("mcPartStartZ",&mcPartStartZ,"mcPartStartZ[nMCParts]/F");
+  tree->Branch("mcPartStartT",&mcPartStartT,"mcPartStartT[nMCParts]/F");
   tree->Branch("mcPartEndX",&mcPartEndX,"mcPartEndX[nMCParts]/F");
   tree->Branch("mcPartEndY",&mcPartEndY,"mcPartEndY[nMCParts]/F");
   tree->Branch("mcPartEndZ",&mcPartEndZ,"mcPartEndZ[nMCParts]/F");
+  tree->Branch("mcPartEndT",&mcPartEndT,"mcPartEndT[nMCParts]/F");
   tree->Branch("mcPartStartTheta",&mcPartStartTheta,"mcPartStartTheta[nMCParts]/F");
   tree->Branch("mcPartStartPhi",&mcPartStartPhi,"mcPartStartPhi[nMCParts]/F");
   tree->Branch("mcPartXFrontTPC",&mcPartXFrontTPC,"mcPartXFrontTPC[nMCParts]/F");
@@ -1612,9 +1682,11 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("trackTrueStartX",&trackTrueStartX,"trackTrueStartX[nTracks]/F");
   tree->Branch("trackTrueStartY",&trackTrueStartY,"trackTrueStartY[nTracks]/F");
   tree->Branch("trackTrueStartZ",&trackTrueStartZ,"trackTrueStartZ[nTracks]/F");
+  tree->Branch("trackTrueStartT",&trackTrueStartT,"trackTrueStartT[nTracks]/F");
   tree->Branch("trackTrueEndX",&trackTrueEndX,"trackTrueEndX[nTracks]/F");
   tree->Branch("trackTrueEndY",&trackTrueEndY,"trackTrueEndY[nTracks]/F");
   tree->Branch("trackTrueEndZ",&trackTrueEndZ,"trackTrueEndZ[nTracks]/F");
+  tree->Branch("trackTrueEndT",&trackTrueEndT,"trackTrueEndT[nTracks]/F");
 
   tree->Branch("iBestMatch",&iBestMatch,"iBestMatch/I");
   tree->Branch("trackMatchDeltaX",&trackMatchDeltaX,"trackMatchDeltaX[nTracks]/F");
@@ -1720,6 +1792,25 @@ void lana::PionAbsSelector::beginJob()
 
   ////////////////////////////////////////
   // Book histograms
+
+  deltaXYTPCBeamlineHist = tfs->make<TH2F>("deltaXYTPCBeamline","",500,-100,100,500,-100,100);
+  setHistTitles(deltaXYTPCBeamlineHist,"#Delta x TPC Track - Beamline Track","#Delta y TPC Track - Beamline Track")
+  deltaXYTPCBeamlineOnlyBeamPrimariesHist = tfs->make<TH2F>("deltaXYTPCBeamlineOnlyBeamPrimaries","",500,-100,100,500,-100,100);
+  setHistTitles(deltaXYTPCBeamlineOnlyBeamPrimariesHist,"#Delta x TPC Track - Beamline Track","#Delta y TPC Track - Beamline Track")
+  deltaXYTPCBeamlineOnlyBeamPrimariesInFlangeHist = tfs->make<TH2F>("deltaXYTPCBeamlineOnlyBeamPrimariesInFlange","",500,-100,100,500,-100,100);
+  setHistTitles(deltaXYTPCBeamlineOnlyBeamPrimariesInFlangeHist,"#Delta x TPC Track - Beamline Track","#Delta y TPC Track - Beamline Track")
+  deltaXYTPCBeamlineOnlyInFlangeHist = tfs->make<TH2F>("deltaXYTPCBeamlineOnlyInFlange","",500,-100,100,500,-100,100);
+  setHistTitles(deltaXYTPCBeamlineOnlyInFlangeHist,"#Delta x TPC Track - Beamline Track","#Delta y TPC Track - Beamline Track")
+
+  deltaAngleTPCBeamlineHist = tfs->make<TH1F>("deltaAngleTPCBeamline","",500,0,180);
+  setHistTitles(deltaAngleTPCBeamlineHist,"#Delta #alpha TPC Track - Beamline Track","TPC-Beamline Track Pairs / Bin")
+  deltaAngleTPCBeamlineOnlyBeamPrimariesHist = tfs->make<TH1F>("deltaAngleTPCBeamlineOnlyBeamPrimaries","",500,0,180);
+  setHistTitles(deltaAngleTPCBeamlineOnlyBeamPrimariesHist,"#Delta #alpha TPC Track - Beamline Track","TPC-Beamline Track Pairs / Bin")
+  deltaAngleTPCBeamlineOnlyBeamPrimariesInFlangeHist = tfs->make<TH1F>("deltaAngleTPCBeamlineOnlyBeamPrimariesInFlange","",500,0,180);
+  setHistTitles(deltaAngleTPCBeamlineOnlyBeamPrimariesInFlangeHist,"#Delta #alpha TPC Track - Beamline Track","TPC-Beamline Track Pairs / Bin")
+  deltaAngleTPCBeamlineOnlyInFlangeHist = tfs->make<TH1F>("deltaAngleTPCBeamlineOnlyInFlange","",500,0,180);
+  setHistTitles(deltaAngleTPCBeamlineOnlyInFlangeHist,"#Delta #alpha TPC Track - Beamline Track","TPC-Beamline Track Pairs / Bin")
+  
 }
 
 void lana::PionAbsSelector::beginRun(art::Run const & r)
@@ -2012,9 +2103,11 @@ void lana::PionAbsSelector::ResetTreeVars()
   trueStartX = DEFAULTNEG;
   trueStartY = DEFAULTNEG;
   trueStartZ = DEFAULTNEG;
+  trueStartT = DEFAULTNEG;
   trueEndX = DEFAULTNEG;
   trueEndY = DEFAULTNEG;
   trueEndZ = DEFAULTNEG;
+  trueEndT = DEFAULTNEG;
   trueStartTheta = DEFAULTNEG;
   trueStartPhi = DEFAULTNEG;
   trueStartMom = DEFAULTNEG;
@@ -2044,9 +2137,11 @@ void lana::PionAbsSelector::ResetTreeVars()
     mcPartStartX[i] = DEFAULTNEG;
     mcPartStartY[i] = DEFAULTNEG;
     mcPartStartZ[i] = DEFAULTNEG;
+    mcPartStartT[i] = DEFAULTNEG;
     mcPartEndX[i] = DEFAULTNEG;
     mcPartEndY[i] = DEFAULTNEG;
     mcPartEndZ[i] = DEFAULTNEG;
+    mcPartEndT[i] = DEFAULTNEG;
     mcPartStartTheta[i] = DEFAULTNEG;
     mcPartStartPhi[i] = DEFAULTNEG;
     mcPartXFrontTPC[i] = DEFAULTNEG;
@@ -2128,9 +2223,11 @@ void lana::PionAbsSelector::ResetTreeVars()
     trackTrueStartX[iTrack] = DEFAULTNEG;
     trackTrueStartY[iTrack] = DEFAULTNEG;
     trackTrueStartZ[iTrack] = DEFAULTNEG;
+    trackTrueStartT[iTrack] = DEFAULTNEG;
     trackTrueEndX[iTrack] = DEFAULTNEG;
     trackTrueEndY[iTrack] = DEFAULTNEG;
     trackTrueEndZ[iTrack] = DEFAULTNEG;
+    trackTrueEndT[iTrack] = DEFAULTNEG;
     iSecTrkID[iTrack] = DEFAULTNEG;
     SecTrkPID[iTrack] = false;
   }

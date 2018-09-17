@@ -155,10 +155,10 @@ physics:
       TrackMatchDeltaXMinMC:          -5.
       TrackMatchDeltaXMaxMC:          5.
       TrackMatchAngleMaxDeg:          10.
-      FlangeCenterX:                  180.
-      FlangeCenterY:                  400.
-      FlangeCenterZ:                  -50.
-      FlangeRadiusCut:                10000.
+      FlangeCenterX:                  50.
+      FlangeCenterY:                  415.
+      FlangeCenterZ:                  0.
+      FlangeRadiusCut:                20.
     }
   }
 
