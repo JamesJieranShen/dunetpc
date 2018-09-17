@@ -1,0 +1,13 @@
+BEGIN_PROLOG
+
+lsu_analyzer:
+{ 
+  module_type:                "LSUAnalyzer"
+}
+
+gdbtest_analyzer:
+{ 
+  module_type:                "GDBTest"
+}
+
+END_PROLOG

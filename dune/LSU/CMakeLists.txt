@@ -1,7 +1,8 @@
 
-art_make(BASENAME_ONLY
-  LIBRARY_NAME      DUNELSU
+art_make(
+  LIBRARY_NAME DUNELSU
   LIB_LIBRARIES
+  ${ROOT_BASIC_LIB_LIST}
   ${ART_FRAMEWORK_CORE}
   ${ART_FRAMEWORK_PRINCIPAL}
   ${ART_FRAMEWORK_SERVICES_REGISTRY}
@@ -24,7 +25,6 @@ art_make(BASENAME_ONLY
   larsim_MCCheater_ParticleInventoryService_service
   larreco_RecoAlg
   MODULE_LIBRARIES
-  ${ROOT_BASIC_LIB_LIST}
   DUNELSU
   )
 install_headers()

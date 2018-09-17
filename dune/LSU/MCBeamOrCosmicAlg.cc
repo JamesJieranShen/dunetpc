@@ -1,4 +1,4 @@
-#include "dunetpc/dune/Protodune/Analysis/MCBeamOrCosmicAlg.h"
+#include "dunetpc/dune/LSU/MCBeamOrCosmicAlg.h"
 
 pdana::MCBeamOrCosmicAlg::MCBeamOrCosmicAlg(art::Event const & event, const art::InputTag mcPartTag, const art::InputTag beamTruthTag, const art::InputTag cosmicTruthTag):
   beamTruthHandle(event.getValidHandle<std::vector<simb::MCTruth> >(beamTruthTag)),
