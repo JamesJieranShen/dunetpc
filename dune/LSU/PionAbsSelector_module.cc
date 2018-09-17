@@ -30,8 +30,8 @@
 #include "nusimdata/SimulationBase/MCParticle.h"
 #include "lardataobj/Simulation/SimChannel.h"
 #include "larcore/Geometry/Geometry.h"
-#include "dunetpc/dune/Protodune/Analysis/TrajectoryInterpExtrapAlg.h"
-#include "dunetpc/dune/Protodune/Analysis/MCBeamOrCosmicAlg.h"
+#include "dunetpc/dune/LSU/TrajectoryInterpExtrapAlg.h"
+#include "dunetpc/dune/LSU/MCBeamOrCosmicAlg.h"
 #include "larsim/MCCheater/BackTrackerService.h"
 
 //ROOT includes
