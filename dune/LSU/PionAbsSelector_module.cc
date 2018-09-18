@@ -266,6 +266,7 @@ private:
   Int_t trueCategory; // int showing which category this event is in
   Int_t trueEndProcess; // int showing which end process
   Int_t truePrimaryPDG; // int showing PDG code of primary
+  Int_t truePrimaryTrackID; // int showing Track ID code of primary particle
   bool trueSignalT;
   bool trueSignalNT;
   UInt_t trueNDaughters; // number of daughter particles
@@ -389,6 +390,11 @@ private:
   Float_t trackMatchDeltaAngle[MAXTRACKS];
   Float_t trackMatchLowestZ[MAXTRACKS];
   UInt_t nMatchedTracks; // number of tracks in this event that pass matching criteria
+
+  bool primTrkIsMatchPrimary; // primary TPC track is matched to the primary MCParticle
+  bool primTrkIsMatchPrimaryDaughter; // primary TPC track is matched to a daughter of the primary MCPart
+  bool primTrkIsMatchBeam; // primary TPC track is matched to a beam MCParticle
+  bool primTrkIsMatchAPrimary; // primary TPC track is matched to a primary (like a halo muon)
 
   Float_t primTrkStartMomTrking; // primary TPC track initial momentum from tracking
   Float_t primTrkStartTheta;  // primary TPC track initial theta
@@ -778,6 +784,7 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     std::string endProcessStr = primaryParticle->EndProcess();
     trueNDaughters = primaryParticle->NumberDaughters();
     truePrimaryPDG = primaryParticle->PdgCode();
+    truePrimaryTrackID = primaryParticle->TrackId();
     nSecTracks = 0;
     for(size_t iDaughter=0; iDaughter < trueNDaughters; iDaughter++)
     {
@@ -1279,11 +1286,9 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     primTrkEndX = primTrkEnd.X();
     primTrkEndY = primTrkEnd.Y();
     primTrkEndZ = primTrkEnd.Z();
-    const TVector3 trackIntersectionPoint = lsu::trackZPlane(0.,*primaryTrack);
-    primTrkXFrontTPC = trackIntersectionPoint.X();
-    primTrkYFrontTPC = trackIntersectionPoint.Y();
+    primTrkXFrontTPC = trackTrueXFrontTPC[iBestMatch];
+    primTrkYFrontTPC = trackTrueYFrontTPC[iBestMatch];
     primTrkEndInFid = InPrimaryFiducial(primTrkEnd);
-
 
     primTrkCaloKin = trackCaloKin[iBestMatch];
     primTrkEndKin = kinWCInTPC - primTrkCaloKin;
@@ -1297,6 +1302,15 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
 
     mf::LogInfo("PrimaryTrack") << "Primary Track start point: (" << std::fixed << std::setprecision(1) << primTrkStart.X() << "," << primTrkStart.Y() << "," << primTrkStart.Z() << ")";
     mf::LogInfo("PrimaryTrack") << "Primary Track end point: (" << std::fixed << std::setprecision(1) << primTrkEnd.X() << "," << primTrkEnd.Y() << "," << primTrkEnd.Z() << ")";
+
+    // Primary Track Truth Match Info
+    if(isMC)
+    {
+      primTrkIsMatchPrimary = trackTrueID[iBestMatch] == truePrimaryTrackID;
+      primTrkIsMatchPrimaryDaughter = trackTrueMotherID[iBestMatch] == truePrimaryTrackID;
+      primTrkIsMatchBeam = trackTrueIsBeam[iBestMatch];
+      primTrkIsMatchAPrimary = trackTrueMotherID[iBestMatch] == 0;
+    }
 
     // Primary Track Calorimetry
     const auto primTrkCalos = tracksCaloVec.at(iBestMatch);
@@ -1615,6 +1629,7 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("trueCategory",&trueCategory,"trueCategory/I");
   tree->Branch("trueEndProcess",&trueEndProcess,"trueEndProcess/I");
   tree->Branch("truePrimaryPDG",&truePrimaryPDG,"truePrimaryPDG/I");
+  tree->Branch("truePrimaryTrackID",&truePrimaryTrackID,"truePrimaryTrackID/I");
   tree->Branch("trueSignalT",&trueSignalT,"trueSignalT/O");
   tree->Branch("trueSignalNT",&trueSignalNT,"trueSignalNT/O");
   tree->Branch("trueNDaughters",&trueNDaughters,"trueNDaughters/i");
@@ -1737,6 +1752,11 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("trackMatchDeltaAngle",&trackMatchDeltaAngle,"trackMatchDeltaAngle[nTracks]/F");
   tree->Branch("trackMatchLowestZ",&trackMatchLowestZ,"trackMatchLowestZ[nTracks]/F");
   tree->Branch("nMatchedTracks",&nMatchedTracks,"nMatchedTracks/i");
+
+  tree->Branch("primTrkIsMatchPrimary",&primTrkIsMatchPrimary,"primTrkIsMatchPrimary/O");
+  //tree->Branch("primTrkIsMatchPrimaryDaughter",&primTrkIsMatchPrimaryDaughter,"primTrkIsMatchPrimaryDaughter/O");
+  tree->Branch("primTrkIsMatchBeam",&primTrkIsMatchBeam,"primTrkIsMatchBeam/O");
+  tree->Branch("primTrkIsMatchAPrimary",&primTrkIsMatchAPrimary,"primTrkIsMatchAPrimary/O");
 
   tree->Branch("primTrkStartMomTrking",&primTrkStartMomTrking,"primTrkStartMomTrking/F");
   tree->Branch("primTrkStartTheta",&primTrkStartTheta,"primTrkStartTheta/F");
@@ -2107,6 +2127,7 @@ void lana::PionAbsSelector::ResetTreeVars()
   trueCategory = DEFAULTNEG;
   trueEndProcess = DEFAULTNEG;
   truePrimaryPDG = DEFAULTNEG;
+  truePrimaryTrackID = DEFAULTNEG;
   trueSignalT = false;
   trueSignalNT = false;
   trueNDaughters = 0;
@@ -2250,6 +2271,11 @@ void lana::PionAbsSelector::ResetTreeVars()
     iSecTrkID[iTrack] = DEFAULTNEG;
     SecTrkPID[iTrack] = false;
   }
+
+  primTrkIsMatchPrimary = DEFAULTNEG;
+  primTrkIsMatchPrimaryDaughter = DEFAULTNEG;
+  primTrkIsMatchBeam = DEFAULTNEG;
+  primTrkIsMatchAPrimary = DEFAULTNEG;
 
   primTrkStartMomTrking = DEFAULTNEG;
   primTrkStartTheta = DEFAULTNEG;
