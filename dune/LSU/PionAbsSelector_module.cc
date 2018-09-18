@@ -322,6 +322,7 @@ private:
   Float_t mcPartEndMom[MAXMCPARTS];
   Float_t mcPartEndE[MAXMCPARTS];
   Float_t mcPartEndKin[MAXMCPARTS];
+  Float_t mcPartDeltaAngle[MAXMCPARTS];
 
   UInt_t nIDEs;
   Int_t simIDETrackID[MAXIDES]; // track ID matching to true particles
@@ -495,11 +496,19 @@ private:
   TH2F* deltaXYTPCBeamlineOnlyBeamPrimariesHist;
   TH2F* deltaXYTPCBeamlineOnlyBeamPrimariesInFlangeHist;
   TH2F* deltaXYTPCBeamlineOnlyInFlangeHist;
+  TH2F* deltaXYTPCBeamlineOnlyInFirst25cmHist;
+  TH2F* deltaXYTPCBeamlineOnlyBeamPrimariesInFirst25cmHist;
+  TH2F* deltaXYTPCBeamlineOnlyBeamPrimariesInFlangeInFirst25cmHist;
+  TH2F* deltaXYTPCBeamlineOnlyInFlangeInFirst25cmHist;
 
   TH1F* deltaAngleTPCBeamlineHist;
   TH1F* deltaAngleTPCBeamlineOnlyBeamPrimariesHist;
   TH1F* deltaAngleTPCBeamlineOnlyBeamPrimariesInFlangeHist;
   TH1F* deltaAngleTPCBeamlineOnlyInFlangeHist;
+  TH1F* deltaAngleTPCBeamlineOnlyInFirst25cmHist;
+  TH1F* deltaAngleTPCBeamlineOnlyBeamPrimariesInFirst25cmHist;
+  TH1F* deltaAngleTPCBeamlineOnlyBeamPrimariesInFlangeInFirst25cmHist;
+  TH1F* deltaAngleTPCBeamlineOnlyInFlangeInFirst25cmHist;
 
   art::ServiceHandle<cheat::BackTrackerService> bt;
  
@@ -715,6 +724,7 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       mcPartEndMom[nMCParts] = 1000.*truth->EndMomentum().Vect().Mag();
       mcPartEndE[nMCParts] = 1000.*truth->EndE();
       mcPartEndKin[nMCParts] = 1000.*(truth->EndE()-truth->Mass());
+      mcPartDeltaAngle[nMCParts] = 1000.*(truth->Momentum().Vect().Angle(truth->EndMomentum().Vect()));
 
       const TVector3 particleFrontTPCPoint = lsu::mcPartStartZPlane(0,*truth);
       mcPartXFrontTPC[nMCParts] = particleFrontTPCPoint.X();
@@ -1235,8 +1245,7 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   } // for track
 
   //Match the primary track to the WCTrack or MCParticle
-  //const art::Ptr<recob::Track> primaryTrack = MatchRecoToTruthOrWCTrack(trackVec,e.isRealData()); // also sets deltaX, deltaY, etc.
-  const art::Ptr<recob::Track> primaryTrack = MatchRecoToTruthOrWCTrack(trackVec,false); // also sets deltaX, deltaY, etc.
+  const art::Ptr<recob::Track> primaryTrack = MatchRecoToTruthOrWCTrack(trackVec,e.isRealData()); // also sets deltaX, deltaY, etc.
   //Get Primary Track Variables
   TVector3 primTrkStart;
   TVector3 primTrkEnd;
@@ -1517,10 +1526,13 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       const float dAngle = trackDir.Angle(mcPartDir)*180./CLHEP::pi;
       deltaXYTPCBeamlineHist->Fill(dx,dy);
       deltaAngleTPCBeamlineHist->Fill(dAngle);
-      const bool mcPartInFlange = sqrt(pow(mcPartXFrontTPC[iMCPart]-fFlangeCenterX,2)
+      const bool mcPartInFlange = pow(fFlangeRadiusCut,2) 
+                                      > (pow(mcPartXFrontTPC[iMCPart]-fFlangeCenterX,2)
                                         +pow(mcPartYFrontTPC[iMCPart]-fFlangeCenterY,2));
-      const bool trackInFlange = sqrt(pow(trackXFrontTPC[iTrack]-fFlangeCenterX,2)
+      const bool trackInFlange = pow(fFlangeRadiusCut,2) 
+                                      > (pow(trackXFrontTPC[iTrack]-fFlangeCenterX,2)
                                         +pow(trackYFrontTPC[iTrack]-fFlangeCenterY,2));
+      const bool trackInFirst25cm = std::min(trackStartZ[iTrack],trackEndZ[iTrack]);
       if (mcPartIsBeam[iMCPart] && mcPartIsPrimary[iMCPart])
       {
         deltaXYTPCBeamlineOnlyBeamPrimariesHist->Fill(dx,dy);
@@ -1529,12 +1541,32 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
         {
           deltaXYTPCBeamlineOnlyBeamPrimariesInFlangeHist->Fill(dx,dy);
           deltaAngleTPCBeamlineOnlyBeamPrimariesInFlangeHist->Fill(dAngle);
+          if (trackInFirst25cm)
+          {
+            deltaXYTPCBeamlineOnlyBeamPrimariesInFlangeInFirst25cmHist->Fill(dx,dy);
+            deltaAngleTPCBeamlineOnlyBeamPrimariesInFlangeInFirst25cmHist->Fill(dAngle);
+          }
+        }
+        if (trackInFirst25cm)
+        {
+          deltaXYTPCBeamlineOnlyBeamPrimariesInFirst25cmHist->Fill(dx,dy);
+          deltaAngleTPCBeamlineOnlyBeamPrimariesInFirst25cmHist->Fill(dAngle);
         }
       }
       if (mcPartInFlange && trackInFlange)
       {
         deltaXYTPCBeamlineOnlyInFlangeHist->Fill(dx,dy);
         deltaAngleTPCBeamlineOnlyInFlangeHist->Fill(dAngle);
+        if (trackInFirst25cm)
+        {
+          deltaXYTPCBeamlineOnlyInFlangeInFirst25cmHist->Fill(dx,dy);
+          deltaAngleTPCBeamlineOnlyInFlangeInFirst25cmHist->Fill(dAngle);
+        }
+      }
+      if (trackInFirst25cm)
+      {
+        deltaXYTPCBeamlineOnlyInFirst25cmHist->Fill(dx,dy);
+        deltaAngleTPCBeamlineOnlyInFirst25cmHist->Fill(dAngle);
       }
     } // for iMCPart
   } // for iTrack
@@ -1639,6 +1671,7 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("mcPartEndMom",&mcPartEndMom,"mcPartEndMom[nMCParts]/F");
   tree->Branch("mcPartEndE",&mcPartEndE,"mcPartEndE[nMCParts]/F");
   tree->Branch("mcPartEndKin",&mcPartEndKin,"mcPartEndKin[nMCParts]/F");
+  tree->Branch("mcPartDeltaAngle",&mcPartDeltaAngle,"mcPartDeltaAngle[nMCParts]/F");
 
   //tree->Branch("nIDEs",&nIDEs,"nIDEs/i");
   //tree->Branch("simIDETrackID",&simIDETrackID,"simIDETrackID[nIDEs]/I");
@@ -1812,6 +1845,14 @@ void lana::PionAbsSelector::beginJob()
   setHistTitles(deltaXYTPCBeamlineOnlyBeamPrimariesInFlangeHist,"#Delta x TPC Track - Beamline Track","#Delta y TPC Track - Beamline Track")
   deltaXYTPCBeamlineOnlyInFlangeHist = tfs->make<TH2F>("deltaXYTPCBeamlineOnlyInFlange","",500,-100,100,500,-100,100);
   setHistTitles(deltaXYTPCBeamlineOnlyInFlangeHist,"#Delta x TPC Track - Beamline Track","#Delta y TPC Track - Beamline Track")
+  deltaXYTPCBeamlineOnlyInFirst25cmHist = tfs->make<TH2F>("deltaXYTPCBeamlineOnlyInFirst25cm","",500,-100,100,500,-100,100);
+  setHistTitles(deltaXYTPCBeamlineOnlyInFirst25cmHist,"#Delta x TPC Track - Beamline Track","#Delta y TPC Track - Beamline Track")
+  deltaXYTPCBeamlineOnlyBeamPrimariesInFirst25cmHist = tfs->make<TH2F>("deltaXYTPCBeamlineOnlyBeamPrimariesInFirst25cm","",500,-100,100,500,-100,100);
+  setHistTitles(deltaXYTPCBeamlineOnlyBeamPrimariesInFirst25cmHist,"#Delta x TPC Track - Beamline Track","#Delta y TPC Track - Beamline Track")
+  deltaXYTPCBeamlineOnlyBeamPrimariesInFlangeInFirst25cmHist = tfs->make<TH2F>("deltaXYTPCBeamlineOnlyBeamPrimariesInFlangeInFirst25cm","",500,-100,100,500,-100,100);
+  setHistTitles(deltaXYTPCBeamlineOnlyBeamPrimariesInFlangeInFirst25cmHist,"#Delta x TPC Track - Beamline Track","#Delta y TPC Track - Beamline Track")
+  deltaXYTPCBeamlineOnlyInFlangeInFirst25cmHist = tfs->make<TH2F>("deltaXYTPCBeamlineOnlyInFlangeInFirst25cm","",500,-100,100,500,-100,100);
+  setHistTitles(deltaXYTPCBeamlineOnlyInFlangeInFirst25cmHist,"#Delta x TPC Track - Beamline Track","#Delta y TPC Track - Beamline Track")
 
   deltaAngleTPCBeamlineHist = tfs->make<TH1F>("deltaAngleTPCBeamline","",500,0,180);
   setHistTitles(deltaAngleTPCBeamlineHist,"#Delta #alpha TPC Track - Beamline Track","TPC-Beamline Track Pairs / Bin")
@@ -1821,6 +1862,14 @@ void lana::PionAbsSelector::beginJob()
   setHistTitles(deltaAngleTPCBeamlineOnlyBeamPrimariesInFlangeHist,"#Delta #alpha TPC Track - Beamline Track","TPC-Beamline Track Pairs / Bin")
   deltaAngleTPCBeamlineOnlyInFlangeHist = tfs->make<TH1F>("deltaAngleTPCBeamlineOnlyInFlange","",500,0,180);
   setHistTitles(deltaAngleTPCBeamlineOnlyInFlangeHist,"#Delta #alpha TPC Track - Beamline Track","TPC-Beamline Track Pairs / Bin")
+  deltaAngleTPCBeamlineOnlyInFirst25cmHist = tfs->make<TH1F>("deltaAngleTPCBeamlineOnlyInFirst25cm","",500,0,180);
+  setHistTitles(deltaAngleTPCBeamlineOnlyInFirst25cmHist,"#Delta #alpha TPC Track - Beamline Track","TPC-Beamline Track Pairs / Bin")
+  deltaAngleTPCBeamlineOnlyBeamPrimariesInFirst25cmHist = tfs->make<TH1F>("deltaAngleTPCBeamlineOnlyBeamPrimariesInFirst25cm","",500,0,180);
+  setHistTitles(deltaAngleTPCBeamlineOnlyBeamPrimariesInFirst25cmHist,"#Delta #alpha TPC Track - Beamline Track","TPC-Beamline Track Pairs / Bin")
+  deltaAngleTPCBeamlineOnlyBeamPrimariesInFlangeInFirst25cmHist = tfs->make<TH1F>("deltaAngleTPCBeamlineOnlyBeamPrimariesInFlangeInFirst25cm","",500,0,180);
+  setHistTitles(deltaAngleTPCBeamlineOnlyBeamPrimariesInFlangeInFirst25cmHist,"#Delta #alpha TPC Track - Beamline Track","TPC-Beamline Track Pairs / Bin")
+  deltaAngleTPCBeamlineOnlyInFlangeInFirst25cmHist = tfs->make<TH1F>("deltaAngleTPCBeamlineOnlyInFlangeInFirst25cm","",500,0,180);
+  setHistTitles(deltaAngleTPCBeamlineOnlyInFlangeInFirst25cmHist,"#Delta #alpha TPC Track - Beamline Track","TPC-Beamline Track Pairs / Bin")
   
 }
 
@@ -2119,6 +2168,7 @@ void lana::PionAbsSelector::ResetTreeVars()
     mcPartEndMom[i] = DEFAULTNEG;
     mcPartEndE[i] = DEFAULTNEG;
     mcPartEndKin[i] = DEFAULTNEG;
+    mcPartDeltaAngle[i] = DEFAULTNEG;
   }
 
   nIDEs = 0;
