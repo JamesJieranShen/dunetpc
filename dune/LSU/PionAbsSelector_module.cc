@@ -346,8 +346,8 @@ private:
   Float_t trackEndY[MAXTRACKS];
   Float_t trackEndZ[MAXTRACKS];
   Float_t trackLength[MAXTRACKS];
-  Float_t trackXFront[MAXTRACKS];
-  Float_t trackYFront[MAXTRACKS];
+  Float_t trackXFrontTPC[MAXTRACKS];
+  Float_t trackYFrontTPC[MAXTRACKS];
   Float_t trackCaloKin[MAXTRACKS];
   Float_t trackLLHPion[MAXTRACKS];
   Float_t trackLLHProton[MAXTRACKS];
@@ -378,6 +378,8 @@ private:
   Float_t trackTrueEndY[MAXTRACKS];
   Float_t trackTrueEndZ[MAXTRACKS];
   Float_t trackTrueEndT[MAXTRACKS];
+  Float_t trackTrueXFrontTPC[MAXTRACKS];
+  Float_t trackTrueYFrontTPC[MAXTRACKS];
 
   Int_t iBestMatch;
   Float_t trackMatchDeltaX[MAXTRACKS];
@@ -397,6 +399,8 @@ private:
   Float_t primTrkEndX; // primary TPC track End x cm
   Float_t primTrkEndY; // primary TPC track End y cm
   Float_t primTrkEndZ; // primary TPC track End z cm
+  Float_t primTrkXFrontTPC;
+  Float_t primTrkYFrontTPC;
   Float_t primTrkCaloRange; // Total track length from calo
   bool primTrkEndInFid; // ends in primary fiducial
 
@@ -502,9 +506,6 @@ private:
   //Internal functions
   const art::Ptr<recob::Track> MatchRecoToTruthOrWCTrack(const std::vector<art::Ptr<recob::Track>>& tracks, bool isData); 
 
-  // trueStartX/Y/Z/Phi/Theta must be initialized
-  void SetXYFrontOfPrimaryMCParticle();
-  void GetXYFront(const art::Ptr<recob::Track> track, float& xFront, float& yFront);
   void ResetTreeVars();
 
   bool InPrimaryFiducial(const TVector3& pos);
@@ -715,14 +716,9 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       mcPartEndE[nMCParts] = 1000.*truth->EndE();
       mcPartEndKin[nMCParts] = 1000.*(truth->EndE()-truth->Mass());
 
-      const double sinTheta = sin(truth->Momentum().Theta());
-      const double phi = truth->Momentum().Phi();
-      const double r = -mcPartStartZ[nMCParts]/truth->Momentum().CosTheta();
-      const double dx = r*sinTheta*cos(phi);
-      const double dy = r*sinTheta*sin(phi);
-
-      mcPartXFrontTPC[nMCParts] = mcPartStartX[nMCParts] + dx;
-      mcPartYFrontTPC[nMCParts] = mcPartStartY[nMCParts] + dy;
+      const TVector3 particleFrontTPCPoint = lsu::mcPartStartZPlane(0,*truth);
+      mcPartXFrontTPC[nMCParts] = particleFrontTPCPoint.X();
+      mcPartYFrontTPC[nMCParts] = particleFrontTPCPoint.Y();
       nMCParts++;
     } // if not neturon or nucleus
   } // for true (mcPart)
@@ -948,7 +944,9 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       trueCategory = 0; // unknown
     }
 
-    SetXYFrontOfPrimaryMCParticle();
+    const TVector3 particleFrontTPCPoint = lsu::mcPartStartZPlane(0,*primaryParticle);
+    trueXFrontTPC = particleFrontTPCPoint.X();
+    trueYFrontTPC = particleFrontTPCPoint.Y();
     xWC = trueXFrontTPC;
     yWC = trueYFrontTPC;
     pzWC = trueStartMomVec4.Z()*1000.; //in MeV/c
@@ -1201,6 +1199,10 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
           trackTrueEndZ[iTrack] = particle->EndZ();
           trackTrueEndT[iTrack] = particle->EndT();
 
+          const TVector3 particleFrontTPCPoint = lsu::mcPartStartZPlane(0,*particle);
+          trackTrueXFrontTPC[iTrack] = particleFrontTPCPoint.X();
+          trackTrueYFrontTPC[iTrack] = particleFrontTPCPoint.Y();
+
           //std::cout << "Truth matching info: " << std::endl;
           //std::cout << "  iTrack:                 " << iTrack << std::endl;
           //std::cout << "  ID:                     " << trackTrueID[iTrack] << std::endl;
@@ -1268,7 +1270,11 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     primTrkEndX = primTrkEnd.X();
     primTrkEndY = primTrkEnd.Y();
     primTrkEndZ = primTrkEnd.Z();
+    const TVector3 trackIntersectionPoint = lsu::trackZPlane(0.,*primaryTrack);
+    primTrkXFrontTPC = trackIntersectionPoint.X();
+    primTrkYFrontTPC = trackIntersectionPoint.Y();
     primTrkEndInFid = InPrimaryFiducial(primTrkEnd);
+
 
     primTrkCaloKin = trackCaloKin[iBestMatch];
     primTrkEndKin = kinWCInTPC - primTrkCaloKin;
@@ -1502,8 +1508,8 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   {
     for (size_t iMCPart=0; iMCPart < nMCParts; iMCPart++)
     {
-      const float dx = trackXFront[iTrack] - mcPartXFrontTPC[iMCPart];
-      const float dy = trackYFront[iTrack] - mcPartYFrontTPC[iMCPart];
+      const float dx = trackXFrontTPC[iTrack] - mcPartXFrontTPC[iMCPart];
+      const float dy = trackYFrontTPC[iTrack] - mcPartYFrontTPC[iMCPart];
       TVector3 trackDir;
       TVector3 mcPartDir;
       trackDir.SetMagThetaPhi(1.,trackStartTheta[iTrack],trackStartPhi[iTrack]);
@@ -1513,8 +1519,8 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       deltaAngleTPCBeamlineHist->Fill(dAngle);
       const bool mcPartInFlange = sqrt(pow(mcPartXFrontTPC[iMCPart]-fFlangeCenterX,2)
                                         +pow(mcPartYFrontTPC[iMCPart]-fFlangeCenterY,2));
-      const bool trackInFlange = sqrt(pow(trackXFront[iTrack]-fFlangeCenterX,2)
-                                        +pow(trackYFront[iTrack]-fFlangeCenterY,2));
+      const bool trackInFlange = sqrt(pow(trackXFrontTPC[iTrack]-fFlangeCenterX,2)
+                                        +pow(trackYFrontTPC[iTrack]-fFlangeCenterY,2));
       if (mcPartIsBeam[iMCPart] && mcPartIsPrimary[iMCPart])
       {
         deltaXYTPCBeamlineOnlyBeamPrimariesHist->Fill(dx,dy);
@@ -1657,8 +1663,8 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("trackEndY",&trackEndY,"trackEndY[nTracks]/F");
   tree->Branch("trackEndZ",&trackEndZ,"trackEndZ[nTracks]/F");
   tree->Branch("trackLength",&trackLength,"trackLength[nTracks]/F");
-  tree->Branch("trackXFront",&trackXFront,"trackXFront[nTracks]/F");
-  tree->Branch("trackYFront",&trackYFront,"trackYFront[nTracks]/F");
+  tree->Branch("trackXFrontTPC",&trackXFrontTPC,"trackXFrontTPC[nTracks]/F");
+  tree->Branch("trackYFrontTPC",&trackYFrontTPC,"trackYFrontTPC[nTracks]/F");
   tree->Branch("trackCaloKin",&trackCaloKin,"trackCaloKin[nTracks]/F");
   tree->Branch("trackLLHPion",&trackLLHPion,"trackLLHPion[nTracks]/F");
   tree->Branch("trackLLHProton",&trackLLHProton,"trackLLHProton[nTracks]/F");
@@ -1688,6 +1694,8 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("trackTrueEndY",&trackTrueEndY,"trackTrueEndY[nTracks]/F");
   tree->Branch("trackTrueEndZ",&trackTrueEndZ,"trackTrueEndZ[nTracks]/F");
   tree->Branch("trackTrueEndT",&trackTrueEndT,"trackTrueEndT[nTracks]/F");
+  tree->Branch("trackTrueXFrontTPC",&trackTrueXFrontTPC,"trackTrueXFrontTPC[nTracks]/F");
+  tree->Branch("trackTrueYFrontTPC",&trackTrueYFrontTPC,"trackTrueYFrontTPC[nTracks]/F");
 
   tree->Branch("iBestMatch",&iBestMatch,"iBestMatch/I");
   tree->Branch("trackMatchDeltaX",&trackMatchDeltaX,"trackMatchDeltaX[nTracks]/F");
@@ -1707,6 +1715,8 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("primTrkEndX",&primTrkEndX,"primTrkEndX/F");
   tree->Branch("primTrkEndY",&primTrkEndY,"primTrkEndY/F");
   tree->Branch("primTrkEndZ",&primTrkEndZ,"primTrkEndZ/F");
+  tree->Branch("primTrkXFrontTPC",&primTrkXFrontTPC,"primTrkXFrontTPC/F");
+  tree->Branch("primTrkYFrontTPC",&primTrkYFrontTPC,"primTrkYFrontTPC/F");
   tree->Branch("primTrkCaloRange",&primTrkCaloRange,"primTrkCaloRange/F");
   tree->Branch("primTrkEndInFid",&primTrkEndInFid,"primTrkEndInFid/O");
 
@@ -1949,9 +1959,9 @@ const art::Ptr<recob::Track> lana::PionAbsSelector::MatchRecoToTruthOrWCTrack(co
         zTrackStart = zTrackEnd;
       }
     }
-    float xTrack;
-    float yTrack;
-    GetXYFront(track,xTrack,yTrack);
+    const TVector3 trackIntersectionPoint = lsu::trackZPlane(0.,*track);
+    float xTrack = trackIntersectionPoint.X();
+    float yTrack = trackIntersectionPoint.Y();
     const float deltaX = xTrack - xTrue;
     const float deltaY = yTrack - yTrue;
     const float deltaR = sqrt(deltaX*deltaX + deltaY*deltaY);
@@ -1959,8 +1969,8 @@ const art::Ptr<recob::Track> lana::PionAbsSelector::MatchRecoToTruthOrWCTrack(co
     const float deltaAngle = trackStartDir.Angle(dirTrue);
     if(iTrack <= MAXTRACKS)
     {
-      trackXFront[iTrack] = xTrack;
-      trackYFront[iTrack] = yTrack;
+      trackXFrontTPC[iTrack] = xTrack;
+      trackYFrontTPC[iTrack] = yTrack;
       trackMatchDeltaX[iTrack] = deltaX;
       trackMatchDeltaY[iTrack] = deltaY;
       trackMatchDeltaR[iTrack] = deltaR;
@@ -2008,48 +2018,6 @@ const art::Ptr<recob::Track> lana::PionAbsSelector::MatchRecoToTruthOrWCTrack(co
   }
 
 } // MatchRecoToTruthOrWCTrack
-
-void lana::PionAbsSelector::SetXYFrontOfPrimaryMCParticle() 
-{
-  if(trueStartTheta < -90000000.
-    || trueStartX < -90000000.
-    || trueStartY < -90000000.
-    || trueStartZ < -90000000.
-    || trueStartPhi < -90000000.)
-  {
-    throw cet::exception("TruthNotSet","truth variables uninitialized");
-  }
-  // look for point where we hit z = 0.
-  const double r = -trueStartZ/cos(trueStartTheta);
-  const double dx = r*sin(trueStartTheta)*cos(trueStartPhi);
-  const double dy = r*sin(trueStartTheta)*sin(trueStartPhi);
-  trueXFrontTPC = trueStartX + dx;
-  trueYFrontTPC = trueStartY + dy;
-}
-
-void lana::PionAbsSelector::GetXYFront(const art::Ptr<recob::Track> track, float& xFront, float& yFront) 
-{
-  xFront = 1e12;
-  yFront = 1e12;
-  const size_t nPoints = track->NumberTrajectoryPoints();
-  if (nPoints < 1) return;
-  const TVector3 & trackStartPos = track->LocationAtPoint(0);
-  TVector3 trackEndPos = trackStartPos;
-  if (nPoints > 1)
-  {
-    trackEndPos = track->LocationAtPoint(nPoints-1);
-  }
-  TVector3 startPos = TVector3(trackStartPos);
-  TVector3 direction = TVector3(track->DirectionAtPoint(0));
-  if (trackEndPos.Z() < trackStartPos.Z())
-  {
-    startPos = TVector3(trackEndPos);
-    direction = TVector3(track->DirectionAtPoint(nPoints-1));
-  }
-  const TVector3 intersectionPoint = lsu::lineZPlane(0.,startPos,direction);
-  xFront = intersectionPoint.X();
-  yFront = intersectionPoint.Y();
-}
 
 void lana::PionAbsSelector::ResetTreeVars() 
 {
@@ -2196,8 +2164,8 @@ void lana::PionAbsSelector::ResetTreeVars()
     trackEndY[iTrack] = DEFAULTNEG;
     trackEndZ[iTrack] = DEFAULTNEG;
     trackLength[iTrack] = DEFAULTNEG;
-    trackXFront[iTrack] = DEFAULTNEG;
-    trackYFront[iTrack] = DEFAULTNEG;
+    trackXFrontTPC[iTrack] = DEFAULTNEG;
+    trackYFrontTPC[iTrack] = DEFAULTNEG;
     trackCaloKin[iTrack] = DEFAULTNEG;
     trackLLHPion[iTrack] = DEFAULTNEG;
     trackLLHProton[iTrack] = DEFAULTNEG;
@@ -2227,6 +2195,8 @@ void lana::PionAbsSelector::ResetTreeVars()
     trackTrueEndY[iTrack] = DEFAULTNEG;
     trackTrueEndZ[iTrack] = DEFAULTNEG;
     trackTrueEndT[iTrack] = DEFAULTNEG;
+    trackTrueXFrontTPC[iTrack] = DEFAULTNEG;
+    trackTrueYFrontTPC[iTrack] = DEFAULTNEG;
     iSecTrkID[iTrack] = DEFAULTNEG;
     SecTrkPID[iTrack] = false;
   }
@@ -2241,6 +2211,8 @@ void lana::PionAbsSelector::ResetTreeVars()
   primTrkEndX = DEFAULTNEG;
   primTrkEndY = DEFAULTNEG;
   primTrkEndZ = DEFAULTNEG;
+  primTrkXFrontTPC = DEFAULTNEG;
+  primTrkYFrontTPC = DEFAULTNEG;
   primTrkCaloRange = DEFAULTNEG;
   primTrkEndInFid = false;
 

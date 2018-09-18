@@ -147,14 +147,14 @@ physics:
       FiducialPrimaryYMax:            580.
       FiducialPrimaryZMin:            5.
       FiducialPrimaryZMax:            600.
-      TrackMatchZMax:                 5.
-      TrackMatchDeltaYMin:            -5.
-      TrackMatchDeltaYMax:            5.
-      TrackMatchDeltaXMinData:        -4.
-      TrackMatchDeltaXMaxData:        6.
-      TrackMatchDeltaXMinMC:          -5.
-      TrackMatchDeltaXMaxMC:          5.
-      TrackMatchAngleMaxDeg:          10.
+      TrackMatchZMax:                 25.
+      TrackMatchDeltaYMin:            -10.
+      TrackMatchDeltaYMax:            10.
+      TrackMatchDeltaXMinData:        -10.
+      TrackMatchDeltaXMaxData:        10.
+      TrackMatchDeltaXMinMC:          -10.
+      TrackMatchDeltaXMaxMC:          10.
+      TrackMatchAngleMaxDeg:          15.
       FlangeCenterX:                  50.
       FlangeCenterY:                  415.
       FlangeCenterZ:                  0.
