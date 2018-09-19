@@ -33,6 +33,7 @@
 #include "dunetpc/dune/LSU/TrajectoryInterpExtrapAlg.h"
 #include "dunetpc/dune/LSU/MCBeamOrCosmicAlg.h"
 #include "dunetpc/dune/LSU/PlaneIntersectionFinder.h"
+#include "dunetpc/dune/LSU/MotherDaughterWalkerAlg.h"
 #include "larsim/MCCheater/BackTrackerService.h"
 
 //ROOT includes
@@ -572,6 +573,7 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   {
     beamOrCosmic = new pdana::MCBeamOrCosmicAlg(e,fTruePartLabel,fBeamTruthTag,fCosmicTruthTag);
   }
+  pdana::MotherDaughterWalkerAlg motherDaughterWalker(e,fTruePartLabel);
 
 //  std::vector<art::Ptr<sim::SimChannel>> simChanVec;
 //  if(!e.isRealData())
@@ -1307,7 +1309,20 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     if(isMC)
     {
       primTrkIsMatchPrimary = trackTrueID[iBestMatch] == truePrimaryTrackID;
-      primTrkIsMatchPrimaryDaughter = trackTrueMotherID[iBestMatch] == truePrimaryTrackID;
+      if (!primTrkIsMatchPrimary)
+      {
+        const auto thisMatchedParticle = motherDaughterWalker.getParticle(trackTrueID[iBestMatch]);
+        if(thisMatchedParticle.isNull())
+        {
+            throw cet::exception("CantFindMCParticle","Couldn't find MCParticle for best match TrackID");
+        }
+        const auto greatestGrandmother = motherDaughterWalker.getGreatestGrandmother(*thisMatchedParticle);
+        
+        if (greatestGrandmother.isNonnull())
+        {
+          primTrkIsMatchPrimaryDaughter = greatestGrandmother->TrackId() == truePrimaryTrackID;
+        }
+      }
       primTrkIsMatchBeam = trackTrueIsBeam[iBestMatch];
       primTrkIsMatchAPrimary = trackTrueMotherID[iBestMatch] == 0;
     }
