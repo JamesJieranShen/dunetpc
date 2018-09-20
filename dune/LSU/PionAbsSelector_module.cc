@@ -264,6 +264,8 @@ private:
 
   UInt_t triggerBits;
 
+  UInt_t nPrimaryParticleCandidates; // Number of MCParticles passing primary particle cuts
+
   Int_t trueCategory; // int showing which category this event is in
   Int_t trueEndProcess; // int showing which end process
   Int_t truePrimaryPDG; // int showing PDG code of primary
@@ -681,7 +683,8 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   }
 
   //Get MCParticle Variables
-  art::Ptr<simb::MCParticle> primaryParticle;
+  std::vector<art::Ptr<simb::MCParticle> > primaryParticleCandidates;
+  std::vector<size_t> primaryParticleCandidateIs;
   for(const auto& truth:(truePartVec))
   {
     if (truth->PdgCode() != 2112 && truth->PdgCode() < 1000000000)
@@ -690,10 +693,6 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       if (beamOrCosmic)
       {
         isBeam= beamOrCosmic->isBeam(truth);
-      }
-      if(primaryParticle.isNull() && truth->Process() == "primary" && isBeam)
-      {
-        primaryParticle = truth;
       }
       mf::LogInfo("MCParticle") << std::fixed << std::setprecision(1) 
           << "TrackId: "<<truth->TrackId()
@@ -737,9 +736,50 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       const TVector3 particleFrontTPCPoint = lsu::mcPartStartZPlane(0,*truth);
       mcPartXFrontTPC[nMCParts] = particleFrontTPCPoint.X();
       mcPartYFrontTPC[nMCParts] = particleFrontTPCPoint.Y();
+
+      if(mcPartIsBeam[nMCParts] 
+            && mcPartIsPrimary[nMCParts]
+            && mcPartXFrontTPC[nMCParts] > -40 && mcPartXFrontTPC[nMCParts] < 15.
+            && mcPartYFrontTPC[nMCParts] > 400. && mcPartYFrontTPC[nMCParts] < 445.
+            && mcPartStartMom[nMCParts] > 500. && mcPartStartMom[nMCParts] < 10000.
+        )
+      {
+        primaryParticleCandidates.push_back(truth);
+        primaryParticleCandidateIs.push_back(nMCParts);
+      }
+
       nMCParts++;
     } // if not neturon or nucleus
   } // for true (mcPart)
+
+  // Debugging printing of primaryParticleCandidates
+  for(const size_t & iMCPart: primaryParticleCandidateIs)
+  {
+    std::cout << "PrimaryParticle Candidate for: "<< eventNumber <<"\n"
+              //<< "  TrackID:   " << mcPartTrackID[iMCPart] << "\n"
+              //<< "  IsPrimary: " << mcPartIsPrimary[iMCPart] << "\n"
+              << "  PDG:       " << mcPartPDG[iMCPart] << "\n"
+              //<< "  StartX:    " << mcPartStartX[iMCPart] << "\n"
+              //<< "  StartY:    " << mcPartStartY[iMCPart] << "\n"
+              << "  StartZ:    " << mcPartStartZ[iMCPart] << "\n"
+              //<< "  EndX:      " << mcPartEndX[iMCPart] << "\n"
+              //<< "  EndY:      " << mcPartEndY[iMCPart] << "\n"
+              << "  EndZ:      " << mcPartEndZ[iMCPart] << "\n"
+              << "  StartMom:  " << mcPartStartMom[iMCPart] << "\n"
+              //<< "  EndMom:    " << mcPartEndMom[iMCPart] << "\n"
+              //<< "  XFrontTPC: " << mcPartXFrontTPC[iMCPart] << "\n"
+              //<< "  YFrontTPC: " << mcPartYFrontTPC[iMCPart] << "\n"
+              ;
+  }
+
+  // Select primaryParticle
+  art::Ptr<simb::MCParticle> primaryParticle;
+  nPrimaryParticleCandidates = primaryParticleCandidates.size();
+  if(nPrimaryParticleCandidates > 0)
+  {
+    primaryParticle = primaryParticleCandidates.at(0);
+  }
+
 
   TVector3 trueStartPos;
   TVector3 trueEndPos;
@@ -1650,6 +1690,8 @@ void lana::PionAbsSelector::beginJob()
 
   tree->Branch("triggerBits",&triggerBits,"triggerBits/i");
 
+  tree->Branch("nPrimaryParticleCandidates",&nPrimaryParticleCandidates,"nPrimaryParticleCandidates/i");
+
   tree->Branch("trueCategory",&trueCategory,"trueCategory/I");
   tree->Branch("trueEndProcess",&trueEndProcess,"trueEndProcess/I");
   tree->Branch("truePrimaryPDG",&truePrimaryPDG,"truePrimaryPDG/I");
@@ -2147,6 +2189,8 @@ void lana::PionAbsSelector::ResetTreeVars()
   firstTOF = DEFAULTNEG;
 
   triggerBits = 0;
+
+  nPrimaryParticleCandidates = 0;
 
   trueCategory = DEFAULTNEG;
   trueEndProcess = DEFAULTNEG;

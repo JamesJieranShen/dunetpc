@@ -32,6 +32,7 @@
 #include "dunetpc/dune/LSU/TrajectoryInterpExtrapAlg.h"
 #include "dunetpc/dune/LSU/MCBeamOrCosmicAlg.h"
 #include "dunetpc/dune/LSU/PlaneIntersectionFinder.h"
+#include "dunetpc/dune/LSU/MotherDaughterWalkerAlg.h"
 #include "larsim/MCCheater/BackTrackerService.h"
 
 //ROOT includes
@@ -121,6 +122,8 @@ private:
   bool mcPartIsPrimary;
   Int_t mcPartTrackID;
   Int_t mcPartPDG;
+  Int_t mcPartGreatestGrandmotherTrackID;
+  Int_t mcPartGreatestGrandmotherPDG;
   Float_t mcPartStartX;
   Float_t mcPartStartY;
   Float_t mcPartStartZ;
@@ -155,6 +158,8 @@ private:
   Float_t trackYFrontTPC;
   Int_t trackTrueID;
   Int_t trackTrueMotherID;
+  Int_t trackTrueGreatestGrandmotherTrackID;
+  Int_t trackTrueGreatestGrandmotherPDG;
   Int_t trackTruePdg;
   bool trackTrueIsBeam;
   Float_t trackTrueKin;
@@ -175,6 +180,7 @@ private:
   Float_t trackTrueEndT;
   Float_t trackTrueXFrontTPC;
   Float_t trackTrueYFrontTPC;
+  Float_t trackMCPartAngle;
 
   art::ServiceHandle<cheat::BackTrackerService> bt;
  
@@ -197,11 +203,6 @@ void lana::BeamMatchingAnalyzer::analyze(art::Event const & e)
   // Implementation of required member function here.
 
   art::ServiceHandle<geo::Geometry> geom;
-
-  runNumber = e.run();
-  subRunNumber = e.subRun();
-  eventNumber = e.id().event();
-  isMC = !(e.isRealData());
 
   //Get needed data products
   std::vector<art::Ptr<simb::MCParticle>> truePartVec;
@@ -240,12 +241,19 @@ void lana::BeamMatchingAnalyzer::analyze(art::Event const & e)
     }
   }
 
+  pdana::MotherDaughterWalkerAlg motherDaughterWalker(e,fTruePartLabel);
+
   //Get MCParticle Variables
   art::Ptr<simb::MCParticle> primaryParticle;
   for(const auto& truth:(truePartVec))
   {
     if (truth->PdgCode() == 2112 && truth->PdgCode() >= 1000000000) continue;
     ResetTreeVars();
+
+    runNumber = e.run();
+    subRunNumber = e.subRun();
+    eventNumber = e.id().event();
+    isMC = !(e.isRealData());
 
     bool isBeam = false;
     if (beamOrCosmic)
@@ -263,6 +271,12 @@ void lana::BeamMatchingAnalyzer::analyze(art::Event const & e)
     mcPartIsPrimary = truth->Process() == "primary";
     mcPartTrackID = truth->TrackId();
     mcPartPDG = truth->PdgCode();
+    const auto greatestGrandmotherTrue = motherDaughterWalker.getGreatestGrandmother(*truth);
+    if (greatestGrandmotherTrue.isNonnull())
+    {
+      mcPartGreatestGrandmotherTrackID = greatestGrandmotherTrue->TrackId();
+      mcPartGreatestGrandmotherPDG = greatestGrandmotherTrue->PdgCode();
+    }
     mcPartStartX = truth->Vx();
     mcPartStartY = truth->Vy();
     mcPartStartZ = truth->Vz();
@@ -281,6 +295,8 @@ void lana::BeamMatchingAnalyzer::analyze(art::Event const & e)
     mcPartEndE = 1000.*truth->EndE();
     mcPartEndKin = 1000.*(truth->EndE()-truth->Mass());
     mcPartDeltaAngle = truth->Momentum().Vect().Angle(truth->EndMomentum().Vect());
+    TVector3 mcPartDir;
+    mcPartDir.SetMagThetaPhi(1.,mcPartStartTheta,mcPartStartPhi);
 
     const TVector3 particleFrontTPCPoint = lsu::mcPartStartZPlane(0,*truth);
     mcPartXFrontTPC = particleFrontTPCPoint.X();
@@ -306,7 +322,6 @@ void lana::BeamMatchingAnalyzer::analyze(art::Event const & e)
       trackXFrontTPC = trackFrontTPCPoint.X();
       trackYFrontTPC = trackFrontTPCPoint.Y();
       if (trackXFrontTPC > 100 || trackXFrontTPC < -200 || trackYFrontTPC < 300 || trackYFrontTPC > 500) continue;
-
       if (nPoints > 0)
       {
         trackStartX = track->Vertex().X();
@@ -327,6 +342,10 @@ void lana::BeamMatchingAnalyzer::analyze(art::Event const & e)
           trackEndZ = track->Vertex().Z();
         }
         trackLength = track->Length();
+        
+        TVector3 trackDir;
+        trackDir.SetMagThetaPhi(1.,trackStartTheta,trackStartPhi);
+        trackMCPartAngle = trackDir.Angle(mcPartDir);
       }
 
       if (isMC && fmHitsForTracks.isValid())
@@ -423,6 +442,13 @@ void lana::BeamMatchingAnalyzer::analyze(art::Event const & e)
             trackTrueXFrontTPC = particleFrontTPCPoint.X();
             trackTrueYFrontTPC = particleFrontTPCPoint.Y();
 
+            const auto greatestGrandmother = motherDaughterWalker.getGreatestGrandmother(*particle);
+            if (greatestGrandmother.isNonnull())
+            {
+              trackTrueGreatestGrandmotherTrackID = greatestGrandmother->TrackId();
+              trackTrueGreatestGrandmotherPDG = greatestGrandmother->PdgCode();
+            }
+
             //std::cout << "Truth matching info: " << std::endl;
             //std::cout << "  iTrack:                 " << iTrack << std::endl;
             //std::cout << "  ID:                     " << trackTrueID << std::endl;
@@ -474,11 +500,13 @@ void lana::BeamMatchingAnalyzer::beginJob()
   tree->Branch("subRunNumber",&subRunNumber,"subRunNumber/i");
   tree->Branch("eventNumber",&eventNumber,"eventNumber/i");
 
-  tree->Branch("nMCParts",&nMCParts,"nMCParts/i");
+  //tree->Branch("nMCParts",&nMCParts,"nMCParts/i");
   tree->Branch("mcPartIsBeam",&mcPartIsBeam,"mcPartIsBeam/O");
   tree->Branch("mcPartIsPrimary",&mcPartIsPrimary,"mcPartIsPrimary/O");
   tree->Branch("mcPartTrackID",&mcPartTrackID,"mcPartTrackID/I");
   tree->Branch("mcPartPDG",&mcPartPDG,"mcPartPDG/I");
+  tree->Branch("mcPartGreatestGrandmotherTrackID",&mcPartGreatestGrandmotherTrackID,"mcPartGreatestGrandmotherTrackID/I");
+  tree->Branch("mcPartGreatestGrandmotherPDG",&mcPartGreatestGrandmotherPDG,"mcPartGreatestGrandmotherPDG/I");
   tree->Branch("mcPartStartX",&mcPartStartX,"mcPartStartX/F");
   tree->Branch("mcPartStartY",&mcPartStartY,"mcPartStartY/F");
   tree->Branch("mcPartStartZ",&mcPartStartZ,"mcPartStartZ/F");
@@ -499,7 +527,7 @@ void lana::BeamMatchingAnalyzer::beginJob()
   tree->Branch("mcPartEndKin",&mcPartEndKin,"mcPartEndKin/F");
   tree->Branch("mcPartDeltaAngle",&mcPartDeltaAngle,"mcPartDeltaAngle/F");
 
-  tree->Branch("nTracks",&nTracks,"nTracks/i");
+  //tree->Branch("nTracks",&nTracks,"nTracks/i");
   tree->Branch("trackStartX",&trackStartX,"trackStartX/F");
   tree->Branch("trackStartY",&trackStartY,"trackStartY/F");
   tree->Branch("trackStartZ",&trackStartZ,"trackStartZ/F");
@@ -513,6 +541,8 @@ void lana::BeamMatchingAnalyzer::beginJob()
   tree->Branch("trackYFrontTPC",&trackYFrontTPC,"trackYFrontTPC/F");
   tree->Branch("trackTrueID",&trackTrueID,"trackTrueID/I");
   tree->Branch("trackTrueMotherID",&trackTrueMotherID,"trackTrueMotherID/I");
+  tree->Branch("trackTrueGreatestGrandmotherTrackID",&trackTrueGreatestGrandmotherTrackID,"trackTrueGreatestGrandmotherTrackID/I");
+  tree->Branch("trackTrueGreatestGrandmotherPDG",&trackTrueGreatestGrandmotherPDG,"trackTrueGreatestGrandmotherPDG/I");
   tree->Branch("trackTruePdg",&trackTruePdg,"trackTruePdg/I");
   tree->Branch("trackTrueIsBeam",&trackTrueIsBeam,"trackTrueIsBeam/O");
   tree->Branch("trackTrueKin",&trackTrueKin,"trackTrueKin/F");
@@ -532,6 +562,8 @@ void lana::BeamMatchingAnalyzer::beginJob()
   tree->Branch("trackTrueEndT",&trackTrueEndT,"trackTrueEndT/F");
   tree->Branch("trackTrueXFrontTPC",&trackTrueXFrontTPC,"trackTrueXFrontTPC/F");
   tree->Branch("trackTrueYFrontTPC",&trackTrueYFrontTPC,"trackTrueYFrontTPC/F");
+
+  tree->Branch("trackMCPartAngle",&trackMCPartAngle,"trackMCPartAngle/F");
 
 }
 
@@ -603,6 +635,8 @@ void lana::BeamMatchingAnalyzer::ResetTreeVars()
   mcPartTrackID = DEFAULTNEG;
   mcPartIsPrimary = false;
   mcPartPDG = DEFAULTNEG;
+  mcPartGreatestGrandmotherTrackID = DEFAULTNEG;
+  mcPartGreatestGrandmotherPDG = DEFAULTNEG;
   mcPartStartX = DEFAULTNEG;
   mcPartStartY = DEFAULTNEG;
   mcPartStartZ = DEFAULTNEG;
@@ -638,6 +672,8 @@ void lana::BeamMatchingAnalyzer::ResetTreeVars()
   trackYFrontTPC = DEFAULTNEG;
   trackTrueID = DEFAULTNEG;
   trackTrueMotherID = DEFAULTNEG;
+  trackTrueGreatestGrandmotherTrackID = DEFAULTNEG;
+  trackTrueGreatestGrandmotherPDG = DEFAULTNEG;
   trackTruePdg = DEFAULTNEG;
   trackTrueIsBeam = false;
   trackTrueKin = DEFAULTNEG;
@@ -657,6 +693,7 @@ void lana::BeamMatchingAnalyzer::ResetTreeVars()
   trackTrueEndT = DEFAULTNEG;
   trackTrueXFrontTPC = DEFAULTNEG;
   trackTrueYFrontTPC = DEFAULTNEG;
+  trackMCPartAngle = DEFAULTNEG;
 }
 
 void lana::BeamMatchingAnalyzer::ResetTreeTrackVars() 
@@ -676,6 +713,8 @@ void lana::BeamMatchingAnalyzer::ResetTreeTrackVars()
   trackYFrontTPC = DEFAULTNEG;
   trackTrueID = DEFAULTNEG;
   trackTrueMotherID = DEFAULTNEG;
+  trackTrueGreatestGrandmotherTrackID = DEFAULTNEG;
+  trackTrueGreatestGrandmotherPDG = DEFAULTNEG;
   trackTruePdg = DEFAULTNEG;
   trackTrueIsBeam = false;
   trackTrueKin = DEFAULTNEG;
@@ -695,6 +734,7 @@ void lana::BeamMatchingAnalyzer::ResetTreeTrackVars()
   trackTrueEndT = DEFAULTNEG;
   trackTrueXFrontTPC = DEFAULTNEG;
   trackTrueYFrontTPC = DEFAULTNEG;
+  trackMCPartAngle = DEFAULTNEG;
 }
 
 DEFINE_ART_MODULE(lana::BeamMatchingAnalyzer)

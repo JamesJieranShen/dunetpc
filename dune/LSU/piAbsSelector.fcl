@@ -160,11 +160,46 @@ physics:
       FlangeCenterZ:                  0.
       FlangeRadiusCut:                30.
     }
+    BeamMatchingAnalyzer: {
+      module_type:                    "BeamMatchingAnalyzer"
+      BeamTruthTag:                   "generator"
+      CosmicTruthTag:                 "cosmicgenerator"
+      TruePartLabel:                  "largeant"
+      SimChanLabel:                   "largeant"
+      TrackLabel:                     "pmtrack"
+      CaloLabel:                      "pmtrackcalo"
+      WCTrackTag:                     "wctrack"
+      TOFTag:                         "tof"
+      RawTriggerTag:                  "daq"
+      PIDATag:                        "pmtrackpid"
+      LikelihoodPIDTag:               "pmtrackpid"
+      TrackHitTag:                    "pmtrack"
+      AllHitTag:                      "hitpdune"
+      CaloPlane:                      2
+      FiducialPrimaryXMin:            30.
+      FiducialPrimaryXMax:            330.
+      FiducialPrimaryYMin:            30.
+      FiducialPrimaryYMax:            580.
+      FiducialPrimaryZMin:            5.
+      FiducialPrimaryZMax:            600.
+      TrackMatchZMax:                 25.
+      TrackMatchDeltaYMin:            -50.
+      TrackMatchDeltaYMax:            50.
+      TrackMatchDeltaXMinData:        -50.
+      TrackMatchDeltaXMaxData:        50.
+      TrackMatchDeltaXMinMC:          -50.
+      TrackMatchDeltaXMaxMC:          50.
+      TrackMatchAngleMaxDeg:          15.
+      FlangeCenterX:                  -30.
+      FlangeCenterY:                  430.
+      FlangeCenterZ:                  0.
+      FlangeRadiusCut:                30.
+    }
   }
 
   stream1: [out1]
 
-  analysis: [ PiAbsSelector ]
+  analysis: [ PiAbsSelector, BeamMatchingAnalyzer ]
 
   reco: [ ] #likelihoodpid ]
 
