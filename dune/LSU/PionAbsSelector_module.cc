@@ -1170,36 +1170,43 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
         ;//<< std::endl;
     if (isMC && fmHitsForTracks.isValid())
     {
-	    int TrackID = DEFAULTNEG;
-        std::set<int> thisTrackIDSet;
 	    std::vector< art::Ptr<recob::Hit> > trackHits = fmHitsForTracks.at(iTrack);
-        std::set<int> setOfTrackIDs = bt->GetSetOfTrackIds(trackHits);
 	    std::vector< art::Ptr<recob::Hit> > trackHitsU;
 	    std::vector< art::Ptr<recob::Hit> > trackHitsV;
 	    std::vector< art::Ptr<recob::Hit> > trackHitsZ;
         for (const auto & trackHit : trackHits)
         {
-            if (trackHit->View() == geo::kU) trackHitsU.push_back(trackHit);
-            else if (trackHit->View() == geo::kV) trackHitsV.push_back(trackHit);
-            else if (trackHit->View() == geo::kZ) trackHitsZ.push_back(trackHit);
+          if (trackHit->View() == geo::kU) trackHitsU.push_back(trackHit);
+          else if (trackHit->View() == geo::kV) trackHitsV.push_back(trackHit);
+          else if (trackHit->View() == geo::kZ) trackHitsZ.push_back(trackHit);
         }
+	    int TrackID = DEFAULTNEG;
+        std::set<int> setOfTrackIDs = bt->GetSetOfTrackIds(trackHits);
+        std::set<int> setOfPosTrackIDs;
         for (const auto & trackID : setOfTrackIDs)
         {
-            //std::cout << "Trying trackID: "<< trackID << std::endl;
-            thisTrackIDSet.clear();
-            thisTrackIDSet.insert(trackID);
-            float purity = bt->HitChargeCollectionPurity(thisTrackIDSet,trackHits);
-            if (purity > trackTrueChargePurity[iTrack])
-            {
-                TrackID = trackID;
-                trackTrueChargePurity[iTrack] = purity;
-            }
+          //std::cout << "Track: "<<iTrack<<" has TrackID: "<< trackID << std::endl;
+          setOfPosTrackIDs.insert(abs(trackID));
+        }
+        std::set<int> thisTrackIDSet;
+        for (const auto & trackID : setOfPosTrackIDs)
+        {
+          thisTrackIDSet.clear();
+          thisTrackIDSet.insert(trackID);
+          thisTrackIDSet.insert(-trackID);
+          float purity = bt->HitChargeCollectionPurity(thisTrackIDSet,trackHits);
+          if (purity > trackTrueChargePurity[iTrack])
+          {
+              TrackID = trackID;
+              trackTrueChargePurity[iTrack] = purity;
+          }
         }
         thisTrackIDSet.clear();
-        if (TrackID >= 0)
+        if (TrackID > DEFAULTNEG)
         {
           trackTrueID[iTrack] = TrackID;
           thisTrackIDSet.insert(TrackID);
+          thisTrackIDSet.insert(-TrackID);
           // In LArIAT, view V is collection, U is induction.
           trackTrueChargeEfficiencyU[iTrack] = bt->HitChargeCollectionEfficiency(
                                   thisTrackIDSet,trackHitsU,allHitsVec,geo::kU);
@@ -1212,29 +1219,19 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
           art::Ptr<simb::MCParticle> particle;
           for(auto mcpart: truePartVec)
           {
-              if (mcpart->TrackId() == TrackID)
-              {
-                  particle = mcpart;
-                  break;
-              }
+            if (mcpart->TrackId() == TrackID)
+            {
+                particle = mcpart;
+                break;
+            }
           }
           if (particle.isNull())
           {
-            std::cout<<"Warning: Couldn't find MCParticle for TrackID: "<<TrackID<<" trying to find: " <<abs(TrackID)<<"\n";
-            for(auto mcpart: truePartVec)
-            {
-                if (mcpart->TrackId() == abs(TrackID))
-                {
-                    particle = mcpart;
-                    break;
-                }
-            }
-            if (particle.isNull())
-            {
-              std::string message = "Couldn't find MCParticle for TrackID: ";
-              message.append(std::to_string(TrackID));
-              throw cet::exception("MCParticleNotFound",message);
-            }
+            std::string message = "Couldn't find MCParticle for Track: ";
+            message.append(std::to_string(iTrack));
+            message.append(" TrackID: ");
+            message.append(std::to_string(TrackID));
+            throw cet::exception("MCParticleNotFound",message);
           } // if can't find MCParticle for highest Track ID
 
           // This is where you can do some analysis of the true particle and compare it to the reco
@@ -1287,7 +1284,10 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
         } // if TrackID >= 0
         else
         {
-            std::cout<<"Error: Found negative TrackID: "<<TrackID<<" for Track "<<iTrack<<"\n";
+            //std::cout<<"Error: Couldn't find TrackID: for Track "<<iTrack<<"\n";
+            std::string message = "Couldn't find TrackID for Track ";
+            message.append(std::to_string(iTrack));
+            throw cet::exception("TrackIDNotFound",message);
         }
     } // if isMC && fmHItsForTracks.isValid
 
