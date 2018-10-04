@@ -23,6 +23,7 @@
 
 //c++ includes
 #include <vector>
+#include <tuple>
 
 namespace mctrue {
   class StartPosDirMatcherAlg;
@@ -79,6 +80,19 @@ class mctrue::StartPosDirMatcherAlg
                 std::vector<art::Ptr<recob::Track>> const& recoTracks,
                 double const& maxAngleDeg, double& distance, double& angleDeg);
 
+    // Messing with new c++17 structured binding
+    // should be able to do:
+    // const auto& [track, distance, angleDeg] = getBestMatch(particle,tracks,maxAngleDeg);
+    inline const std::tuple<art::Ptr<recob::Track>, double, double> getBestMatchTup(
+                simb::MCParticle const& mcParticle, 
+                std::vector<art::Ptr<recob::Track>> const& recoTracks,
+                double const& maxAngleDeg)
+    {
+        double distance;
+        double angleDeg;
+        const auto track = getBestMatch(mcParticle,recoTracks,maxAngleDeg,distance,angleDeg);
+        return std::make_tuple(track,distance,angleDeg);
+    };
 };
 
 #endif

@@ -32,8 +32,8 @@ namespace lsu
 {
     /// Finds the point on a plane intersected by a line
     /**
-     * planePoint is any point on the plane
-     * planeNormal is the normal vector of the plane
+     * planePoint is any point on the plane (TLorentzVector, TVector3, and similar)
+     * planeNormal is the normal vector of the plane (TLorentzVector, TVector3, and similar)
      * linePoint is any point on the line (TLorentzVector, TVector3, and similar)
      * lineDirection is the direction of the line (TLorentzVector, TVector3, and similar)
      *
@@ -42,18 +42,22 @@ namespace lsu
      * with -9999999 for all three components. This 
      * means the vector is parallel to the plane.
      */
-    template <class A, class B>
+    template <class A, class B, class C, class D>
     inline const TVector3 linePlane(
-                const TVector3& planePoint,
-                const TVector3& planeNormal,
-                const A& linePoint,
-                const B& lineDirection)
+                const A& planePoint,
+                const B& planeNormal,
+                const C& linePoint,
+                const D& lineDirection)
         {
+            const TVector3 pp(planePoint.X(),planePoint.Y(),planePoint.Z());
+            TVector3 pn(planeNormal.X(),planeNormal.Y(),planeNormal.Z());
             const TVector3 lp(linePoint.X(),linePoint.Y(),linePoint.Z());
-            const TVector3 ld(lineDirection.X(),lineDirection.Y(),lineDirection.Z());
-            const double normalDotDir = planeNormal.Dot(ld);
+            TVector3 ld(lineDirection.X(),lineDirection.Y(),lineDirection.Z());
+            pn = pn.Unit();
+            ld = ld.Unit();
+            const double normalDotDir = pn.Dot(ld);
             if (normalDotDir == 0.) return TVector3(-9999999.,-9999999.,-9999999.);
-            const double d = (planePoint-lp)*planeNormal / (normalDotDir);
+            const double d = (pp-lp)*pn / (normalDotDir);
             return (d*ld) + lp;
         };
 
@@ -155,7 +159,7 @@ namespace lsu
             const auto & endPoint = traj.End();
             const auto & endDir = traj.EndDirection();
             const double startZ = startPoint.Z();
-            const double endZ = startPoint.Z();
+            const double endZ = endPoint.Z();
             if (planeZ < startZ && planeZ < endZ)
             {
               if (startZ < endZ)
