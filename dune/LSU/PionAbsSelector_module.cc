@@ -738,10 +738,11 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       mcPartYFrontTPC[nMCParts] = particleFrontTPCPoint.Y();
 
       if(mcPartIsBeam[nMCParts] 
-            && mcPartIsPrimary[nMCParts]
-            && mcPartXFrontTPC[nMCParts] > -40 && mcPartXFrontTPC[nMCParts] < 15.
-            && mcPartYFrontTPC[nMCParts] > 400. && mcPartYFrontTPC[nMCParts] < 445.
-            && mcPartStartMom[nMCParts] > 500. && mcPartStartMom[nMCParts] < 10000.
+            && fabs(mcPartStartT[nMCParts]) < 1e-6
+            //&& mcPartIsPrimary[nMCParts]
+            //&& mcPartXFrontTPC[nMCParts] > -40 && mcPartXFrontTPC[nMCParts] < 15.
+            //&& mcPartYFrontTPC[nMCParts] > 400. && mcPartYFrontTPC[nMCParts] < 445.
+            //&& mcPartStartMom[nMCParts] > 500. && mcPartStartMom[nMCParts] < 10000.
         )
       {
         primaryParticleCandidates.push_back(truth);
@@ -756,7 +757,8 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   for(const size_t & iMCPart: primaryParticleCandidateIs)
   {
     std::cout << "PrimaryParticle Candidate for: "<< eventNumber <<"\n"
-              //<< "  TrackID:   " << mcPartTrackID[iMCPart] << "\n"
+              << "  iMCPart:   " << iMCPart << "\n"
+              << "  TrackID:   " << mcPartTrackID[iMCPart] << "\n"
               //<< "  IsPrimary: " << mcPartIsPrimary[iMCPart] << "\n"
               << "  PDG:       " << mcPartPDG[iMCPart] << "\n"
               //<< "  StartX:    " << mcPartStartX[iMCPart] << "\n"

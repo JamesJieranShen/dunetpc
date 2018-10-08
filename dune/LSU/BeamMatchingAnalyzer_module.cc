@@ -282,6 +282,7 @@ void lana::BeamMatchingAnalyzer::analyze(art::Event const & e)
     mcPartStartZ = truth->Vz();
     if (mcPartStartZ > 20) continue;
     mcPartStartT = truth->T();
+    if (fabs(mcPartStartT) > 1e-6) continue;
     mcPartEndX = truth->EndX();
     mcPartEndY = truth->EndY();
     mcPartEndZ = truth->EndZ();
@@ -301,7 +302,7 @@ void lana::BeamMatchingAnalyzer::analyze(art::Event const & e)
     const TVector3 particleFrontTPCPoint = lsu::mcPartStartZPlane(0,*truth);
     mcPartXFrontTPC = particleFrontTPCPoint.X();
     mcPartYFrontTPC = particleFrontTPCPoint.Y();
-    if (mcPartXFrontTPC > 100 || mcPartXFrontTPC < -200 || mcPartYFrontTPC < 300 || mcPartYFrontTPC > 500) continue;
+    //if (mcPartXFrontTPC > 100 || mcPartXFrontTPC < -200 || mcPartYFrontTPC < 300 || mcPartYFrontTPC > 500) continue;
     nMCParts++;
 
     //Get Variables using all tracks
