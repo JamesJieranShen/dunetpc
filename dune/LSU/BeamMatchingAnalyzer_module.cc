@@ -215,7 +215,7 @@ void lana::BeamMatchingAnalyzer::analyze(art::Event const & e)
     }
   }
 
-  pdana::MCBeamOrCosmicAlg* beamOrCosmic;
+  pdana::MCBeamOrCosmicAlg* beamOrCosmic = NULL;
   if(!e.isRealData())
   {
     beamOrCosmic = new pdana::MCBeamOrCosmicAlg(e,fTruePartLabel,fBeamTruthTag,fCosmicTruthTag);
@@ -485,7 +485,7 @@ void lana::BeamMatchingAnalyzer::analyze(art::Event const & e)
 
   } // for true (mcPart)
 
-  if(beamOrCosmic != NULL) delete beamOrCosmic;
+  if(beamOrCosmic) delete beamOrCosmic;
 
 } // analyze function
 

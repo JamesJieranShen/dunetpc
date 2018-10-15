@@ -59,7 +59,7 @@ namespace lsu
             if (normalDotDir == 0.) return TVector3(-9999999.,-9999999.,-9999999.);
             const double d = (pp-lp)*pn / (normalDotDir);
             return (d*ld) + lp;
-        };
+        }
 
     /// Finds the point on a constant x-plane intersected by a line
     /**
@@ -81,7 +81,7 @@ namespace lsu
             const TVector3 planePoint(planeX,0.,0.);
             const TVector3 planeNormal(1.,0.,0.);
             return linePlane(planePoint,planeNormal,linePoint,lineDirection);
-        };
+        }
     
     /// Finds the point on a constant y-plane intersected by a line
     /**
@@ -103,7 +103,7 @@ namespace lsu
             const TVector3 planePoint(0.,planeY,0.);
             const TVector3 planeNormal(0.,1.,0.);
             return linePlane(planePoint,planeNormal,linePoint,lineDirection);
-        };
+        }
     
     /// Finds the point on a constant z-plane intersected by a line
     /**
@@ -125,7 +125,7 @@ namespace lsu
             const TVector3 planePoint(0.,0.,planeZ);
             const TVector3 planeNormal(0.,0.,1.);
             return linePlane(planePoint,planeNormal,linePoint,lineDirection);
-        };
+        }
 
     /// Finds the point on a constant z-plane intersected by a track
     /**
@@ -186,7 +186,7 @@ namespace lsu
             {
                 return TVector3(-9999999.,-9999999.,-9999999.);
             }
-        };
+        }
 
     /// Finds the point on a constant z-plane intersected by the MCParticle Start Direction
     /**
@@ -206,7 +206,7 @@ namespace lsu
                 const simb::MCParticle & particle)
         {
             return lineZPlane(planeZ,particle.Position(),particle.Momentum());
-        };
+        }
 
     /// Finds if the point is within a box
     /**
@@ -238,7 +238,7 @@ namespace lsu
                 && point.Y() > minY && point.Y() < maxY
                 && point.Z() > minZ && point.Z() < maxZ;
             }
-        };
+        }
 
 
     /// Finds if the x-y coordinates of a point are within an x-y box
@@ -257,7 +257,7 @@ namespace lsu
               )
         {
             return point.X() > minX && point.X() < maxX && point.Y() > minY && point.Y() < maxY;
-        };
+        }
 
     /// Finds if the x-z coordinates of a point are within an x-z box
     /**
@@ -275,7 +275,7 @@ namespace lsu
               )
         {
             return point.X() > minX && point.X() < maxX && point.Z() > minZ && point.Z() < maxZ;
-        };
+        }
 
     /// Finds if the y-z coordinates of a point are within an y-z box
     /**
@@ -293,8 +293,8 @@ namespace lsu
               )
         {
             return point.Y() > minY && point.Y() < maxY && point.Z() > minZ && point.Z() < maxZ;
-        };
+        }
     
-};
+}
 
 #endif
