@@ -24,6 +24,7 @@ art_make(
   larsim_MCCheater_BackTrackerService_service           
   larsim_MCCheater_ParticleInventoryService_service
   larreco_RecoAlg
+  ProtoDUNEAnaUtils
   MODULE_LIBRARIES
   DUNELSU
   )

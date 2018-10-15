@@ -34,6 +34,7 @@
 #include "dunetpc/dune/LSU/MCBeamOrCosmicAlg.h"
 #include "dunetpc/dune/LSU/PlaneIntersectionFinder.h"
 #include "dunetpc/dune/LSU/MotherDaughterWalkerAlg.h"
+#include "dunetpc/dune/Protodune/Analysis/ProtoDUNEDataUtils.h"
 #include "larsim/MCCheater/BackTrackerService.h"
 
 //ROOT includes
@@ -262,6 +263,7 @@ private:
   UInt_t TOFTimeStamps[MAXTOFS];
   Float_t firstTOF;
 
+  bool triggerIsBeam;
   UInt_t triggerBits;
 
   UInt_t nPrimaryParticleCandidates; // Number of MCParticles passing primary particle cuts
@@ -680,6 +682,16 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   if (triggerHandle.isValid() && triggerHandle->size() > 0)
   {
     triggerBits = triggerHandle->at(0).TriggerBits();
+  }
+
+  if(e.isRealData())
+  {
+    // For data we can see if this event comes from a beam trigger
+    protoana::ProtoDUNEDataUtils dataUtil;
+    triggerIsBeam = dataUtil.IsBeamTrigger(e);
+    if(triggerIsBeam){
+      std::cout << "This data event has a beam trigger" << std::endl;
+    }
   }
 
   //Get MCParticle Variables
@@ -1103,6 +1115,10 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       }
       trackLength[iTrack] = track->Length();
     }
+
+    const TVector3 trackIntersectionPoint = lsu::trackZPlane(0.,*track);
+    trackXFrontTPC[iTrack] = trackIntersectionPoint.X();
+    trackYFrontTPC[iTrack] = trackIntersectionPoint.Y();
 
     double minz=1000.;
     for(size_t iPoint=0; iPoint < nPoints; iPoint++)
@@ -1690,6 +1706,7 @@ void lana::PionAbsSelector::beginJob()
   //tree->Branch("TOFTimeStamps",&TOFTimeStamps,"TOFTimeStamps[nTOFs]/i");
   //tree->Branch("firstTOF",&firstTOF,"firstTOF/F");
 
+  tree->Branch("triggerIsBeam",&triggerIsBeam,"triggerIsBeam/O");
   tree->Branch("triggerBits",&triggerBits,"triggerBits/i");
 
   tree->Branch("nPrimaryParticleCandidates",&nPrimaryParticleCandidates,"nPrimaryParticleCandidates/i");
@@ -2097,8 +2114,8 @@ const art::Ptr<recob::Track> lana::PionAbsSelector::MatchRecoToTruthOrWCTrack(co
       }
     }
     const TVector3 trackIntersectionPoint = lsu::trackZPlane(0.,*track);
-    float xTrack = trackIntersectionPoint.X();
-    float yTrack = trackIntersectionPoint.Y();
+    float xTrack = trackXFrontTPC[iTrack];
+    float yTrack = trackYFrontTPC[iTrack];
     const float deltaX = xTrack - xTrue;
     const float deltaY = yTrack - yTrue;
     const float deltaR = sqrt(deltaX*deltaX + deltaY*deltaY);
@@ -2106,8 +2123,6 @@ const art::Ptr<recob::Track> lana::PionAbsSelector::MatchRecoToTruthOrWCTrack(co
     const float deltaAngle = trackStartDir.Angle(dirTrue);
     if(iTrack <= MAXTRACKS)
     {
-      trackXFrontTPC[iTrack] = xTrack;
-      trackYFrontTPC[iTrack] = yTrack;
       trackMatchDeltaX[iTrack] = deltaX;
       trackMatchDeltaY[iTrack] = deltaY;
       trackMatchDeltaR[iTrack] = deltaR;
@@ -2190,6 +2205,7 @@ void lana::PionAbsSelector::ResetTreeVars()
   }
   firstTOF = DEFAULTNEG;
 
+  triggerIsBeam = false;
   triggerBits = 0;
 
   nPrimaryParticleCandidates = 0;
