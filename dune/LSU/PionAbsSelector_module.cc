@@ -35,6 +35,7 @@
 #include "dunetpc/dune/LSU/PlaneIntersectionFinder.h"
 #include "dunetpc/dune/LSU/MotherDaughterWalkerAlg.h"
 #include "dunetpc/dune/Protodune/Analysis/ProtoDUNEDataUtils.h"
+#include "dunetpc/dune/DuneObj/ProtoDUNEBeamEvent.h"
 #include "larsim/MCCheater/BackTrackerService.h"
 
 //ROOT includes
@@ -200,8 +201,7 @@ private:
   art::InputTag fSimChanLabel; //The name of the module that produced sim::SimChannel objects
   art::InputTag fTrackLabel; //The name of the module that produced recob::Track objects
   art::InputTag fCaloLabel; //The name of the module that produced anab::Calorimetry objects
-  art::InputTag fWCTrackTag;
-  art::InputTag fTOFTag;
+  art::InputTag fBeamEventTag;
   art::InputTag fRawTriggerTag;
   //art::InputTag fVertexLabel; //The name of the module that produced recob::Vertex objects
   art::InputTag fLikelihoodPIDTag;
@@ -239,6 +239,7 @@ private:
   UInt_t runNumber;
   UInt_t subRunNumber;
   UInt_t eventNumber;
+  UInt_t npWC;
   UInt_t nWCTracks;
   Float_t xWC; // WC track projected to TPC front face, x coord in cm
   Float_t yWC; // WC track projected to TPC front face, y coord in cm
@@ -599,25 +600,15 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   // One element for each track. Each one of those is a vector of calos for each wire plane
   const auto tracksCaloVec = art::FindManyP<anab::Calorimetry>(trackVec, e, fCaloLabel);
 
-  //std::vector<art::Ptr<ldp::WCTrack>> wcTrackVec;
-  //if(e.isRealData())
-  //{
-  //  auto wcTrackHand = e.getValidHandle<std::vector<ldp::WCTrack>>(fWCTrackTag);
-  //  if(wcTrackHand.isValid())
-  //  {
-  //    art::fill_ptr_vector(wcTrackVec, wcTrackHand);
-  //  }
-  //}
-
-  //std::vector<art::Ptr<ldp::TOF>> tofVec;
-  //if(e.isRealData())
-  //{
-  //  auto tofHand = e.getValidHandle<std::vector<ldp::TOF>>(fTOFTag);
-  //  if(tofHand.isValid())
-  //  {
-  //    art::fill_ptr_vector(tofVec, tofHand);
-  //  }
-  //}
+  std::vector<art::Ptr<beam::ProtoDUNEBeamEvent>> beamVec;
+  if(e.isRealData())
+  {
+    auto beamHand = e.getValidHandle<std::vector<beam::ProtoDUNEBeamEvent>>(fBeamEventTag);
+    if(beamHand.isValid())
+    {
+      art::fill_ptr_vector(beamVec, beamHand);
+    }
+  }
 
   art::FindManyP<anab::ParticleID>  fmpida(trackHand, e, fPIDATag);
   art::FindManyP<anab::ParticleID>  fmlhpid(trackHand, e, fLikelihoodPIDTag);
@@ -640,6 +631,67 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   if(e.isRealData())
   {
     e.getByLabel(fRawTriggerTag,triggerHandle);
+  }
+
+  // Beamline info
+  const bool PRINTBEAMEVENT=false;
+  nWCTracks = 0;
+  npWC = 0;
+  for(size_t iBeamEvent=0; iBeamEvent < beamVec.size(); iBeamEvent++)
+  {
+    beam::ProtoDUNEBeamEvent beamEvent = *(beamVec.at(iBeamEvent));
+    //art::Ptr<beam::ProtoDUNEBeamEvent> beamEvent = beamVec.at(iBeamEvent);
+    if(PRINTBEAMEVENT)
+    {
+      std::cout << "PiAbsSel BeamEvent " << iBeamEvent << ": \n";
+      std::cout << "  SpillStart:  " << beamEvent.GetSpillStart() << "\n";
+      std::cout << "  SpillOffset: " << beamEvent.GetSpillOffset() << "\n";
+      std::cout << "  CTB Timestamp: " << beamEvent.GetCTBTimestamp() << "\n";
+      std::cout << "  BI Trigger: " << beamEvent.GetBITrigger() << "\n";
+      std::cout << "  Active Trigger: " << beamEvent.GetActiveTrigger() << "\n";
+      std::cout << "  Is Trigger Matched: " << beamEvent.CheckIsMatched() << "\n";
+      std::cout << "  T0 and T0 - SpillStart:\n";
+      for(size_t iT0=0; iT0 < beamEvent.GetNT0(); iT0++)
+      {
+        std::cout << "    " << beamEvent.GetFullT0(iT0) <<" " <<beamEvent.GetFullT0(iT0)-beamEvent.GetSpillStart() <<"\n";
+      }
+      std::cout << "  Beam Momenta:\n";
+    }
+    for(size_t iMom=0; iMom < beamEvent.GetNRecoBeamMomenta(); iMom++)
+    {
+      npWC++;
+      pWC = beamEvent.GetRecoBeamMomentum(iMom);
+      if(PRINTBEAMEVENT) std::cout << "    " << beamEvent.GetRecoBeamMomentum(iMom) << "\n";
+    }
+    for(size_t iTrack=0; iTrack < beamEvent.GetNBeamTracks(); iTrack++)
+    {
+      const recob::Track & track =  beamEvent.GetBeamTrack(iTrack);
+      nWCTracks++;
+      xWC = track.End().X();
+      yWC = track.End().Y();
+      thetaWC = track.EndDirection().Theta();
+      phiWC = track.EndDirection().Phi();
+    
+      if(PRINTBEAMEVENT)
+      {
+        std::cout << "  Beam Track: "<< iTrack <<"\n";
+        std::cout << "    N Points:  " << track.NumberTrajectoryPoints() << "\n";
+        std::cout << "    Start Pos: " << track.Vertex().X()
+                                  << "  " << track.Vertex().Y()
+                                  << "  " << track.Vertex().Z() << "\n";
+        std::cout << "    End Pos:   " << track.End().X()
+                                  << "  " << track.End().Y()
+                                  << "  " << track.End().Z() << "\n";
+        std::cout << "    Start Theta: " << track.VertexDirection().Theta() << "\n";
+        std::cout << "    Start Phi:   " << track.VertexDirection().Phi() << "\n";
+        std::cout << "    End Theta:   " << track.EndDirection().Theta() << "\n";
+        std::cout << "    End Theta:   " << track.EndDirection().Phi() << "\n";
+      }
+    }
+    for(int iTOF=0; iTOF < beamEvent.GetNTOF1Triggers(); iTOF++)
+    {
+        if(PRINTBEAMEVENT) std::cout << "  TOF: " << beamEvent.GetTOF(iTOF) << "\n";
+    }
   }
 
   //// Get WCTrack Variables
@@ -1683,15 +1735,16 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("subRunNumber",&subRunNumber,"subRunNumber/i");
   tree->Branch("eventNumber",&eventNumber,"eventNumber/i");
 
-  //tree->Branch("nWCTracks",&nWCTracks,"nWCTracks/i");
-  //tree->Branch("xWC",&xWC,"xWC/F");
-  //tree->Branch("yWC",&yWC,"yWC/F");
-  //tree->Branch("thetaWC",&thetaWC,"thetaWC/F");
-  //tree->Branch("phiWC",&phiWC,"phiWC/F");
+  tree->Branch("npWC",&npWC,"npWC/i");
+  tree->Branch("nWCTracks",&nWCTracks,"nWCTracks/i");
+  tree->Branch("xWC",&xWC,"xWC/F");
+  tree->Branch("yWC",&yWC,"yWC/F");
+  tree->Branch("thetaWC",&thetaWC,"thetaWC/F");
+  tree->Branch("phiWC",&phiWC,"phiWC/F");
   //tree->Branch("pzWC",&pzWC,"pzWC/F");
-  //tree->Branch("pWC",&pWC,"pWC/F");
-  //tree->Branch("eWC",&eWC,"eWC/F");
-  //tree->Branch("kinWC",&kinWC,"kinWC/F");
+  tree->Branch("pWC",&pWC,"pWC/F");
+  tree->Branch("eWC",&eWC,"eWC/F");
+  tree->Branch("kinWC",&kinWC,"kinWC/F");
   //tree->Branch("kinWCInTPC",&kinWCInTPC,"kinWCInTPC/F");
   //tree->Branch("eWCProton",&eWCProton,"eWCProton/F");
   //tree->Branch("kinWCProton",&kinWCProton,"kinWCProton/F");
@@ -2012,8 +2065,7 @@ void lana::PionAbsSelector::reconfigure(fhicl::ParameterSet const & p)
   fSimChanLabel = p.get<art::InputTag>("SimChanLabel");
   fTrackLabel = p.get<art::InputTag>("TrackLabel");
   fCaloLabel = p.get<art::InputTag>("CaloLabel");
-  fWCTrackTag = p.get<art::InputTag>("WCTrackTag");
-  fTOFTag = p.get<art::InputTag>("TOFTag");
+  fBeamEventTag = p.get<art::InputTag>("BeamEventTag");
   fRawTriggerTag = p.get<art::InputTag>("RawTriggerTag");
   //fVertexLabel = p.get<art::InputTag>("VertexLabel");
   fLikelihoodPIDTag = p.get<art::InputTag>("LikelihoodPIDTag");
@@ -2178,6 +2230,7 @@ void lana::PionAbsSelector::ResetTreeVars()
   subRunNumber = 0;
   eventNumber = 0;
 
+  npWC = 0;
   nWCTracks = 0;
   xWC = DEFAULTNEG;
   yWC = DEFAULTNEG;

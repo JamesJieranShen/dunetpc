@@ -1,13 +1,15 @@
 #include "services_dune.fcl"
+#include "BeamEvent.fcl"
 
 process_name: PiAbsSelector
 
 services:
 {
-  TFileService: { fileName: "PiAbsSelector.root" }
+  TFileService: { fileName: "PiAbsSelectorData.root" }
   RandomNumberGenerator: {} #ART native random number generator
-  FileCatalogMetadata:  @local::art_file_catalog_mc
+  FileCatalogMetadata:  @local::art_file_catalog_data
   @table::protodune_services
+  IFBeam:            {}
   TimeTracker:      {}
   MemoryTracker:    {}
 }
@@ -121,6 +123,7 @@ physics:
     #likelihoodpid: @local::standard_likelihoodpid
     #likelihoodpidtc: @local::standard_likelihoodpid
     #likelihoodpidtcElena: @local::standard_likelihoodpid
+    beamevent:          @local::proto_beamevent
   }
 
   analyzers:
@@ -198,9 +201,9 @@ physics:
 
   stream1: [out1]
 
-  analysis: [ PiAbsSelector , BeamMatchingAnalyzer ]
+  analysis: [ beamevent, PiAbsSelector , BeamMatchingAnalyzer ]
 
-  reco: [ ] #likelihoodpid ]
+  reco: [ beamevent ] #likelihoodpid ]
 
   trigger_paths: [reco]
 
@@ -221,3 +224,64 @@ outputs:
 
 #physics.producers.likelihoodpid.LikelihoodPIDAlg.PDFFileName: "LHPID_Templates_6_34_01_v1.root"
 #physics.producers.likelihoodpid.LikelihoodPIDAlg.PDGs: [ 211, 2212] #, -13, 321]
+
+physics.producers.beamevent.ValidWindow:           100
+physics.producers.beamevent.Tolerance:           1000000
+
+
+physics.producers.beamevent.Coordinates:         [["XBPF022697",[0,0,0]],
+                                                ["XBPF022698",[0,0,0]],
+                                                ["XBPF022701",[0,0,1]],
+                                                ["XBPF022702",[0,0,2]],
+                                                ["XBPF022707",[-27.173, 421.445, -600]],
+                                                ["XBPF022708",[-27.173, 421.445, -600]],
+                                                ["XBPF022716",[-27.173, 421.445, -800]],
+                                                ["XBPF022717",[-27.173, 421.445, -800]]]
+
+physics.producers.beamevent.Rotations:           [["XBPF022697",[0,0,1]],
+                                                ["XBPF022698",[0,0,1]],
+                                                ["XBPF022701",[0,0,1]],
+                                                ["XBPF022702",[0,0,1]],
+                                                ["XBPF022707",[0,0,0]],
+                                                ["XBPF022708",[0,0,0]],
+                                                ["XBPF022716",[0,0,0]],
+                                                ["XBPF022717",[0,0,0]]]
+
+
+physics.producers.beamevent.Dimension:           [["XBPF022697",1],
+                                                ["XBPF022698",1],
+                                                ["XBPF022701",1],
+                                                ["XBPF022702",1],
+                                                ["XBPF022707",1],
+                                                ["XBPF022708",1],
+                                                ["XBPF022716",1],
+                                                ["XBPF022717",1]]
+
+physics.producers.beamevent.GlobalDetCoords:    [0.,0.,0.]
+physics.producers.beamevent.DetRotation:        [0.,0.,0.]
+
+
+physics.producers.beamevent.TOF1:               "XBTF022687"
+physics.producers.beamevent.TOF2:               "XBTF022716"
+
+physics.producers.beamevent.CKov1:               "XCET022713"
+physics.producers.beamevent.CKov2:               "XCET022716"
+
+physics.producers.beamevent.XBPFPrefix:              "dip/acc/NORTH/NP04/BI/XBPF/"                                                
+physics.producers.beamevent.XTOFPrefix:              "dip/acc/NORTH/NP04/BI/XTOF/"
+physics.producers.beamevent.XCETPrefix:              "dip/acc/NORTH/NP04/BI/XCET/"
+
+
+#Should we grab from the folders each time?
+physics.producers.beamevent.ForceNewFetch:        "false"
+
+#Do we want to match in time between
+#beamline and tpc?
+physics.producers.beamevent.MatchTime:            "true"
+
+#Option to get info from database
+#even if we don't have a good
+#trigger from the BI to CTB 
+#or if we are getting invalid Spill Times
+physics.producers.beamevent.ForceRead:            "false"
+
