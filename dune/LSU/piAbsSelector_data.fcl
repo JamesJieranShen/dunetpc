@@ -201,7 +201,7 @@ physics:
 
   stream1: [out1]
 
-  analysis: [ beamevent, PiAbsSelector , BeamMatchingAnalyzer ]
+  analysis: [ beamevent, PiAbsSelector ] #, BeamMatchingAnalyzer ]
 
   reco: [ beamevent ] #likelihoodpid ]
 
