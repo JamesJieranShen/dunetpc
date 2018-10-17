@@ -643,6 +643,7 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   nWCTracks = 0;
   npWC = 0;
   nBeamTracks = 0;
+  nTOFs = 0;
   for(size_t iBeamEvent=0; iBeamEvent < beamVec.size(); iBeamEvent++)
   {
     beam::ProtoDUNEBeamEvent beamEvent = *(beamVec.at(iBeamEvent));
@@ -657,12 +658,12 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       std::cout << "  Active Trigger: " << beamEvent.GetActiveTrigger() << "\n";
       std::cout << "  Is Trigger Matched: " << beamEvent.CheckIsMatched() << "\n";
       std::cout << "  T0 and T0 - SpillStart:\n";
-      for(size_t iT0=0; iT0 < beamEvent.GetNT0(); iT0++)
-      {
-        std::cout << "    " << beamEvent.GetFullT0(iT0) <<" " <<beamEvent.GetFullT0(iT0)-beamEvent.GetSpillStart() <<"\n";
-      }
+      std::cout << "  T0 and T0 - SpillStart:"<< beamEvent.GetFullT0() <<" " <<beamEvent.GetFullT0()-beamEvent.GetSpillStart() <<"\n";
+      std::cout << "  TOF: " << beamEvent.GetTOF() << "\n";
       std::cout << "  Beam Momenta:\n";
     }
+    TOFs[nTOFs] = beamEvent.GetTOF();
+    nTOFs++;
     const bool sameNTracksAsMom = beamEvent.GetNBeamTracks() == beamEvent.GetNRecoBeamMomenta();
     for(size_t iMom=0; iMom < beamEvent.GetNRecoBeamMomenta(); iMom++)
     {
@@ -713,28 +714,8 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
         std::cout << "    End Theta:   " << track.EndDirection().Phi()*180/CLHEP::pi << " deg\n";
       }
     }
-    for(int iTOF=0; iTOF < beamEvent.GetNTOF1Triggers(); iTOF++)
-    {
-        if(PRINTBEAMEVENT) std::cout << "  TOF: " << beamEvent.GetTOF(iTOF) << "\n";
-    }
   }
-
-  //// Get TOF Variables
-  //nTOFs = 0;
-  //size_t iAllTofs = 0;
-  //for (const auto& tof: tofVec)
-  //{
-  //  for(size_t iTof=0; iTof < tof->NTOF(); iTof++)
-  //  {
-  //    TOFs[iAllTofs] = tof->SingleTOF(iTof);
-  //    TOFTimeStamps[iAllTofs] = tof->TimeStamp(iTof);
-  //    iAllTofs++;
-  //    nTOFs++;
-  //    if(iAllTofs >= MAXTOFS) break;
-  //  }
-  //  if(iAllTofs >= MAXTOFS) break;
-  //}
-  //if (nTOFs > 0) firstTOF = TOFs[0];
+  firstTOF = TOFs[0];
 
   // Get Trigger info
   if (triggerHandle.isValid() && triggerHandle->size() > 0)
@@ -753,8 +734,6 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   }
 
   //Get MCParticle Variables
-  std::vector<art::Ptr<simb::MCParticle> > primaryParticleCandidates;
-  std::vector<size_t> primaryParticleCandidateIs;
   for(const auto& truth:(truePartVec))
   {
     if (truth->PdgCode() != 2112 && truth->PdgCode() < 1000000000)
@@ -807,22 +786,42 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       mcPartXFrontTPC[nMCParts] = particleFrontTPCPoint.X();
       mcPartYFrontTPC[nMCParts] = particleFrontTPCPoint.Y();
 
-      if(mcPartIsBeam[nMCParts] 
-            && fabs(mcPartStartT[nMCParts]) < 20.
-            && mcPartPDG[nMCParts] != 22
-            //&& mcPartIsPrimary[nMCParts]
-            //&& mcPartXFrontTPC[nMCParts] > -40 && mcPartXFrontTPC[nMCParts] < 15.
-            //&& mcPartYFrontTPC[nMCParts] > 400. && mcPartYFrontTPC[nMCParts] < 445.
-            //&& mcPartStartMom[nMCParts] > 500. && mcPartStartMom[nMCParts] < 10000.
-        )
-      {
-        primaryParticleCandidates.push_back(truth);
-        primaryParticleCandidateIs.push_back(nMCParts);
-      }
-
       nMCParts++;
     } // if not neturon or nucleus
   } // for true (mcPart)
+
+  // Get list of primaryParticle candidates
+  std::vector<art::Ptr<simb::MCParticle> > primaryParticleCandidates;
+  std::vector<size_t> primaryParticleCandidateIs;
+  for(size_t iMCPart=0; iMCPart < truePartVec.size(); iMCPart++)
+  {
+      // for MCC11 primary particle should have start T = 0
+      if(mcPartIsBeam[iMCPart] 
+            && fabs(mcPartStartT[iMCPart]) < 1e-6
+        )
+      {
+        primaryParticleCandidates.push_back(truePartVec.at(iMCPart));
+        primaryParticleCandidateIs.push_back(iMCPart);
+      }
+  }
+  if (primaryParticleCandidateIs.size() == 0) // for MCC10
+  {
+    for(size_t iMCPart=0; iMCPart < truePartVec.size(); iMCPart++)
+    {
+        if(mcPartIsBeam[iMCPart] 
+              && fabs(mcPartStartT[iMCPart]) < 20.
+              && mcPartPDG[iMCPart] != 22
+              //&& mcPartIsPrimary[iMCPart]
+              //&& mcPartXFrontTPC[iMCPart] > -40 && mcPartXFrontTPC[iMCPart] < 15.
+              //&& mcPartYFrontTPC[iMCPart] > 400. && mcPartYFrontTPC[iMCPart] < 445.
+              //&& mcPartStartMom[iMCPart] > 500. && mcPartStartMom[iMCPart] < 10000.
+          )
+        {
+          primaryParticleCandidates.push_back(truePartVec.at(iMCPart));
+          primaryParticleCandidateIs.push_back(iMCPart);
+        }
+    }
+  }
 
   // Debugging printing of primaryParticleCandidates
   for(const size_t & iMCPart: primaryParticleCandidateIs)
@@ -1301,12 +1300,13 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
           thisTrackIDSet.insert(TrackID);
           thisTrackIDSet.insert(-TrackID);
           // In LArIAT, view V is collection, U is induction.
-          trackTrueChargeEfficiencyU[iTrack] = bt->HitChargeCollectionEfficiency(
-                                  thisTrackIDSet,trackHitsU,allHitsVec,geo::kU);
-          trackTrueChargeEfficiencyV[iTrack] = bt->HitChargeCollectionEfficiency(
-                                  thisTrackIDSet,trackHitsV,allHitsVec,geo::kV);
-          trackTrueChargeEfficiencyZ[iTrack] = bt->HitChargeCollectionEfficiency(
-                                  thisTrackIDSet,trackHitsZ,allHitsVec,geo::kZ);
+          // Was taking 90% of the time spent in analyze!!! (valgrind callgrind)
+          //trackTrueChargeEfficiencyU[iTrack] = bt->HitChargeCollectionEfficiency(
+          //                        thisTrackIDSet,trackHitsU,allHitsVec,geo::kU);
+          //trackTrueChargeEfficiencyV[iTrack] = bt->HitChargeCollectionEfficiency(
+          //                        thisTrackIDSet,trackHitsV,allHitsVec,geo::kV);
+          //trackTrueChargeEfficiencyZ[iTrack] = bt->HitChargeCollectionEfficiency(
+          //                        thisTrackIDSet,trackHitsZ,allHitsVec,geo::kZ);
 
           // Find the MCParticle corresponding to this trackID
           art::Ptr<simb::MCParticle> particle;
@@ -1757,10 +1757,10 @@ void lana::PionAbsSelector::beginJob()
   //tree->Branch("yWC4Hit",&yWC4Hit,"yWC4Hit/F");
   //tree->Branch("zWC4Hit",&zWC4Hit,"zWC4Hit/F");
 
-  //tree->Branch("nTOFs",&nTOFs,"nTOFs/i");
-  //tree->Branch("TOFs",&TOFs,"TOFs[nTOFs]/F");
+  tree->Branch("nTOFs",&nTOFs,"nTOFs/i");
+  tree->Branch("TOFs",&TOFs,"TOFs[nTOFs]/F");
   //tree->Branch("TOFTimeStamps",&TOFTimeStamps,"TOFTimeStamps[nTOFs]/i");
-  //tree->Branch("firstTOF",&firstTOF,"firstTOF/F");
+  tree->Branch("firstTOF",&firstTOF,"firstTOF/F");
 
   tree->Branch("nBeamTracks",&nBeamTracks,"nBeamTracks/i");
   tree->Branch("beamTrackXFrontTPC",&beamTrackXFrontTPC,"beamTrackXFrontTPC[nBeamTracks]/F");
