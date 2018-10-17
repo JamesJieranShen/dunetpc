@@ -638,7 +638,7 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   }
 
   // Beamline info
-  const bool PRINTBEAMEVENT=false;
+  const bool PRINTBEAMEVENT=true;
   nWCTracks = 0;
   npWC = 0;
   nBeamTracks = 0;
@@ -706,10 +706,10 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
         std::cout << "    End Pos:   " << track.End().X()
                                   << "  " << track.End().Y()
                                   << "  " << track.End().Z() << "\n";
-        std::cout << "    Start Theta: " << track.VertexDirection().Theta() << "\n";
-        std::cout << "    Start Phi:   " << track.VertexDirection().Phi() << "\n";
-        std::cout << "    End Theta:   " << track.EndDirection().Theta() << "\n";
-        std::cout << "    End Theta:   " << track.EndDirection().Phi() << "\n";
+        std::cout << "    Start Theta: " << track.VertexDirection().Theta()*180/CLHEP::pi << " deg\n";
+        std::cout << "    Start Phi:   " << track.VertexDirection().Phi()*180/CLHEP::pi << " deg\n";
+        std::cout << "    End Theta:   " << track.EndDirection().Theta()*180/CLHEP::pi << " deg\n";
+        std::cout << "    End Theta:   " << track.EndDirection().Phi()*180/CLHEP::pi << " deg\n";
       }
     }
     for(int iTOF=0; iTOF < beamEvent.GetNTOF1Triggers(); iTOF++)
@@ -807,7 +807,8 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       mcPartYFrontTPC[nMCParts] = particleFrontTPCPoint.Y();
 
       if(mcPartIsBeam[nMCParts] 
-            && fabs(mcPartStartT[nMCParts]) < 1e-6
+            && fabs(mcPartStartT[nMCParts]) < 20.
+            && mcPartPDG[nMCParts] != 22
             //&& mcPartIsPrimary[nMCParts]
             //&& mcPartXFrontTPC[nMCParts] > -40 && mcPartXFrontTPC[nMCParts] < 15.
             //&& mcPartYFrontTPC[nMCParts] > 400. && mcPartYFrontTPC[nMCParts] < 445.
@@ -833,6 +834,7 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
               //<< "  StartX:    " << mcPartStartX[iMCPart] << "\n"
               //<< "  StartY:    " << mcPartStartY[iMCPart] << "\n"
               << "  StartZ:    " << mcPartStartZ[iMCPart] << "\n"
+              << "  StartT:    " << mcPartStartT[iMCPart] << "\n"
               //<< "  EndX:      " << mcPartEndX[iMCPart] << "\n"
               //<< "  EndY:      " << mcPartEndY[iMCPart] << "\n"
               << "  EndZ:      " << mcPartEndZ[iMCPart] << "\n"
