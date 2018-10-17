@@ -270,6 +270,7 @@ private:
   Float_t beamTrackEProton[MAXBEAMTRACKS];
   Float_t beamTrackKinPion[MAXBEAMTRACKS];
   Float_t beamTrackKinProton[MAXBEAMTRACKS];
+  Float_t beamTrackTruePDG[MAXBEAMTRACKS];
 
   UInt_t nTOFs;
   Float_t TOFs[MAXTOFS];
@@ -678,8 +679,8 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       }
       beamTrackXFrontTPC[nBeamTracks] = track.End().X();
       beamTrackYFrontTPC[nBeamTracks] = track.End().Y();
-      beamTrackTheta[nBeamTracks] = track.End().Theta();
-      beamTrackPhi[nBeamTracks] = track.End().Phi();
+      beamTrackTheta[nBeamTracks] = track.EndDirection().Theta();
+      beamTrackPhi[nBeamTracks] = track.EndDirection().Phi();
       if(sameNTracksAsMom) 
       {
         beamTrackMom[nBeamTracks] = beamEvent.GetRecoBeamMomentum(iTrack);
@@ -856,6 +857,7 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     beamTrackKinPion[nBeamTracks] = beamTrackEPion[nBeamTracks] - MCHARGEDPION;
     beamTrackEProton[nBeamTracks] = sqrt(pow(beamTrackMom[nBeamTracks],2)+pow(MPROTON,2));
     beamTrackKinProton[nBeamTracks] = beamTrackEProton[nBeamTracks] - MPROTON;
+    beamTrackTruePDG[nBeamTracks] = mcPartPDG[iMCPart];
     nBeamTracks++;
   }
 
@@ -1770,6 +1772,7 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("beamTrackEProton",&beamTrackEProton,"beamTrackEProton[nBeamTracks]/F");
   tree->Branch("beamTrackKinPion",&beamTrackKinPion,"beamTrackKinPion[nBeamTracks]/F");
   tree->Branch("beamTrackKinProton",&beamTrackKinProton,"beamTrackKinProton[nBeamTracks]/F");
+  tree->Branch("beamTrackTruePDG",&beamTrackTruePDG,"beamTrackTruePDG[nBeamTracks]/F");
 
 
   tree->Branch("triggerIsBeam",&triggerIsBeam,"triggerIsBeam/O");
@@ -2259,6 +2262,7 @@ void lana::PionAbsSelector::ResetTreeVars()
     beamTrackEProton[iTrack] = DEFAULTNEG;
     beamTrackKinPion[iTrack] = DEFAULTNEG;
     beamTrackKinProton[iTrack] = DEFAULTNEG;
+    beamTrackTruePDG[iTrack] = DEFAULTNEG;
   }
 
   nTOFs = 0;
