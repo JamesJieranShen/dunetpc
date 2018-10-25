@@ -56,7 +56,7 @@
 #define MAXTRACKS 1000
 #define MAXDAUGHTER 25
 #define MAXMCPARTS 10000
-#define MAXBEAMTRACKS 50
+#define MAXBEAMTRACKS 300
 #define MAXIDES 150000
 #define MAXZINT 95
 #define MAXLINT 20
@@ -851,7 +851,7 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     beamTrackYFrontTPC[nBeamTracks] = mcPartYFrontTPC[iMCPart];
     beamTrackTheta[nBeamTracks] = mcPartStartTheta[iMCPart];
     beamTrackPhi[nBeamTracks] = mcPartStartPhi[iMCPart];
-    beamTrackMom[nBeamTracks] = mcPartStartMom[iMCPart];
+    beamTrackMom[nBeamTracks] = mcPartStartMom[iMCPart]*1e-3; // beam in GeV/c
     beamTrackEPion[nBeamTracks] = sqrt(pow(beamTrackMom[nBeamTracks],2)+pow(MCHARGEDPION,2));
     beamTrackKinPion[nBeamTracks] = beamTrackEPion[nBeamTracks] - MCHARGEDPION;
     beamTrackEProton[nBeamTracks] = sqrt(pow(beamTrackMom[nBeamTracks],2)+pow(MPROTON,2));
