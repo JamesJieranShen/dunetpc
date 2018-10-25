@@ -651,14 +651,10 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     if(PRINTBEAMEVENT)
     {
       std::cout << "PiAbsSel BeamEvent " << iBeamEvent << ": \n";
-      std::cout << "  SpillStart:  " << beamEvent.GetSpillStart() << "\n";
-      std::cout << "  SpillOffset: " << beamEvent.GetSpillOffset() << "\n";
       std::cout << "  CTB Timestamp: " << beamEvent.GetCTBTimestamp() << "\n";
       std::cout << "  BI Trigger: " << beamEvent.GetBITrigger() << "\n";
       std::cout << "  Active Trigger: " << beamEvent.GetActiveTrigger() << "\n";
       std::cout << "  Is Trigger Matched: " << beamEvent.CheckIsMatched() << "\n";
-      std::cout << "  T0 and T0 - SpillStart:\n";
-      std::cout << "  T0 and T0 - SpillStart:"<< beamEvent.GetFullT0() <<" " <<beamEvent.GetFullT0()-beamEvent.GetSpillStart() <<"\n";
       std::cout << "  TOF: " << beamEvent.GetTOF() << "\n";
       std::cout << "  Beam Momenta:\n";
     }
