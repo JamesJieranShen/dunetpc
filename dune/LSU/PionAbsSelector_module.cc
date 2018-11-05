@@ -57,6 +57,7 @@
 #define MAXDAUGHTER 25
 #define MAXMCPARTS 10000
 #define MAXBEAMTRACKS 300
+#define MAXBEAMMOMS 300
 #define MAXIDES 150000
 #define MAXZINT 95
 #define MAXLINT 20
@@ -240,8 +241,6 @@ private:
   UInt_t runNumber;
   UInt_t subRunNumber;
   UInt_t eventNumber;
-  UInt_t npWC;
-  UInt_t nWCTracks;
   Float_t xWC; // WC track projected to TPC front face, x coord in cm
   Float_t yWC; // WC track projected to TPC front face, y coord in cm
   Float_t thetaWC; // WC track theta
@@ -272,10 +271,19 @@ private:
   Float_t beamTrackKinProton[MAXBEAMTRACKS];
   Float_t beamTrackTruePDG[MAXBEAMTRACKS];
 
-  UInt_t nTOFs;
-  Float_t TOFs[MAXTOFS];
-  UInt_t TOFTimeStamps[MAXTOFS];
-  Float_t firstTOF;
+  UInt_t nBeamMom;
+  Float_t beamMom[MAXBEAMMOMS];
+
+  UInt_t nBeamEvents;
+  Float_t TOF;
+  Int_t TOFChan;
+
+  Int_t CKov0Status;
+  Int_t CKov1Status;
+  Float_t CKov0Time;
+  Float_t CKov1Time;
+  Float_t CKov0Pressure;
+  Float_t CKov1Pressure;
 
   bool triggerIsBeam;
   UInt_t triggerBits;
@@ -640,10 +648,9 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
 
   // Beamline info
   const bool PRINTBEAMEVENT=true;
-  nWCTracks = 0;
-  npWC = 0;
+  nBeamEvents = beamVec.size();
   nBeamTracks = 0;
-  nTOFs = 0;
+  nBeamMom = 0;
   for(size_t iBeamEvent=0; iBeamEvent < beamVec.size(); iBeamEvent++)
   {
     beam::ProtoDUNEBeamEvent beamEvent = *(beamVec.at(iBeamEvent));
@@ -656,15 +663,28 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       std::cout << "  Active Trigger: " << beamEvent.GetActiveTrigger() << "\n";
       std::cout << "  Is Trigger Matched: " << beamEvent.CheckIsMatched() << "\n";
       std::cout << "  TOF: " << beamEvent.GetTOF() << "\n";
+      std::cout << "  CKov0Status: " << beamEvent.GetCKov0Status() << "\n";
+      std::cout << "  CKov1Status: " << beamEvent.GetCKov1Status() << "\n";
+      std::cout << "  CKov0Time: " << beamEvent.GetCKov0Time() << "\n";
+      std::cout << "  CKov1Time: " << beamEvent.GetCKov1Time() << "\n";
+      std::cout << "  CKov0Pressure: " << beamEvent.GetCKov0Pressure() << "\n";
+      std::cout << "  CKov1Pressure: " << beamEvent.GetCKov1Pressure() << "\n";
       std::cout << "  Beam Momenta:\n";
     }
-    TOFs[nTOFs] = beamEvent.GetTOF();
-    nTOFs++;
+
+    TOF = beamEvent.GetTOF();
+    TOFChan = beamEvent.GetTOFChan();
+    CKov0Status = beamEvent.GetCKov0Status();
+    CKov1Status = beamEvent.GetCKov1Status();
+    CKov0Time = beamEvent.GetCKov0Time();
+    CKov1Time = beamEvent.GetCKov1Time();
+    CKov0Pressure = beamEvent.GetCKov0Pressure();
+    CKov1Pressure = beamEvent.GetCKov1Pressure();
     const bool sameNTracksAsMom = beamEvent.GetNBeamTracks() == beamEvent.GetNRecoBeamMomenta();
     for(size_t iMom=0; iMom < beamEvent.GetNRecoBeamMomenta(); iMom++)
     {
-      npWC++;
-      pWC = beamEvent.GetRecoBeamMomentum(iMom);
+      beamMom[nBeamMom] = beamEvent.GetRecoBeamMomentum(iMom);
+      nBeamMom++;
       if(PRINTBEAMEVENT) std::cout << "    " << beamEvent.GetRecoBeamMomentum(iMom) << "\n";
     }
     for(size_t iTrack=0; iTrack < beamEvent.GetNBeamTracks(); iTrack++)
@@ -692,7 +712,6 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       yWC = track.End().Y();
       thetaWC = track.EndDirection().Theta();
       phiWC = track.EndDirection().Phi();
-      nWCTracks++;
     
       if(PRINTBEAMEVENT)
       {
@@ -711,7 +730,6 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       }
     }
   }
-  firstTOF = TOFs[0];
 
   // Get Trigger info
   if (triggerHandle.isValid() && triggerHandle->size() > 0)
@@ -1734,8 +1752,6 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("subRunNumber",&subRunNumber,"subRunNumber/i");
   tree->Branch("eventNumber",&eventNumber,"eventNumber/i");
 
-  tree->Branch("npWC",&npWC,"npWC/i");
-  tree->Branch("nWCTracks",&nWCTracks,"nWCTracks/i");
   tree->Branch("xWC",&xWC,"xWC/F");
   tree->Branch("yWC",&yWC,"yWC/F");
   tree->Branch("thetaWC",&thetaWC,"thetaWC/F");
@@ -1753,10 +1769,19 @@ void lana::PionAbsSelector::beginJob()
   //tree->Branch("yWC4Hit",&yWC4Hit,"yWC4Hit/F");
   //tree->Branch("zWC4Hit",&zWC4Hit,"zWC4Hit/F");
 
-  tree->Branch("nTOFs",&nTOFs,"nTOFs/i");
-  tree->Branch("TOFs",&TOFs,"TOFs[nTOFs]/F");
-  //tree->Branch("TOFTimeStamps",&TOFTimeStamps,"TOFTimeStamps[nTOFs]/i");
-  tree->Branch("firstTOF",&firstTOF,"firstTOF/F");
+  tree->Branch("nBeamEvents",&nBeamEvents,"nBeamEvents/i");
+  tree->Branch("TOF",&TOF,"TOF/F");
+  tree->Branch("TOFChan",&TOFChan,"TOFChan/I");
+
+  tree->Branch("CKov0Status",&CKov0Status,"CKov0Status/I");
+  tree->Branch("CKov1Status",&CKov1Status,"CKov1Status/I");
+  tree->Branch("CKov0Time",&CKov0Time,"CKov0Time/F");
+  tree->Branch("CKov1Time",&CKov1Time,"CKov1Time/F");
+  tree->Branch("CKov0Pressure",&CKov0Pressure,"CKov0Pressure/F");
+  tree->Branch("CKov1Pressure",&CKov1Pressure,"CKov1Pressure/F");
+
+  tree->Branch("nBeamMom",&nBeamMom,"nBeamMom/i");
+  tree->Branch("beamMom",&beamMom,"beamMom[nBeamMom]/F");
 
   tree->Branch("nBeamTracks",&nBeamTracks,"nBeamTracks/i");
   tree->Branch("beamTrackXFrontTPC",&beamTrackXFrontTPC,"beamTrackXFrontTPC[nBeamTracks]/F");
@@ -2125,7 +2150,7 @@ const art::Ptr<recob::Track> lana::PionAbsSelector::MatchRecoToTruthOrWCTrack(co
   float thetaTrue;
   if(isData)
   {
-    if(nWCTracks == 0) return art::Ptr<recob::Track>();
+    if(nBeamTracks == 0) return art::Ptr<recob::Track>();
     xTrue = xWC;
     yTrue = yWC;
     phiTrue = phiWC;
@@ -2226,8 +2251,6 @@ void lana::PionAbsSelector::ResetTreeVars()
   subRunNumber = 0;
   eventNumber = 0;
 
-  npWC = 0;
-  nWCTracks = 0;
   xWC = DEFAULTNEG;
   yWC = DEFAULTNEG;
   thetaWC = DEFAULTNEG;
@@ -2261,16 +2284,25 @@ void lana::PionAbsSelector::ResetTreeVars()
     beamTrackTruePDG[iTrack] = DEFAULTNEG;
   }
 
-  nTOFs = 0;
-  for(size_t iTof=0; iTof < MAXTOFS; iTof++)
+  nBeamMom = 0;
+  for(size_t iTrack=0; iTrack < MAXBEAMMOMS; iTrack++)
   {
-    TOFs[iTof] = DEFAULTNEG;
-    TOFTimeStamps[iTof] = DEFAULTNEG;
+    beamMom[iTrack] = DEFAULTNEG;
   }
-  firstTOF = DEFAULTNEG;
+ 
+  nBeamEvents = 0;
+  TOF = DEFAULTNEG;
+  TOFChan = DEFAULTNEG;
 
   triggerIsBeam = false;
   triggerBits = 0;
+
+  CKov0Status = DEFAULTNEG;
+  CKov1Status = DEFAULTNEG;
+  CKov0Time = DEFAULTNEG;
+  CKov1Time = DEFAULTNEG;
+  CKov0Pressure = DEFAULTNEG;
+  CKov1Pressure = DEFAULTNEG;
 
   nPrimaryParticleCandidates = 0;
 
