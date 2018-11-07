@@ -20,6 +20,7 @@
 #include "art/Framework/Services/Registry/ServiceHandle.h"
 #include "art/Framework/Services/Optional/TFileService.h"
 #include "messagefacility/MessageLogger/MessageLogger.h"
+#include "art/Framework/Core/FileBlock.h"
 
 //LArSoft includes
 #include "lardataobj/AnalysisBase/Calorimetry.h"
@@ -241,6 +242,7 @@ private:
   UInt_t runNumber;
   UInt_t subRunNumber;
   UInt_t eventNumber;
+  std::string infilename;
   Float_t xWC; // WC track projected to TPC front face, x coord in cm
   Float_t yWC; // WC track projected to TPC front face, y coord in cm
   Float_t thetaWC; // WC track theta
@@ -275,6 +277,9 @@ private:
   Float_t beamMom[MAXBEAMMOMS];
 
   UInt_t nBeamEvents;
+  Int_t BITrigger;
+  bool BITriggerMatched;
+  UInt_t BIActiveTrigger;
   Float_t TOF;
   Int_t TOFChan;
 
@@ -557,7 +562,8 @@ bool lana::PionAbsSelector::InPrimaryFiducial(const TVector3& pos)
 
 lana::PionAbsSelector::PionAbsSelector(fhicl::ParameterSet const & p)
   :
-  EDAnalyzer(p)  // ,
+  EDAnalyzer(p),
+  infilename("NoInFilenameFound")
  // More initializers here.
 {
   this->reconfigure(p);
@@ -672,6 +678,9 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       std::cout << "  Beam Momenta:\n";
     }
 
+    BITrigger = beamEvent.GetBITrigger();
+    BITriggerMatched = beamEvent.CheckIsMatched();
+    BIActiveTrigger = beamEvent.GetActiveTrigger();
     TOF = beamEvent.GetTOF();
     TOFChan = beamEvent.GetTOFChan();
     CKov0Status = beamEvent.GetCKov0Status();
@@ -1751,6 +1760,7 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("runNumber",&runNumber,"runNumber/i");
   tree->Branch("subRunNumber",&subRunNumber,"subRunNumber/i");
   tree->Branch("eventNumber",&eventNumber,"eventNumber/i");
+  tree->Branch("infilename",&infilename);
 
   tree->Branch("xWC",&xWC,"xWC/F");
   tree->Branch("yWC",&yWC,"yWC/F");
@@ -1770,6 +1780,9 @@ void lana::PionAbsSelector::beginJob()
   //tree->Branch("zWC4Hit",&zWC4Hit,"zWC4Hit/F");
 
   tree->Branch("nBeamEvents",&nBeamEvents,"nBeamEvents/i");
+  tree->Branch("BITrigger",&BITrigger,"BITrigger/I");
+  tree->Branch("BITriggerMatched",&BITriggerMatched,"BITriggerMatched/O");
+  tree->Branch("BIActiveTrigger",&BIActiveTrigger,"BIActiveTrigger/i");
   tree->Branch("TOF",&TOF,"TOF/F");
   tree->Branch("TOFChan",&TOFChan,"TOFChan/I");
 
@@ -2120,6 +2133,7 @@ void lana::PionAbsSelector::reconfigure(fhicl::ParameterSet const & p)
 void lana::PionAbsSelector::respondToCloseInputFile(art::FileBlock const & fb)
 {
   // Implementation of optional member function here.
+  infilename = "INVALID";
 }
 
 void lana::PionAbsSelector::respondToCloseOutputFiles(art::FileBlock const & fb)
@@ -2130,6 +2144,7 @@ void lana::PionAbsSelector::respondToCloseOutputFiles(art::FileBlock const & fb)
 void lana::PionAbsSelector::respondToOpenInputFile(art::FileBlock const & fb)
 {
   // Implementation of optional member function here.
+  infilename = fb.fileName();
 }
 
 void lana::PionAbsSelector::respondToOpenOutputFiles(art::FileBlock const & fb)
@@ -2291,6 +2306,9 @@ void lana::PionAbsSelector::ResetTreeVars()
   }
  
   nBeamEvents = 0;
+  BITrigger = DEFAULTNEG;
+  BITriggerMatched = false;
+  BIActiveTrigger = 0;
   TOF = DEFAULTNEG;
   TOFChan = DEFAULTNEG;
 
