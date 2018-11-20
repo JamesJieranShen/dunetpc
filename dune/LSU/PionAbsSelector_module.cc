@@ -541,17 +541,21 @@ private:
   TH1F* deltaAngleTPCBeamlineOnlyInFlangeInFirst25cmHist;
 
   art::ServiceHandle<cheat::BackTrackerService> bt;
+
+  protoana::ProtoDUNEDataUtils fDataUtil;
  
   //Internal functions
   const art::Ptr<recob::Track> MatchRecoToTruthOrWCTrack(const std::vector<art::Ptr<recob::Track>>& tracks, bool isData); 
 
   void ResetTreeVars();
 
-  bool InPrimaryFiducial(const TVector3& pos);
+  template <class T>
+  bool InPrimaryFiducial(const T & pos); // use a type with X(), Y(), Z() methods
 
 };
 
-bool lana::PionAbsSelector::InPrimaryFiducial(const TVector3& pos)
+template <class T>
+bool lana::PionAbsSelector::InPrimaryFiducial(const T & pos)
 {
   bool isInX = pos.X() > fFiducialPrimaryXMin && pos.X() < fFiducialPrimaryXMax;
   bool isInY = pos.Y() > fFiducialPrimaryYMin && pos.Y() < fFiducialPrimaryYMax;
@@ -563,7 +567,8 @@ bool lana::PionAbsSelector::InPrimaryFiducial(const TVector3& pos)
 lana::PionAbsSelector::PionAbsSelector(fhicl::ParameterSet const & p)
   :
   EDAnalyzer(p),
-  infilename("NoInFilenameFound")
+  infilename("NoInFilenameFound"),
+  fDataUtil(p.get<fhicl::ParameterSet>("DataUtil"))
  // More initializers here.
 {
   this->reconfigure(p);
@@ -749,8 +754,7 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   if(e.isRealData())
   {
     // For data we can see if this event comes from a beam trigger
-    protoana::ProtoDUNEDataUtils dataUtil;
-    triggerIsBeam = dataUtil.IsBeamTrigger(e);
+    triggerIsBeam = fDataUtil.IsBeamTrigger(e);
     if(triggerIsBeam){
       std::cout << "This data event has a beam trigger" << std::endl;
     }
@@ -1501,7 +1505,7 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
             primTrkPitches.push_back(primTrkCalo->TrkPitchVec().at(cRangeIt));
             primTrkIBackwards.push_back(IBackwards);
             IBackwards--;
-            TVector3 thisPoint = primTrkCalo->XYZ().at(cRangeIt);
+            const auto thisPoint = primTrkCalo->XYZ().at(cRangeIt); // PositionVector3D
             primTrkXs.push_back(thisPoint.X());
             primTrkYs.push_back(thisPoint.Y());
             primTrkZs.push_back(thisPoint.Z());
@@ -1669,7 +1673,7 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
             secMinTrkPitches.push_back(secMinTrkCalo->TrkPitchVec().at(cRangeIt));
             secMinTrkIBackwards.push_back(IBackwards);
             IBackwards--;
-            TVector3 thisPoint = secMinTrkCalo->XYZ().at(cRangeIt);
+            const auto thisPoint = secMinTrkCalo->XYZ().at(cRangeIt); // PositionVector3D
             secMinTrkXs.push_back(thisPoint.X());
             secMinTrkYs.push_back(thisPoint.Y());
             secMinTrkZs.push_back(thisPoint.Z());

@@ -92,6 +92,24 @@ class mctrue::TrajectoryInterpExtrapAlg
 
     /// Finds the point of closest approach of the trajectory to the point & interpolates momentum with debug info
     /**
+     * Templated version of below methods. Point has to have X(), Y(), and Z() methods.
+     */
+    template <class T>
+    const TVector3 pointOfClosestApproach(
+                const simb::MCTrajectory& trajectory,
+                const T & point,
+                double& distance,
+                TLorentzVector& interpolatedMomentum,
+                size_t& iClosestTrajPoint,
+                double& distanceToClosestTrajPoint,
+                bool extrapolate=false)
+    {
+        TVector3 pointVec3(point.X(),point.Y(),point.Z());
+        return pointOfClosestApproach(trajectory, pointVec3, distance, interpolatedMomentum, iClosestTrajPoint, distanceToClosestTrajPoint, extrapolate);
+    }
+
+    /// Finds the point of closest approach of the trajectory to the point & interpolates momentum with debug info
+    /**
      * distance is set to the distance between the point of closest
      * approach and the input point. It will be < 0 if finding the point 
      * of closest approach fails. If extrapolate is false and

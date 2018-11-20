@@ -158,6 +158,7 @@ physics:
       FlangeCenterY:                  430.
       FlangeCenterZ:                  0.
       FlangeRadiusCut:                30.
+      DataUtils:                      @local::standard_protodunedatautils
     }
     BeamMatchingAnalyzer: {
       module_type:                    "BeamMatchingAnalyzer"
