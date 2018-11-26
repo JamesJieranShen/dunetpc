@@ -16,6 +16,7 @@ art_make(
   ${MF_MESSAGELOGGER}
   cetlib cetlib_except
   #larpandoraobj
+  larpandora_LArPandoraInterface
   lardataobj_RecoBase
   lardata_Utilities
   larcorealg_Geometry

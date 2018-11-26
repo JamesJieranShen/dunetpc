@@ -1,4 +1,5 @@
 #include "services_dune.fcl"
+#include "ProtoDUNEDataUtils.fcl"
 
 process_name: PiAbsSelector
 
@@ -139,6 +140,9 @@ physics:
       LikelihoodPIDTag:               "pmtrackpid"
       TrackHitTag:                    "pmtrack"
       AllHitTag:                      "hitpdune"
+      PFParticleTag:                  "pandora"
+      PFTrackTag:                     "pandoraTrack"
+      PFShowerTag:                    "pandoraShower"
       CaloPlane:                      2
       FiducialPrimaryXMin:            30.
       FiducialPrimaryXMax:            330.
@@ -158,7 +162,7 @@ physics:
       FlangeCenterY:                  430.
       FlangeCenterZ:                  0.
       FlangeRadiusCut:                30.
-      DataUtils:                      @local::standard_protodunedatautils
+      DataUtil:                       @local::standard_protodunedatautils
     }
     BeamMatchingAnalyzer: {
       module_type:                    "BeamMatchingAnalyzer"
