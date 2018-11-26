@@ -709,7 +709,7 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       std::cout << "  Beam Momenta:\n";
     }
 
-    TriggerBits = beamEvent.GetTimingTrigger();
+    triggerBits = beamEvent.GetTimingTrigger();
     BITrigger = beamEvent.GetBITrigger();
     BITriggerMatched = beamEvent.CheckIsMatched();
     BIActiveTrigger = beamEvent.GetActiveTrigger();
