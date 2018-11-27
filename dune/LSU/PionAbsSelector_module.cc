@@ -288,6 +288,11 @@ private:
   UInt_t BIActiveTrigger;
   Float_t TOF;
   Int_t TOFChan;
+  UInt_t nTOFs;
+  float TOFs[MAXTOFS];
+  Int_t TOFChans[MAXTOFS];
+  UInt_t TOFusTrigs[MAXTOFS];
+  UInt_t TOFdsTrigs[MAXTOFS];
 
   Int_t CKov0Status;
   Int_t CKov1Status;
@@ -721,6 +726,35 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     CKov1Time = beamEvent.GetCKov1Time();
     CKov0Pressure = beamEvent.GetCKov0Pressure();
     CKov1Pressure = beamEvent.GetCKov1Pressure();
+
+    const auto tofs = beamEvent.GetTOFs(); // double
+    const auto tofChans = beamEvent.GetTOFChans(); // int
+    const auto usTOFTrigs = beamEvent.GetUpstreamTriggers(); // size_t
+    const auto dsTOFTrigs = beamEvent.GetDownstreamTriggers(); // size_t
+    nTOFs = tofs.size();
+    for(size_t iTOF=0; iTOF < nTOFs; iTOF++)
+    {
+        std::cout << "iTOF: " << iTOF;
+        std::cout << " TOF: " << tofs.at(iTOF);
+        TOFs[iTOF] = tofs.at(iTOF);
+        if(tofChans.size() > iTOF)
+        {
+          std::cout << " chan: " << tofChans.at(iTOF);
+          TOFChans[iTOF] = tofChans.at(iTOF);
+        }
+        if(usTOFTrigs.size() > iTOF)
+        {
+          std::cout << " usTrig: " << usTOFTrigs.at(iTOF);
+          TOFusTrigs[iTOF] = usTOFTrigs.at(iTOF);
+        }
+        if(dsTOFTrigs.size() > iTOF)
+        {
+          std::cout << " dsTrig: " << dsTOFTrigs.at(iTOF);
+          TOFdsTrigs[iTOF] = dsTOFTrigs.at(iTOF);
+        }
+        std::cout << std::endl;
+    }
+
     const bool sameNTracksAsMom = beamEvent.GetNBeamTracks() == beamEvent.GetNRecoBeamMomenta();
     for(size_t iMom=0; iMom < beamEvent.GetNRecoBeamMomenta(); iMom++)
     {
@@ -1921,6 +1955,11 @@ void lana::PionAbsSelector::beginJob()
   //tree->Branch("BIActiveTrigger",&BIActiveTrigger,"BIActiveTrigger/i");
   tree->Branch("TOF",&TOF,"TOF/F");
   tree->Branch("TOFChan",&TOFChan,"TOFChan/I");
+  tree->Branch("nTOFs",&nTOFs,"nTOFs/i");
+  tree->Branch("TOFs",&TOFs,"TOFs[nTOFs]/F");
+  tree->Branch("TOFChans",&TOFChans,"TOFChans[nTOFs]/I");
+  tree->Branch("TOFusTrigs",&TOFusTrigs,"TOFusTrigs[nTOFs]/i");
+  tree->Branch("TOFdsTrigs",&TOFdsTrigs,"TOFdsTrigs[nTOFs]/i");
 
   tree->Branch("CKov0Status",&CKov0Status,"CKov0Status/I");
   tree->Branch("CKov1Status",&CKov1Status,"CKov1Status/I");
@@ -2469,6 +2508,14 @@ void lana::PionAbsSelector::ResetTreeVars()
   BIActiveTrigger = 0;
   TOF = DEFAULTNEG;
   TOFChan = DEFAULTNEG;
+  nTOFs = 0;
+  for(size_t iTOF; iTOF < MAXTOFS; iTOF++)
+  {
+    TOFs[iTOF] = DEFAULTNEG;
+    TOFChans[iTOF] = DEFAULTNEG;
+    TOFusTrigs[iTOF] = 0;
+    TOFdsTrigs[iTOF] = 0;
+  }
 
   triggerIsBeam = false;
   triggerBits = 0;
