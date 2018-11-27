@@ -65,6 +65,7 @@
 #define MAXPFBEAMPRIM 10
 #define MAXZINT 95
 #define MAXLINT 20
+#define NTOFCHANS 4
 
 #define MCHARGEDPION 139.57018 // MeV/c^2
 #define MPROTON 938.2720813 // MeV/c^2
@@ -293,6 +294,9 @@ private:
   Int_t TOFChans[MAXTOFS];
   UInt_t TOFusTrigs[MAXTOFS];
   UInt_t TOFdsTrigs[MAXTOFS];
+  float TOFsByChan[NTOFCHANS];
+  UInt_t TOFusTrigsByChan[NTOFCHANS];
+  UInt_t TOFdsTrigsByChan[NTOFCHANS];
 
   Int_t CKov0Status;
   Int_t CKov1Status;
@@ -754,6 +758,27 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
         }
         std::cout << std::endl;
     }
+    // Backwards so that the first one is the one we record
+    for(int jTOF=nTOFs-1; jTOF >= 0; jTOF--)
+    {
+      const size_t iTOF=jTOF;
+      if(tofChans.size() > iTOF)
+      {
+        const auto & chan = tofChans.at(iTOF);
+        if (chan >= 0 && chan < NTOFCHANS)
+        {
+          TOFsByChan[chan] = tofs.at(iTOF);
+          if(usTOFTrigs.size() > iTOF)
+          {
+            TOFusTrigsByChan[chan] = usTOFTrigs.at(iTOF);
+          }
+          if(dsTOFTrigs.size() > iTOF)
+          {
+            TOFdsTrigsByChan[chan] = dsTOFTrigs.at(iTOF);
+          }
+        }
+      }
+    } // for jTOF backwards
 
     const bool sameNTracksAsMom = beamEvent.GetNBeamTracks() == beamEvent.GetNRecoBeamMomenta();
     for(size_t iMom=0; iMom < beamEvent.GetNRecoBeamMomenta(); iMom++)
@@ -1960,6 +1985,9 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("TOFChans",&TOFChans,"TOFChans[nTOFs]/I");
   tree->Branch("TOFusTrigs",&TOFusTrigs,"TOFusTrigs[nTOFs]/i");
   tree->Branch("TOFdsTrigs",&TOFdsTrigs,"TOFdsTrigs[nTOFs]/i");
+  tree->Branch("TOFsByChan",&TOFsByChan,"TOFsByChan[4]/F");
+  tree->Branch("TOFusTrigsByChan",&TOFusTrigsByChan,"TOFusTrigsByChan[4]/i");
+  tree->Branch("TOFdsTrigsByChan",&TOFdsTrigsByChan,"TOFdsTrigsByChan[4]/i");
 
   tree->Branch("CKov0Status",&CKov0Status,"CKov0Status/I");
   tree->Branch("CKov1Status",&CKov1Status,"CKov1Status/I");
@@ -2509,12 +2537,18 @@ void lana::PionAbsSelector::ResetTreeVars()
   TOF = DEFAULTNEG;
   TOFChan = DEFAULTNEG;
   nTOFs = 0;
-  for(size_t iTOF; iTOF < MAXTOFS; iTOF++)
+  for(size_t iTOF=0; iTOF < MAXTOFS; iTOF++)
   {
     TOFs[iTOF] = DEFAULTNEG;
     TOFChans[iTOF] = DEFAULTNEG;
     TOFusTrigs[iTOF] = 0;
     TOFdsTrigs[iTOF] = 0;
+  }
+  for(size_t iTOF=0; iTOF < NTOFCHANS; iTOF++)
+  {
+    TOFsByChan[iTOF] = DEFAULTNEG;
+    TOFusTrigsByChan[iTOF] = 0;
+    TOFdsTrigsByChan[iTOF] = 0;
   }
 
   triggerIsBeam = false;
