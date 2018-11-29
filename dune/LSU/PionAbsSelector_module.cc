@@ -53,27 +53,25 @@
 #include <algorithm> //for std::sort
 #include <cmath>
 
-#define DEFAULTNEG -99999999
-#define DEFAULTPOS 99999999
-#define MAXTOFS 10
-#define MAXTRACKS 1000
-#define MAXDAUGHTER 25
-#define MAXMCPARTS 10000
-#define MAXBEAMTRACKS 300
-#define MAXBEAMMOMS 300
-#define MAXIDES 150000
-#define MAXPFSECTRKS 25
-#define MAXPFSECSHWRS 25
-#define MAXZINT 95
-#define MAXLINT 20
-#define NTOFCHANS 4
+const auto DEFAULTNEG = -99999999;
+const auto DEFAULTPOS = 99999999;
+const auto MAXTOFS = 10;
+const auto MAXTRACKS = 1000;
+const auto MAXDAUGHTER = 25;
+const auto MAXMCPARTS = 10000;
+const auto MAXBEAMTRACKS = 300;
+const auto MAXBEAMMOMS = 300;
+const auto MAXIDES = 150000;
+const auto MAXPFSECTRKS = 25;
+const auto MAXPFSECSHWRS = 25;
+const auto MAXZINT = 95;
+const auto MAXLINT = 20;
+const auto NTOFCHANS = 4;
 
-#define MCHARGEDPION 139.57018 // MeV/c^2
-#define MPROTON 938.2720813 // MeV/c^2
-#define KINLOSTBEFORETPC 0.0 //MeV; from LArIAT pion total cross section group
-#define KINLOSTBEFORETPCPROTON 0.0 //MeV; from LArIAT pion total cross section group
-
-#define setHistTitles(hist,xtitle,ytitle) hist->GetXaxis()->SetTitle(xtitle); hist->GetYaxis()->SetTitle(ytitle);
+const auto MCHARGEDPION = 139.57018; // MeV/c^2
+const auto MPROTON = 938.2720813; // MeV/c^2
+const auto KINLOSTBEFORETPC = 0.0; //MeV; from LArIAT pion total cross section group
+const auto KINLOSTBEFORETPCPROTON = 0.0; //MeV; from LArIAT pion total cross section group
 
 namespace lana {
   class PionAbsSelector;
@@ -91,6 +89,13 @@ struct lana::PiAbsSecondary //add more data members here as needed
   PiAbsSecondary(const art::Ptr<recob::Track>& track, const std::string pid): fTrackPtr(track), fPidName(pid)
   {}
 };
+
+template <class T, class U, class V>
+inline void setHistTitles(T hist, U xtitle, V ytitle)
+{
+  hist->GetXaxis()->SetTitle(xtitle);
+  hist->GetYaxis()->SetTitle(ytitle);
+}
 
 template <class T>
 float findAverage(const T first, const T last)
@@ -2348,22 +2353,22 @@ void lana::PionAbsSelector::beginJob()
   // Book histograms
 
   deltaXYTPCBeamlineHist = tfs->make<TH2F>("deltaXYTPCBeamline","",500,-500,500,500,-500,500);
-  setHistTitles(deltaXYTPCBeamlineHist,"#Delta x TPC Track - Beamline Track","#Delta y TPC Track - Beamline Track")
+  setHistTitles(deltaXYTPCBeamlineHist,"#Delta x TPC Track - Beamline Track","#Delta y TPC Track - Beamline Track");
   deltaXYTPCBeamlineOnlyInFlangeHist = tfs->make<TH2F>("deltaXYTPCBeamlineOnlyInFlange","",500,-500,500,500,-500,500);
-  setHistTitles(deltaXYTPCBeamlineOnlyInFlangeHist,"#Delta x TPC Track - Beamline Track","#Delta y TPC Track - Beamline Track")
+  setHistTitles(deltaXYTPCBeamlineOnlyInFlangeHist,"#Delta x TPC Track - Beamline Track","#Delta y TPC Track - Beamline Track");
   deltaXYTPCBeamlineOnlyInFirst25cmHist = tfs->make<TH2F>("deltaXYTPCBeamlineOnlyInFirst25cm","",500,-500,500,500,-500,500);
-  setHistTitles(deltaXYTPCBeamlineOnlyInFirst25cmHist,"#Delta x TPC Track - Beamline Track","#Delta y TPC Track - Beamline Track")
+  setHistTitles(deltaXYTPCBeamlineOnlyInFirst25cmHist,"#Delta x TPC Track - Beamline Track","#Delta y TPC Track - Beamline Track");
   deltaXYTPCBeamlineOnlyInFlangeInFirst25cmHist = tfs->make<TH2F>("deltaXYTPCBeamlineOnlyInFlangeInFirst25cm","",500,-500,500,500,-500,500);
-  setHistTitles(deltaXYTPCBeamlineOnlyInFlangeInFirst25cmHist,"#Delta x TPC Track - Beamline Track","#Delta y TPC Track - Beamline Track")
+  setHistTitles(deltaXYTPCBeamlineOnlyInFlangeInFirst25cmHist,"#Delta x TPC Track - Beamline Track","#Delta y TPC Track - Beamline Track");
 
   deltaAngleTPCBeamlineHist = tfs->make<TH1F>("deltaAngleTPCBeamline","",500,0,180);
-  setHistTitles(deltaAngleTPCBeamlineHist,"#Delta #alpha TPC Track - Beamline Track","TPC-Beamline Track Pairs / Bin")
+  setHistTitles(deltaAngleTPCBeamlineHist,"#Delta #alpha TPC Track - Beamline Track","TPC-Beamline Track Pairs / Bin");
   deltaAngleTPCBeamlineOnlyInFlangeHist = tfs->make<TH1F>("deltaAngleTPCBeamlineOnlyInFlange","",500,0,180);
-  setHistTitles(deltaAngleTPCBeamlineOnlyInFlangeHist,"#Delta #alpha TPC Track - Beamline Track","TPC-Beamline Track Pairs / Bin")
+  setHistTitles(deltaAngleTPCBeamlineOnlyInFlangeHist,"#Delta #alpha TPC Track - Beamline Track","TPC-Beamline Track Pairs / Bin");
   deltaAngleTPCBeamlineOnlyInFirst25cmHist = tfs->make<TH1F>("deltaAngleTPCBeamlineOnlyInFirst25cm","",500,0,180);
-  setHistTitles(deltaAngleTPCBeamlineOnlyInFirst25cmHist,"#Delta #alpha TPC Track - Beamline Track","TPC-Beamline Track Pairs / Bin")
+  setHistTitles(deltaAngleTPCBeamlineOnlyInFirst25cmHist,"#Delta #alpha TPC Track - Beamline Track","TPC-Beamline Track Pairs / Bin");
   deltaAngleTPCBeamlineOnlyInFlangeInFirst25cmHist = tfs->make<TH1F>("deltaAngleTPCBeamlineOnlyInFlangeInFirst25cm","",500,0,180);
-  setHistTitles(deltaAngleTPCBeamlineOnlyInFlangeInFirst25cmHist,"#Delta #alpha TPC Track - Beamline Track","TPC-Beamline Track Pairs / Bin")
+  setHistTitles(deltaAngleTPCBeamlineOnlyInFlangeInFirst25cmHist,"#Delta #alpha TPC Track - Beamline Track","TPC-Beamline Track Pairs / Bin");
   
 }
 
