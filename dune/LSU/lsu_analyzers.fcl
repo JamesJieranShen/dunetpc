@@ -43,6 +43,7 @@ piabsselector:
   PFParticleTag:                  "pandora"
   PFTrackTag:                     "pandoraTrack"
   PFShowerTag:                    "pandoraShower"
+  PFCaloTag:                      "pandoracalo"
   CaloPlane:                      2
   FiducialPrimaryXMin:            30.
   FiducialPrimaryXMax:            330.
@@ -50,18 +51,20 @@ piabsselector:
   FiducialPrimaryYMax:            580.
   FiducialPrimaryZMin:            5.
   FiducialPrimaryZMax:            600.
-  TrackMatchZMax:                 25.
-  TrackMatchDeltaYMin:            -50.
-  TrackMatchDeltaYMax:            50.
-  TrackMatchDeltaXMinData:        -50.
-  TrackMatchDeltaXMaxData:        50.
-  TrackMatchDeltaXMinMC:          -50.
-  TrackMatchDeltaXMaxMC:          50.
-  TrackMatchAngleMaxDeg:          15.
-  FlangeCenterX:                  -30.
+  TrackMatchZMax:                 50.
+  TrackMatchDeltaXMinData:        10.
+  TrackMatchDeltaXMaxData:        30.
+  TrackMatchDeltaXMinMC:          -5.
+  TrackMatchDeltaXMaxMC:          15.
+  TrackMatchDeltaYMinData:        5.
+  TrackMatchDeltaYMaxData:        25.
+  TrackMatchDeltaYMinMC:          -10
+  TrackMatchDeltaYMaxMC:          10
+  TrackMatchAngleMaxDeg:          30.
+  FlangeCenterX:                  -15.
   FlangeCenterY:                  430.
   FlangeCenterZ:                  0.
-  FlangeRadiusCut:                30.
+  FlangeRadiusCut:                50.
   DataUtil:                       @local::standard_protodunedatautils
 }
 

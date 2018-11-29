@@ -62,7 +62,8 @@
 #define MAXBEAMTRACKS 300
 #define MAXBEAMMOMS 300
 #define MAXIDES 150000
-#define MAXPFBEAMPRIM 10
+#define MAXPFSECTRKS 25
+#define MAXPFSECSHWRS 25
 #define MAXZINT 95
 #define MAXLINT 20
 #define NTOFCHANS 4
@@ -218,6 +219,7 @@ private:
   art::InputTag fPFParticleTag;
   art::InputTag fPFTrackTag;
   art::InputTag fPFShowerTag;
+  art::InputTag fPFCaloTag;
 
   unsigned int fCaloPlane; //The plane we are using for calorimetry
 
@@ -229,12 +231,14 @@ private:
   double fFiducialPrimaryZMax;
 
   double fTrackMatchZMax;
-  double fTrackMatchDeltaYMin;
-  double fTrackMatchDeltaYMax;
   double fTrackMatchDeltaXMinData;
   double fTrackMatchDeltaXMaxData;
   double fTrackMatchDeltaXMinMC;
   double fTrackMatchDeltaXMaxMC;
+  double fTrackMatchDeltaYMinData;
+  double fTrackMatchDeltaYMaxData;
+  double fTrackMatchDeltaYMinMC;
+  double fTrackMatchDeltaYMaxMC;
   double fTrackMatchAngleMaxDeg;
   double fFlangeCenterX;
   double fFlangeCenterY;
@@ -544,23 +548,27 @@ private:
 
   // PFParticle/Pandora stuff
   UInt_t PFNBeamSlices;
-  Int_t PFBeamPrimPDG[MAXPFBEAMPRIM];
-  Int_t PFBeamPrimNDaughters[MAXPFBEAMPRIM];
-  Int_t PFBeamPrimNDaughterTracks[MAXPFBEAMPRIM];
-  Int_t PFBeamPrimNDaughterShowers[MAXPFBEAMPRIM];
-  bool PFBeamPrimIsTracklike[MAXPFBEAMPRIM];
-  bool PFBeamPrimIsShowerlike[MAXPFBEAMPRIM];
-  float PFBeamPrimStartX[MAXPFBEAMPRIM];
-  float PFBeamPrimStartY[MAXPFBEAMPRIM];
-  float PFBeamPrimStartZ[MAXPFBEAMPRIM];
-  float PFBeamPrimEndX[MAXPFBEAMPRIM];
-  float PFBeamPrimEndY[MAXPFBEAMPRIM];
-  float PFBeamPrimEndZ[MAXPFBEAMPRIM];
-  float PFBeamPrimStartTheta[MAXPFBEAMPRIM];
-  float PFBeamPrimStartPhi[MAXPFBEAMPRIM];
-  float PFBeamPrimTrkLen[MAXPFBEAMPRIM];
-  float PFBeamPrimShwrLen[MAXPFBEAMPRIM];
-  float PFBeamPrimShwrOpenAngle[MAXPFBEAMPRIM];
+  UInt_t PFBeamPrimNDaughters;
+  UInt_t PFBeamPrimNDaughterTracks;
+  UInt_t PFBeamPrimNDaughterShowers;
+  Int_t PFBeamPrimPDG;
+  bool PFBeamPrimIsTracklike;
+  bool PFBeamPrimIsShowerlike;
+  float PFBeamPrimStartX;
+  float PFBeamPrimStartY;
+  float PFBeamPrimStartZ;
+  float PFBeamPrimEndX;
+  float PFBeamPrimEndY;
+  float PFBeamPrimEndZ;
+  float PFBeamPrimStartTheta;
+  float PFBeamPrimStartPhi;
+  float PFBeamPrimTrkLen;
+  float PFBeamPrimShwrLen;
+  float PFBeamPrimShwrOpenAngle;
+
+  float PFBeamSecTrkdEdxAverageLast3Hits[MAXPFSECTRKS];
+  float PFBeamSecTrkdEdxAverageLast5Hits[MAXPFSECTRKS];
+  float PFBeamSecTrkdEdxAverageLast7Hits[MAXPFSECTRKS];
 
   /////////////////////////////
   //Histograms
@@ -1791,6 +1799,22 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   //////////// PFParticle //////
   //////////////////////////////
   
+
+  /**
+  LArPandoraHelper larPandoraHelper;
+  lar_pandora::PFParticleVector allPFParticles;
+  lar_pandora::PFParticlesToMetadata pfPartsToMetadata;
+  larPandoraHelper.CollectPFParticleMetadata(e,fPFParticleTag.encode(),allPFParticles,pfPartsToMetadata);
+  lar_pandora::PFParticleMap idToPFParticleMap; // map int to Ptr<PFParticle>
+  larPandoraHelper.BuildPFParticleMap(allPFParticles,pfPartsToTracks);
+  lar_pandora::TrackVector allPFTracks; // vector<Ptr<Track>>
+  lar_pandora::PFParticlesToTracks pfPartsToTracks; // map of Ptr<PFParticle> to Ptr<Track>
+  larPandoraHelper.CollectTracks(e,fPFParticleTag.encode(),allPFTracks,pfPartsToTracks);
+  lar_pandora::ShowerVector allPFShowers; // vector<Ptr<Shower>>
+  lar_pandora::PFParticlesToShowers pfPartsToShowers; // map of Ptr<PFParticle> to Ptr<Shower>
+  larPandoraHelper.CollectShowers(e,fPFParticleTag.encode(),allPFShowers,pfPartsToShowers);
+  **/
+
   protoana::ProtoDUNEPFParticleUtils pfPartUtils;
   std::cout << "Number of primary PFParticles: " << pfPartUtils.GetNumberPrimaryPFParticle(e,fPFParticleTag.encode()) << std::endl;
   std::vector<recob::PFParticle*> pfFromBeamSlice = pfPartUtils.GetPFParticlesFromBeamSlice(e,fPFParticleTag.encode());
@@ -1798,23 +1822,18 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   std::cout << "Number of primary beam PFParticles: " << PFNBeamSlices << std::endl;
   for(size_t iPF=0; iPF < PFNBeamSlices; iPF++)
   {
-    if(iPF >= MAXPFBEAMPRIM) 
-    {
-      std::cout << "Error: too many beam primaries! not recording all!";
-      break;
-    }
     recob::PFParticle* pfBeamPart = pfFromBeamSlice.at(iPF);
-    PFBeamPrimPDG[iPF] = pfBeamPart->PdgCode();
-    PFBeamPrimNDaughters[iPF] = pfBeamPart->NumDaughters();
+    PFBeamPrimPDG = pfBeamPart->PdgCode();
+    PFBeamPrimNDaughters = pfBeamPart->NumDaughters();
     const bool isPFParticleTracklike = pfPartUtils.IsPFParticleTracklike(*pfBeamPart);
     const bool isPFParticleShowerlike = pfPartUtils.IsPFParticleShowerlike(*pfBeamPart);
-    PFBeamPrimIsTracklike[iPF] = isPFParticleTracklike;
-    PFBeamPrimIsShowerlike[iPF] = isPFParticleShowerlike;
+    PFBeamPrimIsTracklike = isPFParticleTracklike;
+    PFBeamPrimIsShowerlike = isPFParticleShowerlike;
 
     const TVector3 pfBeamVertex = pfPartUtils.GetPFParticleVertex(*pfBeamPart,e,fPFParticleTag.encode(),fPFTrackTag.encode());
-    PFBeamPrimStartX[iPF] = pfBeamVertex.X();
-    PFBeamPrimStartY[iPF] = pfBeamVertex.Y();
-    PFBeamPrimStartZ[iPF] = pfBeamVertex.Z();
+    PFBeamPrimStartX = pfBeamVertex.X();
+    PFBeamPrimStartY = pfBeamVertex.Y();
+    PFBeamPrimStartZ = pfBeamVertex.Z();
 
     std::cout << "Beam PFParticle: "<< iPF 
                 << " is primary: " << pfBeamPart->IsPrimary() 
@@ -1826,18 +1845,44 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     if(isPFParticleTracklike)
     {
       const recob::Track* pfTrack = pfPartUtils.GetPFParticleTrack(*pfBeamPart, e, fPFParticleTag.encode(),fPFTrackTag.encode());
+      
       if(pfTrack)
       {
         const TVector3 pfBeamSecondaryVertex = pfPartUtils.GetPFParticleSecondaryVertex(*pfBeamPart,e,fPFParticleTag.encode(),fPFTrackTag.encode());
-        PFBeamPrimEndX[iPF] = pfBeamSecondaryVertex.X();
-        PFBeamPrimEndY[iPF] = pfBeamSecondaryVertex.Y();
-        PFBeamPrimEndZ[iPF] = pfBeamSecondaryVertex.Z();
-        PFBeamPrimStartTheta[iPF] = pfTrack->Theta();
-        PFBeamPrimStartPhi[iPF] = pfTrack->Phi();
+        PFBeamPrimEndX = pfBeamSecondaryVertex.X();
+        PFBeamPrimEndY = pfBeamSecondaryVertex.Y();
+        PFBeamPrimEndZ = pfBeamSecondaryVertex.Z();
+        PFBeamPrimStartTheta = pfTrack->Theta();
+        PFBeamPrimStartPhi = pfTrack->Phi();
         if(pfTrack->NPoints() > 1)
         {
-          PFBeamPrimTrkLen[iPF] = pfTrack->Length();
+          PFBeamPrimTrkLen = pfTrack->Length();
         }
+
+        /**
+        const auto pfTrackCalos = art::FindManyP<anab::Calorimetry>({pfTrack}, e, fPFCaloTag).at(0);
+        for(const auto& pfTrackCalo:pfTrkCalos)
+        {
+          if(pfTrackCalo->PlaneID().Plane == fCaloPlane)
+          {
+            const auto& dEdxSize = pfTrackCalo->dEdx().size();
+            const auto& dEdxBegin = pfTrackCalo->dEdx().begin();
+            const auto& dEdxEnd = pfTrackCalo->dEdx().end();
+            if (dEdxSize >= 3)
+            {
+              PFBeamPrimdEdxAverageLast3Hits = findAverage(dEdxEnd - 3, dEdxEnd);
+            }
+            if (dEdxSize >= 5)
+            {
+              PFBeamPrimdEdxAverageLast5Hits = findAverage(dEdxEnd - 5, dEdxEnd);
+            }
+            if (dEdxSize >= 7)
+            {
+              PFBeamPrimdEdxAverageLast7Hits = findAverage(dEdxEnd - 7, dEdxEnd);
+            }
+          } // if Plane is fCaloPlane
+        } // for pfTrackCalo
+        **/
       } // if pfTrack
     } // if isPFParticleTracklike
     if(isPFParticleShowerlike)
@@ -1847,15 +1892,15 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       {
         //const TVector3 showerStart = pfShower->ShowerStart();
         const TVector3 showerDir = pfShower->Direction();
-        PFBeamPrimStartTheta[iPF] = showerDir.Theta();
-        PFBeamPrimStartPhi[iPF] = showerDir.Phi();
+        PFBeamPrimStartTheta = showerDir.Theta();
+        PFBeamPrimStartPhi = showerDir.Phi();
         if(pfShower->has_open_angle())
         {
-          PFBeamPrimShwrOpenAngle[iPF] = pfShower->OpenAngle();
+          PFBeamPrimShwrOpenAngle = pfShower->OpenAngle();
         }
         if(pfShower->has_length())
         {
-          PFBeamPrimShwrLen[iPF] = pfShower->Length();
+          PFBeamPrimShwrLen = pfShower->Length();
         }
         std::cout << "    Shower: "
                   << " has open angle: " << pfShower->has_open_angle()
@@ -1872,21 +1917,52 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       } // if pfShower
     } // if isPFParticleShowerlike
 
-    const auto pfBeamDaughterTracks = pfPartUtils.GetPFParticleDaughterTracks(*pfBeamPart,e,fPFParticleTag.encode(),fPFTrackTag.encode());
-    const auto pfBeamDaughterShowers = pfPartUtils.GetPFParticleDaughterShowers(*pfBeamPart,e,fPFParticleTag.encode(),fPFShowerTag.encode());
-    PFBeamPrimNDaughterTracks[iPF] = pfBeamDaughterTracks.size();
-    PFBeamPrimNDaughterShowers[iPF] = pfBeamDaughterShowers.size();
+    const auto& pfBeamDaughterTracks = pfPartUtils.GetPFParticleDaughterTracks(*pfBeamPart,e,fPFParticleTag.encode(),fPFTrackTag.encode());
+    const auto& pfBeamDaughterShowers = pfPartUtils.GetPFParticleDaughterShowers(*pfBeamPart,e,fPFParticleTag.encode(),fPFShowerTag.encode());
+    PFBeamPrimNDaughterTracks = pfBeamDaughterTracks.size();
+    PFBeamPrimNDaughterShowers = pfBeamDaughterShowers.size();
     
-     std::cout << "    N daughters: " << pfBeamPart->NumDaughters()
+    std::cout << "    N daughters: " << pfBeamPart->NumDaughters()
                 << " N daughter tracks: " << pfBeamDaughterTracks.size()
                 << " N daughter showers: " << pfBeamDaughterShowers.size()
                 << std::endl;
-     std::cout << "    Vertex:           "
+    std::cout << "    Vertex:           "
                 << "(" << pfBeamVertex.X()
                 << "," << pfBeamVertex.Y()
                 << "," << pfBeamVertex.Z()
                 << ")"
                 << std::endl;
+    for(size_t iSec=0; iSec < pfBeamDaughterTracks.size(); iSec++)
+    {
+        const auto& pfBeamDaughterTrack = pfBeamDaughterTracks.at(iSec);
+        std::cout << "Daughter "<<iSec<<" track len: " << pfBeamDaughterTrack->Length() << std::endl;
+        /**
+        const auto pfTrackCalos = art::FindManyP<anab::Calorimetry>({pfBeamDaughterTrack}, e, fPFCaloTag).at(0);
+        for(const auto& pfTrackCalo:pfTrkCalos)
+        {
+          if(pfTrackCalo->PlaneID().Plane == fCaloPlane)
+          {
+            const auto& dEdxSize = pfTrackCalo->dEdx().size();
+            const auto& dEdxBegin = pfTrackCalo->dEdx().begin();
+            const auto& dEdxEnd = pfTrackCalo->dEdx().end();
+            if (dEdxSize >= 3)
+            {
+              PFBeamSecTrkdEdxAverageLast3Hits[iSec] = findAverage(dEdxEnd - 3, dEdxEnd);
+            }
+            if (dEdxSize >= 5)
+            {
+              PFBeamSecTrkdEdxAverageLast5Hits[iSec] = findAverage(dEdxEnd - 5, dEdxEnd);
+            }
+            if (dEdxSize >= 7)
+            {
+              PFBeamSecTrkdEdxAverageLast7Hits[iSec] = findAverage(dEdxEnd - 7, dEdxEnd);
+            }
+          } // if Plane is fCaloPlane
+        } // for pfTrackCalo
+        **/
+    } // for pfBeamDaughterTrack
+    
+    break; // only look at first PFSlice
   } // for iPF
 
   // Done with PFParticles
@@ -2246,23 +2322,27 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("nSecTrkPIDAL18",&nSecTrkPIDAL18,"nSecTrkPIDAL18/I");
 
   tree->Branch("PFNBeamSlices",&PFNBeamSlices,"PFNBeamSlices/i");
-  tree->Branch("PFBeamPrimPDG",&PFBeamPrimPDG,"PFBeamPrimPDG[PFNBeamSlices]/I");
-  tree->Branch("PFBeamPrimNDaughters",&PFBeamPrimNDaughters,"PFBeamPrimNDaughters[PFNBeamSlices]/I");
-  tree->Branch("PFBeamPrimNDaughterTracks",&PFBeamPrimNDaughterTracks,"PFBeamPrimNDaughterTracks[PFNBeamSlices]/I");
-  tree->Branch("PFBeamPrimNDaughterShowers",&PFBeamPrimNDaughterShowers,"PFBeamPrimNDaughterShowers[PFNBeamSlices]/I");
-  tree->Branch("PFBeamPrimIsTracklike",&PFBeamPrimIsTracklike,"PFBeamPrimIsTracklike[PFNBeamSlices]/O");
-  tree->Branch("PFBeamPrimIsShowerlike",&PFBeamPrimIsShowerlike,"PFBeamPrimIsShowerlike[PFNBeamSlices]/O");
-  tree->Branch("PFBeamPrimStartX",&PFBeamPrimStartX,"PFBeamPrimStartX[PFNBeamSlices]/F");
-  tree->Branch("PFBeamPrimStartY",&PFBeamPrimStartY,"PFBeamPrimStartY[PFNBeamSlices]/F");
-  tree->Branch("PFBeamPrimStartZ",&PFBeamPrimStartZ,"PFBeamPrimStartZ[PFNBeamSlices]/F");
-  tree->Branch("PFBeamPrimEndX",&PFBeamPrimEndX,"PFBeamPrimEndX[PFNBeamSlices]/F");
-  tree->Branch("PFBeamPrimEndY",&PFBeamPrimEndY,"PFBeamPrimEndY[PFNBeamSlices]/F");
-  tree->Branch("PFBeamPrimEndZ",&PFBeamPrimEndZ,"PFBeamPrimEndZ[PFNBeamSlices]/F");
-  tree->Branch("PFBeamPrimStartTheta",&PFBeamPrimStartTheta,"PFBeamPrimStartTheta[PFNBeamSlices]/F");
-  tree->Branch("PFBeamPrimStartPhi",&PFBeamPrimStartPhi,"PFBeamPrimStartPhi[PFNBeamSlices]/F");
-  tree->Branch("PFBeamPrimTrkLen",&PFBeamPrimTrkLen,"PFBeamPrimTrkLen[PFNBeamSlices]/F");
-  tree->Branch("PFBeamPrimShwrLen",&PFBeamPrimShwrLen,"PFBeamPrimShwrLen[PFNBeamSlices]/F");
-  tree->Branch("PFBeamPrimShwrOpenAngle",&PFBeamPrimShwrOpenAngle,"PFBeamPrimShwrOpenAngle[PFNBeamSlices]/F");
+  tree->Branch("PFBeamPrimNDaughters",&PFBeamPrimNDaughters,"PFBeamPrimNDaughters/i");
+  tree->Branch("PFBeamPrimNDaughterTracks",&PFBeamPrimNDaughterTracks,"PFBeamPrimNDaughterTracks/i");
+  tree->Branch("PFBeamPrimNDaughterShowers",&PFBeamPrimNDaughterShowers,"PFBeamPrimNDaughterShowers/i");
+  tree->Branch("PFBeamPrimPDG",&PFBeamPrimPDG,"PFBeamPrimPDG/I");
+  tree->Branch("PFBeamPrimIsTracklike",&PFBeamPrimIsTracklike,"PFBeamPrimIsTracklike/O");
+  tree->Branch("PFBeamPrimIsShowerlike",&PFBeamPrimIsShowerlike,"PFBeamPrimIsShowerlike/O");
+  tree->Branch("PFBeamPrimStartX",&PFBeamPrimStartX,"PFBeamPrimStartX/F");
+  tree->Branch("PFBeamPrimStartY",&PFBeamPrimStartY,"PFBeamPrimStartY/F");
+  tree->Branch("PFBeamPrimStartZ",&PFBeamPrimStartZ,"PFBeamPrimStartZ/F");
+  tree->Branch("PFBeamPrimEndX",&PFBeamPrimEndX,"PFBeamPrimEndX/F");
+  tree->Branch("PFBeamPrimEndY",&PFBeamPrimEndY,"PFBeamPrimEndY/F");
+  tree->Branch("PFBeamPrimEndZ",&PFBeamPrimEndZ,"PFBeamPrimEndZ/F");
+  tree->Branch("PFBeamPrimStartTheta",&PFBeamPrimStartTheta,"PFBeamPrimStartTheta/F");
+  tree->Branch("PFBeamPrimStartPhi",&PFBeamPrimStartPhi,"PFBeamPrimStartPhi/F");
+  tree->Branch("PFBeamPrimTrkLen",&PFBeamPrimTrkLen,"PFBeamPrimTrkLen/F");
+  tree->Branch("PFBeamPrimShwrLen",&PFBeamPrimShwrLen,"PFBeamPrimShwrLen/F");
+  tree->Branch("PFBeamPrimShwrOpenAngle",&PFBeamPrimShwrOpenAngle,"PFBeamPrimShwrOpenAngle/F");
+
+  tree->Branch("PFBeamSecTrkdEdxAverageLast3Hits",&PFBeamSecTrkdEdxAverageLast3Hits,"PFBeamSecTrkdEdxAverageLast3Hits[PFBeamPrimNDaughterTracks]/F");
+  tree->Branch("PFBeamSecTrkdEdxAverageLast5Hits",&PFBeamSecTrkdEdxAverageLast5Hits,"PFBeamSecTrkdEdxAverageLast5Hits[PFBeamPrimNDaughterTracks]/F");
+  tree->Branch("PFBeamSecTrkdEdxAverageLast7Hits",&PFBeamSecTrkdEdxAverageLast7Hits,"PFBeamSecTrkdEdxAverageLast7Hits[PFBeamPrimNDaughterTracks]/F");
 
   ////////////////////////////////////////
   // Book histograms
@@ -2331,6 +2411,7 @@ void lana::PionAbsSelector::reconfigure(fhicl::ParameterSet const & p)
   fPFParticleTag = p.get<art::InputTag>("PFParticleTag");
   fPFTrackTag = p.get<art::InputTag>("PFTrackTag");
   fPFShowerTag = p.get<art::InputTag>("PFShowerTag");
+  fPFCaloTag = p.get<art::InputTag>("PFCaloTag");
   
   fCaloPlane = p.get<unsigned int>("CaloPlane");
 
@@ -2342,12 +2423,14 @@ void lana::PionAbsSelector::reconfigure(fhicl::ParameterSet const & p)
   fFiducialPrimaryZMax = p.get<double>("FiducialPrimaryZMax");
 
   fTrackMatchZMax = p.get<double>("TrackMatchZMax");
-  fTrackMatchDeltaYMin = p.get<double>("TrackMatchDeltaYMin");
-  fTrackMatchDeltaYMax = p.get<double>("TrackMatchDeltaYMax");
   fTrackMatchDeltaXMinData = p.get<double>("TrackMatchDeltaXMinData");
   fTrackMatchDeltaXMaxData = p.get<double>("TrackMatchDeltaXMaxData");
   fTrackMatchDeltaXMinMC = p.get<double>("TrackMatchDeltaXMinMC");
   fTrackMatchDeltaXMaxMC = p.get<double>("TrackMatchDeltaXMaxMC");
+  fTrackMatchDeltaYMinData = p.get<double>("TrackMatchDeltaYMinData");
+  fTrackMatchDeltaYMaxData = p.get<double>("TrackMatchDeltaYMaxData");
+  fTrackMatchDeltaYMinMC = p.get<double>("TrackMatchDeltaYMinMC");
+  fTrackMatchDeltaYMaxMC = p.get<double>("TrackMatchDeltaYMaxMC");
   fTrackMatchAngleMaxDeg = p.get<double>("TrackMatchAngleMaxDeg");
   fFlangeCenterX = p.get<double>("FlangeCenterX");
   fFlangeCenterY = p.get<double>("FlangeCenterY");
@@ -2451,7 +2534,8 @@ const art::Ptr<recob::Track> lana::PionAbsSelector::MatchRecoToTruthOrWCTrack(co
     if (sqrt(pow(xTrue-fFlangeCenterX,2)+pow(yTrue-fFlangeCenterY,2)) > fFlangeRadiusCut) continue;
     if (sqrt(pow(xTrack-fFlangeCenterX,2)+pow(yTrack-fFlangeCenterY,2)) > fFlangeRadiusCut) continue;
 
-    if (deltaY < fTrackMatchDeltaYMin || deltaY > fTrackMatchDeltaYMax) continue; // Only allow these tracks for matching
+    if (isData && (deltaY < fTrackMatchDeltaYMinData || deltaY > fTrackMatchDeltaYMaxData)) continue; // Only allow these tracks for matching
+    if (!isData && (deltaY < fTrackMatchDeltaYMinMC || deltaY > fTrackMatchDeltaYMaxMC)) continue; // Only allow these tracks for matching
     if (isData && (deltaX < fTrackMatchDeltaXMinData || deltaX > fTrackMatchDeltaXMaxData)) continue; // Only allow these tracks for matching
     if (!isData && (deltaX < fTrackMatchDeltaXMinMC || deltaX > fTrackMatchDeltaXMaxMC)) continue; // Only allow these tracks for matching
     if (deltaAngle > fTrackMatchAngleMaxDeg) continue; // Only allow these tracks for matching
@@ -2812,26 +2896,31 @@ void lana::PionAbsSelector::ResetTreeVars()
   nSecTrkPIDAL18 = 0;
 
   PFNBeamSlices = 0;
-  for(size_t iPF=0; iPF < MAXPFBEAMPRIM; iPF++)
+  PFBeamPrimNDaughters = 0;
+  PFBeamPrimNDaughterTracks = 0;
+  PFBeamPrimNDaughterShowers = 0;
+  PFBeamPrimPDG = DEFAULTNEG;
+  PFBeamPrimIsTracklike = false;
+  PFBeamPrimIsShowerlike = false;
+  PFBeamPrimStartX = DEFAULTNEG;
+  PFBeamPrimStartY = DEFAULTNEG;
+  PFBeamPrimStartZ = DEFAULTNEG;
+  PFBeamPrimEndX = DEFAULTNEG;
+  PFBeamPrimEndY = DEFAULTNEG;
+  PFBeamPrimEndZ = DEFAULTNEG;
+  PFBeamPrimStartTheta = DEFAULTNEG;
+  PFBeamPrimStartPhi = DEFAULTNEG;
+  PFBeamPrimTrkLen = DEFAULTNEG;
+  PFBeamPrimShwrLen = DEFAULTNEG;
+  PFBeamPrimShwrOpenAngle = DEFAULTNEG;
+
+  for(size_t iSec=0; iSec < MAXPFSECTRKS; iSec++)
   {
-    PFBeamPrimPDG[iPF] = DEFAULTNEG;
-    PFBeamPrimNDaughters[iPF] = DEFAULTNEG;
-    PFBeamPrimNDaughterTracks[iPF] = DEFAULTNEG;
-    PFBeamPrimNDaughterShowers[iPF] = DEFAULTNEG;
-    PFBeamPrimIsTracklike[iPF] = false;
-    PFBeamPrimIsShowerlike[iPF] = false;
-    PFBeamPrimStartX[iPF] = DEFAULTNEG;
-    PFBeamPrimStartY[iPF] = DEFAULTNEG;
-    PFBeamPrimStartZ[iPF] = DEFAULTNEG;
-    PFBeamPrimEndX[iPF] = DEFAULTNEG;
-    PFBeamPrimEndY[iPF] = DEFAULTNEG;
-    PFBeamPrimEndZ[iPF] = DEFAULTNEG;
-    PFBeamPrimStartTheta[iPF] = DEFAULTNEG;
-    PFBeamPrimStartPhi[iPF] = DEFAULTNEG;
-    PFBeamPrimTrkLen[iPF] = DEFAULTNEG;
-    PFBeamPrimShwrLen[iPF] = DEFAULTNEG;
-    PFBeamPrimShwrOpenAngle[iPF] = DEFAULTNEG;
+    PFBeamSecTrkdEdxAverageLast3Hits[iSec] = DEFAULTNEG;
+    PFBeamSecTrkdEdxAverageLast5Hits[iSec] = DEFAULTNEG;
+    PFBeamSecTrkdEdxAverageLast7Hits[iSec] = DEFAULTNEG;
   }
+
 } // ResetTreeVars
 
 DEFINE_ART_MODULE(lana::PionAbsSelector)
