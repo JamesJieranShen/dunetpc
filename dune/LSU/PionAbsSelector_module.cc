@@ -316,6 +316,7 @@ private:
 
   bool triggerIsBeam;
   UInt_t triggerBits;
+  Int_t nGoodFEMBs[6];
 
   UInt_t nPrimaryParticleCandidates; // Number of MCParticles passing primary particle cuts
 
@@ -559,6 +560,9 @@ private:
   Int_t PFBeamPrimPDG;
   bool PFBeamPrimIsTracklike;
   bool PFBeamPrimIsShowerlike;
+  float PFBeamPrimBeamCosmicScore;
+  float PFBeamPrimXFrontTPC;
+  float PFBeamPrimYFrontTPC;
   float PFBeamPrimStartX;
   float PFBeamPrimStartY;
   float PFBeamPrimStartZ;
@@ -570,7 +574,11 @@ private:
   float PFBeamPrimTrkLen;
   float PFBeamPrimShwrLen;
   float PFBeamPrimShwrOpenAngle;
+  float PFBeamPrimdEdxAverageLast3Hits;
+  float PFBeamPrimdEdxAverageLast5Hits;
+  float PFBeamPrimdEdxAverageLast7Hits;
 
+  float PFBeamSecTrkLen[MAXPFSECTRKS];
   float PFBeamSecTrkdEdxAverageLast3Hits[MAXPFSECTRKS];
   float PFBeamSecTrkdEdxAverageLast5Hits[MAXPFSECTRKS];
   float PFBeamSecTrkdEdxAverageLast7Hits[MAXPFSECTRKS];
@@ -856,6 +864,11 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     triggerIsBeam = fDataUtil.IsBeamTrigger(e);
     if(triggerIsBeam){
       std::cout << "This data event has a beam trigger" << std::endl;
+    }
+
+    for(size_t k=0; k < 6; k++)
+    {
+      nGoodFEMBs[k] = fDataUtil.GetNActiveFembsForAPA(e, k);
     }
   }
 
@@ -1823,6 +1836,16 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   protoana::ProtoDUNEPFParticleUtils pfPartUtils;
   std::cout << "Number of primary PFParticles: " << pfPartUtils.GetNumberPrimaryPFParticle(e,fPFParticleTag.encode()) << std::endl;
   std::vector<recob::PFParticle*> pfFromBeamSlice = pfPartUtils.GetPFParticlesFromBeamSlice(e,fPFParticleTag.encode());
+
+  // All this just to get the calos
+  auto allPFTrackHand = e.getValidHandle<std::vector<recob::Track>>(fPFTrackTag);
+  std::vector<art::Ptr<recob::Track>> allPFTrackVec;
+  if(allPFTrackHand.isValid())
+  {
+    art::fill_ptr_vector(allPFTrackVec, allPFTrackHand);
+  }
+  art::FindManyP<anab::Calorimetry>  fmPFCalo(allPFTrackHand, e, fPFCaloTag);
+
   PFNBeamSlices = pfFromBeamSlice.size();
   std::cout << "Number of primary beam PFParticles: " << PFNBeamSlices << std::endl;
   for(size_t iPF=0; iPF < PFNBeamSlices; iPF++)
@@ -1834,6 +1857,7 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     const bool isPFParticleShowerlike = pfPartUtils.IsPFParticleShowerlike(*pfBeamPart);
     PFBeamPrimIsTracklike = isPFParticleTracklike;
     PFBeamPrimIsShowerlike = isPFParticleShowerlike;
+    PFBeamPrimBeamCosmicScore = pfPartUtils.GetBeamCosmicScore(*pfBeamPart,e,fPFParticleTag.encode());
 
     const TVector3 pfBeamVertex = pfPartUtils.GetPFParticleVertex(*pfBeamPart,e,fPFParticleTag.encode(),fPFTrackTag.encode());
     PFBeamPrimStartX = pfBeamVertex.X();
@@ -1853,6 +1877,9 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       
       if(pfTrack)
       {
+        const TVector3 pfTrackFrontTPCPoint = lsu::trackZPlane(0,*pfTrack);
+        PFBeamPrimXFrontTPC = pfTrackFrontTPCPoint.X();
+        PFBeamPrimYFrontTPC = pfTrackFrontTPCPoint.Y();
         const TVector3 pfBeamSecondaryVertex = pfPartUtils.GetPFParticleSecondaryVertex(*pfBeamPart,e,fPFParticleTag.encode(),fPFTrackTag.encode());
         PFBeamPrimEndX = pfBeamSecondaryVertex.X();
         PFBeamPrimEndY = pfBeamSecondaryVertex.Y();
@@ -1864,14 +1891,19 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
           PFBeamPrimTrkLen = pfTrack->Length();
         }
 
-        /**
-        const auto pfTrackCalos = art::FindManyP<anab::Calorimetry>({pfTrack}, e, fPFCaloTag).at(0);
-        for(const auto& pfTrackCalo:pfTrkCalos)
+        const auto& shouldBeThisTrackToo = allPFTrackVec.at(pfTrack->ID());
+        if(pfTrack->ID() != shouldBeThisTrackToo->ID() 
+            || pfTrack->NPoints() != shouldBeThisTrackToo->NPoints())
+        {
+          throw cet::exception("PionAbsSelector","track->ID() isn't the track index in the list for primary track!");
+        }
+        const auto& pfTrackCalos = fmPFCalo.at(pfTrack->ID());
+        for(const auto& pfTrackCalo:pfTrackCalos)
         {
           if(pfTrackCalo->PlaneID().Plane == fCaloPlane)
           {
             const auto& dEdxSize = pfTrackCalo->dEdx().size();
-            const auto& dEdxBegin = pfTrackCalo->dEdx().begin();
+            //const auto& dEdxBegin = pfTrackCalo->dEdx().begin();
             const auto& dEdxEnd = pfTrackCalo->dEdx().end();
             if (dEdxSize >= 3)
             {
@@ -1887,7 +1919,6 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
             }
           } // if Plane is fCaloPlane
         } // for pfTrackCalo
-        **/
       } // if pfTrack
     } // if isPFParticleTracklike
     if(isPFParticleShowerlike)
@@ -1899,6 +1930,11 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
         const TVector3 showerDir = pfShower->Direction();
         PFBeamPrimStartTheta = showerDir.Theta();
         PFBeamPrimStartPhi = showerDir.Phi();
+
+        const TVector3 showerFrontTPCPoint = lsu::lineZPlane(0,pfBeamVertex,showerDir);
+        PFBeamPrimXFrontTPC = showerFrontTPCPoint.X();
+        PFBeamPrimYFrontTPC = showerFrontTPCPoint.Y();
+
         if(pfShower->has_open_angle())
         {
           PFBeamPrimShwrOpenAngle = pfShower->OpenAngle();
@@ -1941,14 +1977,22 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     {
         const auto& pfBeamDaughterTrack = pfBeamDaughterTracks.at(iSec);
         std::cout << "Daughter "<<iSec<<" track len: " << pfBeamDaughterTrack->Length() << std::endl;
-        /**
-        const auto pfTrackCalos = art::FindManyP<anab::Calorimetry>({pfBeamDaughterTrack}, e, fPFCaloTag).at(0);
-        for(const auto& pfTrackCalo:pfTrkCalos)
+        PFBeamSecTrkLen[iSec] = pfBeamDaughterTrack->Length();
+
+        const auto& shouldBeThisTrackToo = allPFTrackVec.at(pfBeamDaughterTrack->ID());
+        if(pfBeamDaughterTrack->ID() != shouldBeThisTrackToo->ID() 
+            || pfBeamDaughterTrack->NPoints() != shouldBeThisTrackToo->NPoints())
+        {
+          throw cet::exception("PionAbsSelector","track->ID() isn't the track index in the list for daughter track!");
+        }
+        const auto& pfBeamDaughterTrackCalos = fmPFCalo.at(pfBeamDaughterTrack->ID());
+
+        for(const auto& pfTrackCalo:pfBeamDaughterTrackCalos)
         {
           if(pfTrackCalo->PlaneID().Plane == fCaloPlane)
           {
             const auto& dEdxSize = pfTrackCalo->dEdx().size();
-            const auto& dEdxBegin = pfTrackCalo->dEdx().begin();
+            //const auto& dEdxBegin = pfTrackCalo->dEdx().begin();
             const auto& dEdxEnd = pfTrackCalo->dEdx().end();
             if (dEdxSize >= 3)
             {
@@ -1964,7 +2008,6 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
             }
           } // if Plane is fCaloPlane
         } // for pfTrackCalo
-        **/
     } // for pfBeamDaughterTrack
     
     break; // only look at first PFSlice
@@ -2095,6 +2138,7 @@ void lana::PionAbsSelector::beginJob()
 
   tree->Branch("triggerIsBeam",&triggerIsBeam,"triggerIsBeam/O");
   tree->Branch("triggerBits",&triggerBits,"triggerBits/i");
+  tree->Branch("nGoodFEMBs",&nGoodFEMBs,"nGoodFEMBs[6]/I");
 
   tree->Branch("nPrimaryParticleCandidates",&nPrimaryParticleCandidates,"nPrimaryParticleCandidates/i");
 
@@ -2333,6 +2377,9 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("PFBeamPrimPDG",&PFBeamPrimPDG,"PFBeamPrimPDG/I");
   tree->Branch("PFBeamPrimIsTracklike",&PFBeamPrimIsTracklike,"PFBeamPrimIsTracklike/O");
   tree->Branch("PFBeamPrimIsShowerlike",&PFBeamPrimIsShowerlike,"PFBeamPrimIsShowerlike/O");
+  tree->Branch("PFBeamPrimBeamCosmicScore",&PFBeamPrimBeamCosmicScore,"PFBeamPrimBeamCosmicScore/F");
+  tree->Branch("PFBeamPrimXFrontTPC",&PFBeamPrimXFrontTPC,"PFBeamPrimXFrontTPC/F");
+  tree->Branch("PFBeamPrimYFrontTPC",&PFBeamPrimYFrontTPC,"PFBeamPrimYFrontTPC/F");
   tree->Branch("PFBeamPrimStartX",&PFBeamPrimStartX,"PFBeamPrimStartX/F");
   tree->Branch("PFBeamPrimStartY",&PFBeamPrimStartY,"PFBeamPrimStartY/F");
   tree->Branch("PFBeamPrimStartZ",&PFBeamPrimStartZ,"PFBeamPrimStartZ/F");
@@ -2344,7 +2391,11 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("PFBeamPrimTrkLen",&PFBeamPrimTrkLen,"PFBeamPrimTrkLen/F");
   tree->Branch("PFBeamPrimShwrLen",&PFBeamPrimShwrLen,"PFBeamPrimShwrLen/F");
   tree->Branch("PFBeamPrimShwrOpenAngle",&PFBeamPrimShwrOpenAngle,"PFBeamPrimShwrOpenAngle/F");
+  tree->Branch("PFBeamPrimdEdxAverageLast3Hits",&PFBeamPrimdEdxAverageLast3Hits,"PFBeamPrimdEdxAverageLast3Hits/F");
+  tree->Branch("PFBeamPrimdEdxAverageLast5Hits",&PFBeamPrimdEdxAverageLast5Hits,"PFBeamPrimdEdxAverageLast5Hits/F");
+  tree->Branch("PFBeamPrimdEdxAverageLast7Hits",&PFBeamPrimdEdxAverageLast7Hits,"PFBeamPrimdEdxAverageLast7Hits/F");
 
+  tree->Branch("PFBeamSecTrkLen",&PFBeamSecTrkLen,"PFBeamSecTrkLen[PFBeamPrimNDaughterTracks]/F");
   tree->Branch("PFBeamSecTrkdEdxAverageLast3Hits",&PFBeamSecTrkdEdxAverageLast3Hits,"PFBeamSecTrkdEdxAverageLast3Hits[PFBeamPrimNDaughterTracks]/F");
   tree->Branch("PFBeamSecTrkdEdxAverageLast5Hits",&PFBeamSecTrkdEdxAverageLast5Hits,"PFBeamSecTrkdEdxAverageLast5Hits[PFBeamPrimNDaughterTracks]/F");
   tree->Branch("PFBeamSecTrkdEdxAverageLast7Hits",&PFBeamSecTrkdEdxAverageLast7Hits,"PFBeamSecTrkdEdxAverageLast7Hits[PFBeamPrimNDaughterTracks]/F");
@@ -2642,6 +2693,10 @@ void lana::PionAbsSelector::ResetTreeVars()
 
   triggerIsBeam = false;
   triggerBits = 0;
+  for(size_t k=0; k < 6; k++)
+  {
+    nGoodFEMBs[6] = DEFAULTNEG;
+  }
 
   CKov0Status = DEFAULTNEG;
   CKov1Status = DEFAULTNEG;
@@ -2907,6 +2962,9 @@ void lana::PionAbsSelector::ResetTreeVars()
   PFBeamPrimPDG = DEFAULTNEG;
   PFBeamPrimIsTracklike = false;
   PFBeamPrimIsShowerlike = false;
+  PFBeamPrimBeamCosmicScore = DEFAULTNEG;
+  PFBeamPrimXFrontTPC = DEFAULTNEG;
+  PFBeamPrimYFrontTPC = DEFAULTNEG;
   PFBeamPrimStartX = DEFAULTNEG;
   PFBeamPrimStartY = DEFAULTNEG;
   PFBeamPrimStartZ = DEFAULTNEG;
@@ -2918,9 +2976,13 @@ void lana::PionAbsSelector::ResetTreeVars()
   PFBeamPrimTrkLen = DEFAULTNEG;
   PFBeamPrimShwrLen = DEFAULTNEG;
   PFBeamPrimShwrOpenAngle = DEFAULTNEG;
+  PFBeamPrimdEdxAverageLast3Hits = DEFAULTNEG;
+  PFBeamPrimdEdxAverageLast5Hits = DEFAULTNEG;
+  PFBeamPrimdEdxAverageLast7Hits = DEFAULTNEG;
 
   for(size_t iSec=0; iSec < MAXPFSECTRKS; iSec++)
   {
+    PFBeamSecTrkLen[iSec] = DEFAULTNEG;
     PFBeamSecTrkdEdxAverageLast3Hits[iSec] = DEFAULTNEG;
     PFBeamSecTrkdEdxAverageLast5Hits[iSec] = DEFAULTNEG;
     PFBeamSecTrkdEdxAverageLast7Hits[iSec] = DEFAULTNEG;
