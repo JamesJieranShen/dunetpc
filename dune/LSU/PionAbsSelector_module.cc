@@ -578,6 +578,18 @@ private:
   float PFBeamPrimdEdxAverageLast5Hits;
   float PFBeamPrimdEdxAverageLast7Hits;
 
+  std::vector<float> PFBeamPrimResRanges;
+  std::vector<float> PFBeamPrimdEdxs;
+  std::vector<float> PFBeamPrimPitches;
+  std::vector<float> PFBeamPrimXs;
+  std::vector<float> PFBeamPrimYs;
+  std::vector<float> PFBeamPrimZs;
+  std::vector<bool> PFBeamPrimInFids;
+  std::vector<float> PFBeamPrimKins;
+  std::vector<float> PFBeamPrimKinsProton;
+  float PFBeamPrimKinInteract;
+  float PFBeamPrimKinInteractProton;
+
   float PFBeamSecTrkLen[MAXPFSECTRKS];
   float PFBeamSecTrkdEdxAverageLast3Hits[MAXPFSECTRKS];
   float PFBeamSecTrkdEdxAverageLast5Hits[MAXPFSECTRKS];
@@ -1917,6 +1929,37 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
             {
               PFBeamPrimdEdxAverageLast7Hits = findAverage(dEdxEnd - 7, dEdxEnd);
             }
+
+            double intE = 0.;
+            for(size_t cRangeIt = 0; cRangeIt < pfTrackCalo->ResidualRange().size() 
+                                && cRangeIt < pfTrackCalo->dEdx().size(); cRangeIt++)
+            {
+              PFBeamPrimResRanges.push_back(pfTrackCalo->ResidualRange().at(cRangeIt));
+              PFBeamPrimdEdxs.push_back(pfTrackCalo->dEdx().at(cRangeIt));
+              PFBeamPrimPitches.push_back(pfTrackCalo->TrkPitchVec().at(cRangeIt));
+              const auto& thisPoint = pfTrackCalo->XYZ().at(cRangeIt); // PositionVector3D
+              PFBeamPrimXs.push_back(thisPoint.X());
+              PFBeamPrimYs.push_back(thisPoint.Y());
+              PFBeamPrimZs.push_back(thisPoint.Z());
+
+              const bool thisInFid = InPrimaryFiducial(thisPoint);
+              PFBeamPrimInFids.push_back(thisInFid);
+              const double thisKin = kinWCInTPC-intE;
+              PFBeamPrimKins.push_back(thisKin);
+              const double thisKinProton = kinWCInTPCProton-intE;
+              PFBeamPrimKinsProton.push_back(thisKinProton);
+              if(thisInFid)
+              {
+                PFBeamPrimKinInteract = thisKin;
+                PFBeamPrimKinInteractProton = thisKinProton;
+              }
+              else
+              {
+                PFBeamPrimKinInteract = DEFAULTNEG;
+                PFBeamPrimKinInteractProton = DEFAULTNEG;
+              }
+              intE += pfTrackCalo->dEdx().at(cRangeIt)*pfTrackCalo->TrkPitchVec().at(cRangeIt);
+            } // for cRangeIt
           } // if Plane is fCaloPlane
         } // for pfTrackCalo
       } // if pfTrack
@@ -2394,6 +2437,18 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("PFBeamPrimdEdxAverageLast3Hits",&PFBeamPrimdEdxAverageLast3Hits,"PFBeamPrimdEdxAverageLast3Hits/F");
   tree->Branch("PFBeamPrimdEdxAverageLast5Hits",&PFBeamPrimdEdxAverageLast5Hits,"PFBeamPrimdEdxAverageLast5Hits/F");
   tree->Branch("PFBeamPrimdEdxAverageLast7Hits",&PFBeamPrimdEdxAverageLast7Hits,"PFBeamPrimdEdxAverageLast7Hits/F");
+
+  tree->Branch("PFBeamPrimResRanges",&PFBeamPrimResRanges);
+  tree->Branch("PFBeamPrimdEdxs",&PFBeamPrimdEdxs);
+  tree->Branch("PFBeamPrimPitches",&PFBeamPrimPitches);
+  tree->Branch("PFBeamPrimXs",&PFBeamPrimXs);
+  tree->Branch("PFBeamPrimYs",&PFBeamPrimYs);
+  tree->Branch("PFBeamPrimZs",&PFBeamPrimZs);
+  tree->Branch("PFBeamPrimInFids",&PFBeamPrimInFids);
+  tree->Branch("PFBeamPrimKins",&PFBeamPrimKins);
+  tree->Branch("PFBeamPrimKinsProton",&PFBeamPrimKinsProton);
+  tree->Branch("PFBeamPrimKinInteract",&PFBeamPrimKinInteract,"PFBeamPrimKinInteract/F");
+  tree->Branch("PFBeamPrimKinInteractProton",&PFBeamPrimKinInteractProton,"PFBeamPrimKinInteractProton/F");
 
   tree->Branch("PFBeamSecTrkLen",&PFBeamSecTrkLen,"PFBeamSecTrkLen[PFBeamPrimNDaughterTracks]/F");
   tree->Branch("PFBeamSecTrkdEdxAverageLast3Hits",&PFBeamSecTrkdEdxAverageLast3Hits,"PFBeamSecTrkdEdxAverageLast3Hits[PFBeamPrimNDaughterTracks]/F");
@@ -2979,6 +3034,18 @@ void lana::PionAbsSelector::ResetTreeVars()
   PFBeamPrimdEdxAverageLast3Hits = DEFAULTNEG;
   PFBeamPrimdEdxAverageLast5Hits = DEFAULTNEG;
   PFBeamPrimdEdxAverageLast7Hits = DEFAULTNEG;
+
+  PFBeamPrimResRanges.clear();
+  PFBeamPrimdEdxs.clear();
+  PFBeamPrimPitches.clear();
+  PFBeamPrimXs.clear();
+  PFBeamPrimYs.clear();
+  PFBeamPrimZs.clear();
+  PFBeamPrimInFids.clear();
+  PFBeamPrimKins.clear();
+  PFBeamPrimKinsProton.clear();
+  PFBeamPrimKinInteract = DEFAULTNEG;
+  PFBeamPrimKinInteractProton = DEFAULTNEG;
 
   for(size_t iSec=0; iSec < MAXPFSECTRKS; iSec++)
   {
