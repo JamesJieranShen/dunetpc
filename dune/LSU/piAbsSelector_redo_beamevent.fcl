@@ -11,6 +11,8 @@ services:
   RandomNumberGenerator: {} #ART native random number generator
   FileCatalogMetadata:  @local::art_file_catalog_data
   @table::protodune_services
+  PdspChannelMapService:        @local::pdspchannelmap
+  ChannelStatusService:         @local::pdsp_channel_status
   IFBeam:            {}
   TimeTracker:      {}
   MemoryTracker:    {}
