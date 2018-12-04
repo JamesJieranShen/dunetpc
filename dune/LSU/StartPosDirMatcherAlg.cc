@@ -13,8 +13,10 @@
 */
 
 #include "StartPosDirMatcherAlg.h"
+#include "GenVectorHelper.h"
 #include "messagefacility/MessageLogger/MessageLogger.h"
 #include "TMath.h"
+#include "Math/GenVector/VectorUtil.h"
 #include <algorithm>
 
 /// Find best match track given MCParticle and set of tracks
@@ -45,27 +47,24 @@ mctrue::StartPosDirMatcherAlg::getBestMatch(
   {
     return art::Ptr<recob::Track>(); //return an invalid art::Ptr
   }
-  const TVector3 mcpStartPos = mcParticle.Position().Vect();
-  const TVector3 mcpStartMom = mcParticle.Momentum().Vect();
+  const auto& mcpStartPos = lsu::toPoint(mcParticle.Position());
+  const auto& mcpStartMom = lsu::toVector(mcParticle.Momentum());
   const double maxAngleRad = maxAngleDeg*TMath::Pi()/180.;
 
   auto bestMatch = recoTracks.end();
   for(auto track = recoTracks.begin(); track != recoTracks.end(); track++)
   {
     // First from the front of the track
-    const TVector3 vertex = (*track)->Vertex();
-    const auto trackStartDirDispVect = (*track)->StartDirection();
-    const TVector3 trackStartDir = TVector3(trackStartDirDispVect.X(), 
-                                            trackStartDirDispVect.Y(), 
-                                            trackStartDirDispVect.Z());
-    double vertexAngle = mcpStartMom.Angle(trackStartDir);
+    const auto& vertex = (*track)->Vertex();
+    const auto& trackStartDir = (*track)->StartDirection();
+    double vertexAngle = ROOT::Math::VectorUtil::Angle(mcpStartMom,trackStartDir);
     if (vertexAngle > TMath::PiOver2())
     {
       vertexAngle -= TMath::PiOver2();
     }
     if (vertexAngle <= maxAngleRad)
     {
-      const double vertexDistance = (mcpStartPos-vertex).Mag();
+      const double vertexDistance = (mcpStartPos-vertex).R();
       if (vertexDistance < distance)
       {
         distance = vertexDistance;
@@ -74,19 +73,16 @@ mctrue::StartPosDirMatcherAlg::getBestMatch(
       }
     }
     // Then end of track
-    const TVector3 trkEnd = (*track)->End();
-    const auto trackEndDirDispVect = (*track)->EndDirection();
-    const TVector3 trackEndDir = TVector3(trackEndDirDispVect.X(), 
-                                          trackEndDirDispVect.Y(), 
-                                          trackEndDirDispVect.Z());
-    double endAngle = mcpStartMom.Angle(trackEndDir);
+    const auto& trkEnd = (*track)->End();
+    const auto& trackEndDir = (*track)->EndDirection();
+    double endAngle = ROOT::Math::VectorUtil::Angle(mcpStartMom,trackEndDir);
     if (endAngle > TMath::PiOver2())
     {
       endAngle -= TMath::PiOver2();
     }
     if (endAngle <= maxAngleRad)
     {
-      const double endDistance = (mcpStartPos-trkEnd).Mag();
+      const double endDistance = (mcpStartPos-trkEnd).R();
       if (endDistance < distance)
       {
         distance = endDistance;

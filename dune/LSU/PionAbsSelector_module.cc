@@ -35,6 +35,7 @@
 #include "dunetpc/dune/LSU/MCBeamOrCosmicAlg.h"
 #include "dunetpc/dune/LSU/PlaneIntersectionFinder.h"
 #include "dunetpc/dune/LSU/MotherDaughterWalkerAlg.h"
+#include "dunetpc/dune/LSU/GenVectorHelper.h"
 #include "dunetpc/dune/Protodune/Analysis/ProtoDUNEDataUtils.h"
 #include "dunetpc/dune/Protodune/Analysis/ProtoDUNEPFParticleUtils.h"
 #include "larpandora/LArPandoraInterface/LArPandoraHelper.h"
@@ -46,6 +47,8 @@
 #include "TH2F.h"
 #include "TFile.h"
 #include "TTree.h"
+#include "Math/Vector4Dfwd.h" // for 4D genvectors
+#include "Math/GenVector/VectorUtil.h"
 
 //c++ includes
 #include <string>
@@ -1020,22 +1023,22 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   }
 
 
-  TVector3 trueStartPos;
-  TVector3 trueEndPos;
-  TVector3 trueSecondToEndPos;
-  TLorentzVector trueStartMomVec4;
-  TLorentzVector trueEndMomVec4;
-  TLorentzVector trueSecondToEndMomVec4;
+  recob::Track::Point_t trueStartPos;
+  recob::Track::Point_t trueEndPos;
+  recob::Track::Point_t trueSecondToEndPos;
+  ROOT::Math::XYZTVector trueStartMomVec4;
+  ROOT::Math::XYZTVector trueEndMomVec4;
+  ROOT::Math::XYZTVector trueSecondToEndMomVec4;
 
   if(primaryParticle)
   {
-    trueStartPos = TVector3(primaryParticle->Trajectory().begin()->first.Vect());
-    trueEndPos = TVector3(std::prev(primaryParticle->Trajectory().end())->first.Vect());
-    trueSecondToEndPos = TVector3(std::prev(std::prev(primaryParticle->Trajectory().end()))->first.Vect());
+    trueStartPos = lsu::toPoint(primaryParticle->Trajectory().begin()->first.Vect());
+    trueEndPos = lsu::toPoint(std::prev(primaryParticle->Trajectory().end())->first.Vect());
+    trueSecondToEndPos = lsu::toPoint(std::prev(std::prev(primaryParticle->Trajectory().end()))->first.Vect());
 
-    trueStartMomVec4 = TLorentzVector(primaryParticle->Trajectory().begin()->second);
-    trueEndMomVec4 = TLorentzVector(std::prev(primaryParticle->Trajectory().end())->second);
-    trueSecondToEndMomVec4 = TLorentzVector(std::prev(std::prev(primaryParticle->Trajectory().end()))->second);
+    trueStartMomVec4 = lsu::toVector4(primaryParticle->Trajectory().begin()->second);
+    trueEndMomVec4 = lsu::toVector4(std::prev(primaryParticle->Trajectory().end())->second);
+    trueSecondToEndMomVec4 = lsu::toVector4(std::prev(std::prev(primaryParticle->Trajectory().end()))->second);
 
     trueStartX = trueStartPos.X();
     trueStartY = trueStartPos.Y();
@@ -1052,13 +1055,13 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     trueStartPhi = trueStartMomVec4.Vect().Phi();
     thetaWC = trueStartMomVec4.Vect().Theta();
     phiWC = trueStartMomVec4.Vect().Phi();
-    trueStartMom = trueStartMomVec4.Vect().Mag()*1000.; //in MeV/c
+    trueStartMom = trueStartMomVec4.R()*1000.; //in MeV/c
     trueStartE = trueStartMomVec4.E()*1000.;// in MeV
     trueStartKin = trueStartE - primaryParticle->Mass()*1000.; // in MeV
-    trueEndMom = trueEndMomVec4.Vect().Mag()*1000.; // in MeV/c
+    trueEndMom = trueEndMomVec4.R()*1000.; // in MeV/c
     trueEndE = trueEndMomVec4.E()*1000.; // in MeV
     trueEndKin = trueEndE - primaryParticle->Mass()*1000.; // in MeV
-    trueSecondToEndMom = trueSecondToEndMomVec4.Vect().Mag()*1000.; // in MeV/c
+    trueSecondToEndMom = trueSecondToEndMomVec4.R()*1000.; // in MeV/c
     trueSecondToEndE = trueSecondToEndMomVec4.E()*1000.; // in MeV
     trueSecondToEndKin = trueSecondToEndE - primaryParticle->Mass()*1000.; // in MeV
     std::string processStr = primaryParticle->Process();
@@ -1540,10 +1543,10 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   //Match the primary track to the WCTrack or MCParticle
   const art::Ptr<recob::Track> primaryTrack = MatchRecoToTruthOrWCTrack(trackVec,e.isRealData()); // also sets deltaX, deltaY, etc.
   //Get Primary Track Variables
-  TVector3 primTrkStart;
-  TVector3 primTrkEnd;
-  TVector3 primTrkStartDir;
-  TVector3 primTrkEndDir;
+  recob::Track::Point_t primTrkStart;
+  recob::Track::Point_t primTrkEnd;
+  recob::Track::Vector_t primTrkStartDir;
+  recob::Track::Vector_t primTrkEndDir;
   if(iBestMatch < 0)
   {
     mf::LogWarning("PionAbsorption") << "Event " << e.id().event() << " thrown out because a primary track could not be identified.\n";
@@ -1558,10 +1561,10 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   }
   else // good primaryTrack
   {
-    primTrkStart = TVector3(primaryTrack->LocationAtPoint(0));
-    primTrkEnd = TVector3(primaryTrack->LocationAtPoint(primaryTrack->NumberTrajectoryPoints()-1));
-    primTrkStartDir = TVector3(primaryTrack->DirectionAtPoint(0));
-    primTrkEndDir = TVector3(primaryTrack->DirectionAtPoint(primaryTrack->NumberTrajectoryPoints()-1));
+    primTrkStart = primaryTrack->LocationAtPoint(0);
+    primTrkEnd = primaryTrack->LocationAtPoint(primaryTrack->NumberTrajectoryPoints()-1);
+    primTrkStartDir = primaryTrack->DirectionAtPoint(0);
+    primTrkEndDir = primaryTrack->DirectionAtPoint(primaryTrack->NumberTrajectoryPoints()-1);
     primTrkStartMomTrking = primaryTrack->MomentumAtPoint(0)*1000.; // MeV/c
     primTrkStartTheta = primTrkStartDir.Theta();
     primTrkStartPhi = primTrkStartDir.Phi();
@@ -1724,8 +1727,8 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
         mf::LogInfo("SecondaryTrack") << std::fixed << std::setprecision(1) 
                 << "Start: (" << secTrkStart.X() << "," << secTrkStart.Y() << "," << secTrkStart.Z() << ") "
                 << "End: (" << secTrkEnd.X() << "," << secTrkEnd.Y() << "," << secTrkEnd.Z() << ")";
-        const float secTrkStartDistToPrimEnd = (secTrkStart-primTrkEnd).Mag();
-        const float secTrkEndDistToPrimEnd = (secTrkEnd-primTrkEnd).Mag();
+        const float secTrkStartDistToPrimEnd = (secTrkStart-primTrkEnd).R();
+        const float secTrkEndDistToPrimEnd = (secTrkEnd-primTrkEnd).R();
         trackStartDistToPrimTrkEnd[iTrack] = secTrkStartDistToPrimEnd;
         trackEndDistToPrimTrkEnd[iTrack] = secTrkEndDistToPrimEnd;
         trackClosestDistToPrimTrkEnd[iTrack] = secTrkEndDistToPrimEnd;
@@ -1847,7 +1850,7 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
 
   protoana::ProtoDUNEPFParticleUtils pfPartUtils;
   std::cout << "Number of primary PFParticles: " << pfPartUtils.GetNumberPrimaryPFParticle(e,fPFParticleTag.encode()) << std::endl;
-  std::vector<recob::PFParticle*> pfFromBeamSlice = pfPartUtils.GetPFParticlesFromBeamSlice(e,fPFParticleTag.encode());
+  const std::vector<const recob::PFParticle*> pfFromBeamSlice = pfPartUtils.GetPFParticlesFromBeamSlice(e,fPFParticleTag.encode());
 
   // All this just to get the calos
   auto allPFTrackHand = e.getValidHandle<std::vector<recob::Track>>(fPFTrackTag);
@@ -1862,7 +1865,7 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   std::cout << "Number of primary beam PFParticles: " << PFNBeamSlices << std::endl;
   for(size_t iPF=0; iPF < PFNBeamSlices; iPF++)
   {
-    recob::PFParticle* pfBeamPart = pfFromBeamSlice.at(iPF);
+    const recob::PFParticle* pfBeamPart = pfFromBeamSlice.at(iPF);
     PFBeamPrimPDG = pfBeamPart->PdgCode();
     PFBeamPrimNDaughters = pfBeamPart->NumDaughters();
     const bool isPFParticleTracklike = pfPartUtils.IsPFParticleTracklike(*pfBeamPart);
@@ -2627,7 +2630,7 @@ const art::Ptr<recob::Track> lana::PionAbsSelector::MatchRecoToTruthOrWCTrack(co
     const float deltaY = yTrack - yTrue;
     const float deltaR = sqrt(deltaX*deltaX + deltaY*deltaY);
     const auto& trackStartDir = track->DirectionAtPoint(0);
-    const float deltaAngle = trackStartDir.Angle(dirTrue);
+    const float deltaAngle = ROOT::Math::VectorUtil::Angle(trackStartDir,dirTrue);
     if(iTrack <= MAXTRACKS)
     {
       trackMatchDeltaX[iTrack] = deltaX;
