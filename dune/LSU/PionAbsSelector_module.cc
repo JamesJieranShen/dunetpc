@@ -1783,33 +1783,33 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       } //if this track is not the primary
     } // for track in trackVec
 
-    // SecMin Calorimetry
-    int itc = tracksCaloVec.size();
-    if(iSecMin >= 0 && iSecMin < itc)
-    {
-      const auto secMinTrkCalos = tracksCaloVec.at(iSecMin);
-      for(const auto& secMinTrkCalo:secMinTrkCalos)
-      {
-        if(secMinTrkCalo->PlaneID().Plane == fCaloPlane)
-        {
-          size_t IBackwards = secMinTrkCalo->dEdx().size()-1;
-          for(size_t cRangeIt = 0; cRangeIt < secMinTrkCalo->ResidualRange().size() && cRangeIt < secMinTrkCalo->dEdx().size(); cRangeIt++)
-          {
-            secMinTrkResRanges.push_back(secMinTrkCalo->ResidualRange().at(cRangeIt));
-            secMinTrkdEdxs.push_back(secMinTrkCalo->dEdx().at(cRangeIt));
-            secMinTrkPitches.push_back(secMinTrkCalo->TrkPitchVec().at(cRangeIt));
-            secMinTrkIBackwards.push_back(IBackwards);
-            IBackwards--;
-            const auto thisPoint = secMinTrkCalo->XYZ().at(cRangeIt); // PositionVector3D
-            secMinTrkXs.push_back(thisPoint.X());
-            secMinTrkYs.push_back(thisPoint.Y());
-            secMinTrkZs.push_back(thisPoint.Z());
-            bool thisInFid = InPrimaryFiducial(thisPoint);
-            secMinTrkInFids.push_back(thisInFid);
-          } // for cRangeIt
-        } // if plane == fCaloPlane
-      } // for calo in caloVec
-    } // have good secondary
+//    // SecMin Calorimetry
+//    int itc = tracksCaloVec.size();
+//    if(iSecMin >= 0 && iSecMin < itc)
+//    {
+//      const auto secMinTrkCalos = tracksCaloVec.at(iSecMin);
+//      for(const auto& secMinTrkCalo:secMinTrkCalos)
+//      {
+//        if(secMinTrkCalo->PlaneID().Plane == fCaloPlane)
+//        {
+//          size_t IBackwards = secMinTrkCalo->dEdx().size()-1;
+//          for(size_t cRangeIt = 0; cRangeIt < secMinTrkCalo->ResidualRange().size() && cRangeIt < secMinTrkCalo->dEdx().size(); cRangeIt++)
+//          {
+//            secMinTrkResRanges.push_back(secMinTrkCalo->ResidualRange().at(cRangeIt));
+//            secMinTrkdEdxs.push_back(secMinTrkCalo->dEdx().at(cRangeIt));
+//            secMinTrkPitches.push_back(secMinTrkCalo->TrkPitchVec().at(cRangeIt));
+//            secMinTrkIBackwards.push_back(IBackwards);
+//            IBackwards--;
+//            const auto thisPoint = secMinTrkCalo->XYZ().at(cRangeIt); // PositionVector3D
+//            secMinTrkXs.push_back(thisPoint.X());
+//            secMinTrkYs.push_back(thisPoint.Y());
+//            secMinTrkZs.push_back(thisPoint.Z());
+//            bool thisInFid = InPrimaryFiducial(thisPoint);
+//            secMinTrkInFids.push_back(thisInFid);
+//          } // for cRangeIt
+//        } // if plane == fCaloPlane
+//      } // for calo in caloVec
+//    } // have good secondary
 
   } // good primaryTrack
   if (isMC && nTracksInFirstZ[2] >= 1 && nTracksInFirstZ[14] < 4 && nTracksLengthLt[5] < 3
