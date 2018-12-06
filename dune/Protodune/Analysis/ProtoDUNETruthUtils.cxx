@@ -6,6 +6,7 @@
 #include "art/Framework/Principal/Event.h"
 
 #include "lardata/DetectorInfoServices/DetectorClocksService.h"
+#include "larcore/Geometry/Geometry.h"
 
 protoana::ProtoDUNETruthUtils::ProtoDUNETruthUtils(){
 
@@ -171,5 +172,36 @@ const float protoana::ProtoDUNETruthUtils::ConvertTrueTimeToPandoraTimeMicro(con
   auto const* detclock = lar::providerFrom<detinfo::DetectorClocksService>();
 
   return detclock->G4ToElecTime(trueTime);
+}
+
+
+const std::vector<sim::IDE> protoana::ProtoDUNETruthUtils::GetIDEsFromParticle(const simb::MCParticle & part, const art::Event & evt) const{
+
+  art::ServiceHandle<geo::Geometry> geom;
+  std::vector<sim::IDE> result;
+  const auto& partTrackID = part.TrackId();
+
+  std::vector<art::Ptr<sim::SimChannel>> simChanVec;
+  auto simChanHand = evt.getValidHandle<std::vector<sim::SimChannel> >("largeant");
+  art::fill_ptr_vector(simChanVec, simChanHand);
+  for(const auto& channel: simChanVec)
+  {
+    const auto& channelNumber = channel->Channel();
+    auto signalType = geom->SignalType(channelNumber);
+    if(signalType != geo::kCollection) continue;
+    for(const auto& TDCIDEs: channel->TDCIDEMap())
+    {
+      // unsigned short TDC = TDCIDEs.first;
+      const std::vector<sim::IDE>& IDEs = TDCIDEs.second;
+      for(const auto& IDE: IDEs)
+      {
+        if(IDE.trackID == partTrackID)
+        {
+          result.push_back(IDE);
+        }
+      }
+    } // for TDCIDE
+  } // for channel
+  return result;
 }
 

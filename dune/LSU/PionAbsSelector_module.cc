@@ -36,8 +36,10 @@
 #include "dunetpc/dune/LSU/PlaneIntersectionFinder.h"
 #include "dunetpc/dune/LSU/MotherDaughterWalkerAlg.h"
 #include "dunetpc/dune/LSU/GenVectorHelper.h"
+#include "dunetpc/dune/LSU/BackTrackerAlg.h"
 #include "dunetpc/dune/Protodune/Analysis/ProtoDUNEDataUtils.h"
 #include "dunetpc/dune/Protodune/Analysis/ProtoDUNEPFParticleUtils.h"
+#include "dunetpc/dune/Protodune/Analysis/ProtoDUNETruthUtils.h"
 #include "larpandora/LArPandoraInterface/LArPandoraHelper.h"
 #include "dunetpc/dune/DuneObj/ProtoDUNEBeamEvent.h"
 #include "larsim/MCCheater/BackTrackerService.h"
@@ -64,7 +66,7 @@ const auto MAXDAUGHTER = 25;
 const auto MAXMCPARTS = 10000;
 const auto MAXBEAMTRACKS = 300;
 const auto MAXBEAMMOMS = 300;
-const auto MAXIDES = 150000;
+const auto MAXIDES = 20000;
 const auto MAXPFSECTRKS = 25;
 const auto MAXPFSECSHWRS = 25;
 const auto MAXZINT = 95;
@@ -386,15 +388,11 @@ private:
   Float_t mcPartDeltaAngle[MAXMCPARTS];
 
   UInt_t nIDEs;
-  Int_t simIDETrackID[MAXIDES]; // track ID matching to true particles
   Float_t simIDENumElectrons[MAXIDES]; // number of electrons at wire for this time tick
   Float_t simIDEEnergy[MAXIDES]; // number energy deposited for this time tick in MeV
   Float_t simIDEX[MAXIDES]; // true X position cm
   Float_t simIDEY[MAXIDES]; // true Y position cm
   Float_t simIDEZ[MAXIDES]; // true Z position cm
-  UInt_t simIDETDC[MAXIDES]; // TDC tick number
-  bool simIDEIsPrimary[MAXIDES]; // true if this IDE Track ID == Track ID of primary particle
-  bool simIDEIsCollection[MAXIDES]; // true if this IDE channel is a collection channel
 
   UInt_t nTracks;
   UInt_t nTracksInFirstZ[MAXZINT]; // the number of tracks with a space point in (0,i) cm where i is the index
@@ -674,16 +672,6 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     beamOrCosmic = new pdana::MCBeamOrCosmicAlg(e,fTruePartLabel,fBeamTruthTag,fCosmicTruthTag);
   }
   pdana::MotherDaughterWalkerAlg motherDaughterWalker(e,fTruePartLabel);
-
-//  std::vector<art::Ptr<sim::SimChannel>> simChanVec;
-//  if(!e.isRealData())
-//  {
-//    auto simChanHand = e.getValidHandle<std::vector<sim::SimChannel>>(fSimChanLabel);
-//    if(simChanHand.isValid())
-//    {
-//      art::fill_ptr_vector(simChanVec, simChanHand);
-//    }
-//  }
 
   auto trackHand = e.getValidHandle<std::vector<recob::Track>>(fTrackLabel);
   std::vector<art::Ptr<recob::Track>> trackVec;
@@ -1252,7 +1240,26 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     yWC = trueYFrontTPC;
     pzWC = trueStartMomVec4.Z()*1000.; //in MeV/c
     pWC = trueStartMom; //in MeV/c
-  }
+
+
+    // Get SimChannel Info
+    protoana::ProtoDUNETruthUtils pdTruthUtils;
+    const auto ides = pdTruthUtils.GetIDEsFromParticle(*primaryParticle,e);
+    for(const sim::IDE & ide: ides)
+    {
+      if (nIDEs >= MAXIDES - 1)
+      {
+          throw cet::exception("TooManyIDEs","Too many IDEs in this event, ran out of room in array");
+      }
+      simIDENumElectrons[nIDEs] = ide.numElectrons;
+      simIDEEnergy[nIDEs] = ide.energy; // MeV
+      simIDEX[nIDEs] = ide.x; // cm
+      simIDEY[nIDEs] = ide.y;
+      simIDEZ[nIDEs] = ide.z;
+      nIDEs++;
+    } // for ide
+
+  } // if primaryParticle
 
   eWC = sqrt(pWC*pWC+MCHARGEDPION*MCHARGEDPION); // assume charged pion in MeV
   kinWC = eWC - MCHARGEDPION; // assume charged pion in MeV
@@ -1262,51 +1269,6 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   eWCProton = sqrt(pWC*pWC+MPROTON*MPROTON);
   kinWCProton = eWCProton - MPROTON;
   kinWCInTPCProton = kinWCProton - KINLOSTBEFORETPCPROTON;
-
-//  // Get SimChannel Info
-//  for(const auto& simChan:(simChanVec))
-//  {
-//    raw::ChannelID_t channelID = simChan->Channel();
-//    geo::SigType_t signalType = geom->SignalType(channelID);
-//    const auto & tdcides = simChan->TDCIDEMap();
-//    for(const auto tdcide: tdcides)
-//    {
-//      const unsigned short tdc = tdcide.first;
-//      const std::vector<sim::IDE> ides = tdcide.second;
-//      for(const sim::IDE ide: ides)
-//      {
-//        if (nIDEs >= MAXIDES - 1)
-//        {
-//            throw cet::exception("TooManyIDEs","Too many IDEs in this event, ran out of room in array");
-//        }
-//        simIDETrackID[nIDEs] = ide.trackID;
-//        simIDENumElectrons[nIDEs] = ide.numElectrons;
-//        simIDEEnergy[nIDEs] = ide.energy; // MeV
-//        simIDEX[nIDEs] = ide.x; // cm
-//        simIDEY[nIDEs] = ide.y;
-//        simIDEZ[nIDEs] = ide.z;
-//
-//        simIDETDC[nIDEs] = tdc;
-//        if (primaryParticle && (primaryParticle->TrackId() == ide.trackID))
-//        {
-//          simIDEIsPrimary[nIDEs] = true;
-//        }
-//        else
-//        {
-//          simIDEIsPrimary[nIDEs] = false;
-//        }
-//        if (signalType == geo::kCollection)
-//        {
-//          simIDEIsCollection[nIDEs] = true;
-//        }
-//        else
-//        {
-//          simIDEIsCollection[nIDEs] = false;
-//        }
-//        nIDEs++;
-//      } // for ide
-//    } // for tdcide
-//  } // for simChan
 
 
   //Get Variables using all tracks
@@ -1852,14 +1814,22 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   std::cout << "Number of primary PFParticles: " << pfPartUtils.GetNumberPrimaryPFParticle(e,fPFParticleTag.encode()) << std::endl;
   const std::vector<const recob::PFParticle*> pfFromBeamSlice = pfPartUtils.GetPFParticlesFromBeamSlice(e,fPFParticleTag.encode());
 
-  // All this just to get the calos
+  // All this just to get the calos and truth
   auto allPFTrackHand = e.getValidHandle<std::vector<recob::Track>>(fPFTrackTag);
   std::vector<art::Ptr<recob::Track>> allPFTrackVec;
   if(allPFTrackHand.isValid())
   {
     art::fill_ptr_vector(allPFTrackVec, allPFTrackHand);
   }
+  art::FindManyP<recob::Hit> fmHitsForPFTracks(allPFTrackHand, e, fPFTrackTag);
   art::FindManyP<anab::Calorimetry>  fmPFCalo(allPFTrackHand, e, fPFCaloTag);
+  //auto allPFShowerHand = e.getValidHandle<std::vector<recob::Shower>>(fPFShowerTag);
+  //std::vector<art::Ptr<recob::Shower>> allPFShowerVec;
+  //if(allPFShowerHand.isValid())
+  //{
+  //  art::fill_ptr_vector(allPFShowerVec, allPFShowerHand);
+  //}
+  //art::FindManyP<recob::Hit> fmHitsForPFShowers(allPFShowerHand, e, fPFShowerTag);
 
   PFNBeamSlices = pfFromBeamSlice.size();
   std::cout << "Number of primary beam PFParticles: " << PFNBeamSlices << std::endl;
@@ -1965,6 +1935,21 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
             } // for cRangeIt
           } // if Plane is fCaloPlane
         } // for pfTrackCalo
+
+        if(isMC) // Now MCTruth Matching
+        {
+          const auto& pfTrackHits = fmHitsForPFTracks.at(pfTrack->ID());
+          lsu::BackTrackerAlg btAlg;
+          bool trackIDIsNeg = false;
+          const auto pfTrackMCPart = btAlg.getMCParticle(pfTrackHits,e,trackIDIsNeg);
+          bool isTrueBeam = false;
+          if (beamOrCosmic)
+          {
+            isTrueBeam = beamOrCosmic->isBeam(pfTrackMCPart);
+          }
+          std::cout << "PFPrimaryTrack MCPart: PDG: " << pfTrackMCPart.PdgCode() <<"  Mom: "<< pfTrackMCPart.Momentum().Vect().Mag() << " isBeam: "<<isTrueBeam<<" process: "<<pfTrackMCPart.Process() << " end process: "<<pfTrackMCPart.EndProcess()<< std::endl;
+
+        } // if isMC
       } // if pfTrack
     } // if isPFParticleTracklike
     if(isPFParticleShowerlike)
@@ -2001,6 +1986,20 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
                   << "," << showerDir.Z()
                   << ")"
                   << std::endl;
+        //if(isMC) // Now MCTruth Matching
+        //{
+        //  const auto& pfShowerHits = fmHitsForPFShowers.at(pfShower->ID());
+        //  lsu::BackTrackerAlg btAlg;
+        //  bool trackIDIsNeg = false;
+        //  const auto pfShowerMCPart = btAlg.getMCParticle(pfShowerHits,e,trackIDIsNeg);
+        //  bool isTrueBeam = false;
+        //  if (beamOrCosmic)
+        //  {
+        //    isTrueBeam = beamOrCosmic->isBeam(pfShowerMCPart);
+        //  }
+        //  std::cout << "PFPrimaryShower MCPart: PDG: " << pfShowerMCPart.PdgCode() <<"  Mom: "<< pfShowerMCPart.Momentum().Vect().Mag() << " isBeam: "<<isTrueBeam<<" process: "<<pfShowerMCPart.Process() << " end process: "<<pfShowerMCPart.EndProcess()<< std::endl;
+
+        //} // if isMC
       } // if pfShower
     } // if isPFParticleShowerlike
 
@@ -2250,16 +2249,12 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("mcPartEndKin",&mcPartEndKin,"mcPartEndKin[nMCParts]/F");
   tree->Branch("mcPartDeltaAngle",&mcPartDeltaAngle,"mcPartDeltaAngle[nMCParts]/F");
 
-  //tree->Branch("nIDEs",&nIDEs,"nIDEs/i");
-  //tree->Branch("simIDETrackID",&simIDETrackID,"simIDETrackID[nIDEs]/I");
-  //tree->Branch("simIDENumElectrons",&simIDENumElectrons,"simIDENumElectrons[nIDEs]/F");
-  //tree->Branch("simIDEEnergy",&simIDEEnergy,"simIDEEnergy[nIDEs]/F");
-  //tree->Branch("simIDEX",&simIDEX,"simIDEX[nIDEs]/F");
-  //tree->Branch("simIDEY",&simIDEY,"simIDEY[nIDEs]/F");
-  //tree->Branch("simIDEZ",&simIDEZ,"simIDEZ[nIDEs]/F");
-  //tree->Branch("simIDETDC",&simIDETDC,"simIDETDC[nIDEs]/i");
-  //tree->Branch("simIDEIsPrimary",&simIDEIsPrimary,"simIDEIsPrimary[nIDEs]/O");
-  //tree->Branch("simIDEIsCollection",&simIDEIsCollection,"simIDEIsCollection[nIDEs]/O");
+  tree->Branch("nIDEs",&nIDEs,"nIDEs/i");
+  tree->Branch("simIDENumElectrons",&simIDENumElectrons,"simIDENumElectrons[nIDEs]/F");
+  tree->Branch("simIDEEnergy",&simIDEEnergy,"simIDEEnergy[nIDEs]/F");
+  tree->Branch("simIDEX",&simIDEX,"simIDEX[nIDEs]/F");
+  tree->Branch("simIDEY",&simIDEY,"simIDEY[nIDEs]/F");
+  tree->Branch("simIDEZ",&simIDEZ,"simIDEZ[nIDEs]/F");
   
   tree->Branch("nTracks",&nTracks,"nTracks/i");
   tree->Branch("nTracksInFirstZ",&nTracksInFirstZ,("nTracksInFirstZ["+std::to_string(MAXZINT)+"]/i").c_str());
@@ -2836,15 +2831,11 @@ void lana::PionAbsSelector::ResetTreeVars()
   nIDEs = 0;
   for(size_t iIDE=0; iIDE < MAXIDES; iIDE++)
   {
-    simIDETrackID[iIDE] = DEFAULTNEG;
     simIDENumElectrons[iIDE] = DEFAULTNEG;
     simIDEEnergy[iIDE] = DEFAULTNEG;
     simIDEX[iIDE] = DEFAULTNEG;
     simIDEY[iIDE] = DEFAULTNEG;
     simIDEZ[iIDE] = DEFAULTNEG;
-    simIDETDC[iIDE] = 0;
-    simIDEIsPrimary[iIDE] = false;
-    simIDEIsCollection[iIDE] = false;
   }
 
   nTracks = 0;

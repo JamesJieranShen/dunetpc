@@ -12,6 +12,7 @@
 #include "lardataobj/RecoBase/Track.h"
 #include "nusimdata/SimulationBase/MCParticle.h"
 #include "nusimdata/SimulationBase/MCTruth.h"
+#include "lardataobj/Simulation/SimChannel.h"
 
 #include "art/Framework/Principal/Event.h"
 
@@ -35,6 +36,8 @@ namespace protoana {
     // Microsecond versions
     const float ConvertTrueTimeToPandoraTimeMicro(const simb::MCParticle &part) const;
     const float ConvertTrueTimeToPandoraTimeMicro(const float trueTime) const;
+
+    const std::vector<sim::IDE> GetIDEsFromParticle(const simb::MCParticle & part, const art::Event & evt) const;
 
   private:
 
