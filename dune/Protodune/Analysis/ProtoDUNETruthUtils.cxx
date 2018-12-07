@@ -8,6 +8,8 @@
 #include "lardata/DetectorInfoServices/DetectorClocksService.h"
 #include "larcore/Geometry/Geometry.h"
 
+#include <algorithm>
+
 protoana::ProtoDUNETruthUtils::ProtoDUNETruthUtils(){
 
 }
@@ -174,8 +176,7 @@ const float protoana::ProtoDUNETruthUtils::ConvertTrueTimeToPandoraTimeMicro(con
   return detclock->G4ToElecTime(trueTime);
 }
 
-
-const std::vector<sim::IDE> protoana::ProtoDUNETruthUtils::GetIDEsFromParticle(const simb::MCParticle & part, const art::Event & evt) const{
+std::vector<sim::IDE> protoana::ProtoDUNETruthUtils::GetIDEsFromParticle(const simb::MCParticle & part, const art::Event & evt) const{
 
   art::ServiceHandle<geo::Geometry> geom;
   std::vector<sim::IDE> result;
@@ -202,6 +203,12 @@ const std::vector<sim::IDE> protoana::ProtoDUNETruthUtils::GetIDEsFromParticle(c
       }
     } // for TDCIDE
   } // for channel
+  return result;
+}
+
+std::vector<sim::IDE> protoana::ProtoDUNETruthUtils::GetIDEsFromParticleSortZ(const simb::MCParticle & part, const art::Event & evt) const{
+  auto result = GetIDEsFromParticle(part,evt);
+  std::sort(result.begin(),result.end(),[](const auto& a, const auto& b){return a.z < b.z;});
   return result;
 }
 

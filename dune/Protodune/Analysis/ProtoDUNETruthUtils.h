@@ -37,7 +37,8 @@ namespace protoana {
     const float ConvertTrueTimeToPandoraTimeMicro(const simb::MCParticle &part) const;
     const float ConvertTrueTimeToPandoraTimeMicro(const float trueTime) const;
 
-    const std::vector<sim::IDE> GetIDEsFromParticle(const simb::MCParticle & part, const art::Event & evt) const;
+    std::vector<sim::IDE> GetIDEsFromParticle(const simb::MCParticle & part, const art::Event & evt) const;
+    std::vector<sim::IDE> GetIDEsFromParticleSortZ(const simb::MCParticle & part, const art::Event & evt) const;
 
   private:
 

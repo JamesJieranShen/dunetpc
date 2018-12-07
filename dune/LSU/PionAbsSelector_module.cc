@@ -2255,7 +2255,7 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
 
     // Get SimChannel Info
     protoana::ProtoDUNETruthUtils pdTruthUtils;
-    const auto ides = pdTruthUtils.GetIDEsFromParticle(*primaryParticle,e);
+    const auto ides = pdTruthUtils.GetIDEsFromParticleSortZ(*primaryParticle,e);
     for(const sim::IDE & ide: ides)
     {
       if (nIDEs >= MAXIDES - 1)
