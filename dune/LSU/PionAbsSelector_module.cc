@@ -616,6 +616,12 @@ private:
   //Internal functions
   const art::Ptr<recob::Track> MatchRecoToTruthOrWCTrack(const std::vector<art::Ptr<recob::Track>>& tracks, bool isData); 
   const art::Ptr<simb::MCParticle> ProcessMCParticles(const std::vector<art::Ptr<simb::MCParticle>>& truePartVec, const pdana::MCBeamOrCosmicAlg * const beamOrCosmic, const art::Event& e); // returns primary particle candidate
+  void ProcessAllTracks(const std::vector<art::Ptr<recob::Track>>& trackVec,
+        const std::vector<art::Ptr<simb::MCParticle>>& truePartVec,
+        const art::FindManyP<anab::Calorimetry>& tracksCaloVec, 
+        const art::FindManyP<recob::Hit>& fmHitsForTracks,
+        const pdana::MCBeamOrCosmicAlg * const beamOrCosmic,
+        const art::Event& e);
 
   void ResetTreeVars();
 
@@ -878,236 +884,7 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
 
   const art::Ptr<simb::MCParticle> primaryParticle = ProcessMCParticles(truePartVec,beamOrCosmic,e);
 
-  //Get Variables using all tracks
-  nTracks = trackVec.size();
-  if (nTracks > MAXTRACKS)
-  {
-    mf::LogError("Track") << "Too many tracks in event to record: "
-        << nTracks << " > " << MAXTRACKS << ", not saving event to tree.";
-    return;
-  }
-  for(size_t iTrack=0; iTrack < trackVec.size(); iTrack++)
-  {
-    const art::Ptr<recob::Track> track = trackVec[iTrack];
-    const size_t nPoints = track->NumberTrajectoryPoints();
-
-    if (nPoints > 0)
-    {
-      trackStartX[iTrack] = track->Vertex().X();
-      trackStartY[iTrack] = track->Vertex().Y();
-      trackStartZ[iTrack] = track->Vertex().Z();
-      trackStartTheta[iTrack] = track->VertexDirection().Theta();
-      trackStartPhi[iTrack] = track->VertexDirection().Phi();
-      if (nPoints > 1)
-      {
-        trackEndX[iTrack] = track->End().X();
-        trackEndY[iTrack] = track->End().Y();
-        trackEndZ[iTrack] = track->End().Z();
-      }
-      else
-      {
-        trackEndX[iTrack] = track->Vertex().X();
-        trackEndY[iTrack] = track->Vertex().Y();
-        trackEndZ[iTrack] = track->Vertex().Z();
-      }
-      trackLength[iTrack] = track->Length();
-    }
-
-    const TVector3 trackIntersectionPoint = lsu::trackZPlane(0.,*track);
-    trackXFrontTPC[iTrack] = trackIntersectionPoint.X();
-    trackYFrontTPC[iTrack] = trackIntersectionPoint.Y();
-
-    double minz=1000.;
-    for(size_t iPoint=0; iPoint < nPoints; iPoint++)
-    {
-      const double pointZ = track->LocationAtPoint(iPoint).Z();
-      if(pointZ < minz)
-      {
-        minz = pointZ;
-      }
-    } // for iPoint
-    for(size_t z=0; z < MAXZINT; z++)
-    {
-      if(minz < z)
-      {
-        // the number of tracks with a space point in [0,i] cm where i is the index
-        nTracksInFirstZ[z]++;
-      }
-    } // for z
-    const double trkLength = track->Length();
-    for(size_t l=0; l < MAXLINT; l++)
-    {
-      if(trkLength < l)
-      {
-        // the number of tracks with length less than i cm where i is the index
-        nTracksLengthLt[l]++;
-      }
-    } // for l
-    // calo info
-    const auto calos = tracksCaloVec.at(iTrack);
-    for(const auto& calo:calos)
-    {
-      if(calo->PlaneID().Plane == fCaloPlane)
-      {
-          trackCaloKin[iTrack] = calo->KineticEnergy();
-          //for(size_t cRangeIt = 0; cRangeIt < calo->ResidualRange().size() && cRangeIt < calo->dEdx().size(); cRangeIt++)
-          //{
-          //  trackResRanges[iTrk].push_back(primTrkCalo->ResidualRange().at(cRangeIt));
-          //  trackdEdxs[iTrk].push_back(primTrkCalo->dEdx().at(cRangeIt));
-          //}
-        } // if plane == fCaloPlane
-    } //for calo in caloVec
-    const auto lhpids = fmlhpid.at(iTrack);
-    for (const auto& lhpid: lhpids)
-    {
-      if(lhpid->PlaneID().Plane == fCaloPlane)
-      {
-        trackLLHPion[iTrack] = lhpid->Chi2Pion();
-        trackLLHProton[iTrack] = lhpid->Chi2Proton();
-        trackLLHMuon[iTrack] = lhpid->Chi2Muon();
-        trackLLHKaon[iTrack] = lhpid->Chi2Kaon();
-      } // if lhpid plane == fCaloPlane
-    } // for lhpid
-    const auto pidas = fmpida.at(iTrack);
-    for (const auto& pida: pidas)
-    {
-      if(pida->PlaneID().Plane == fCaloPlane)
-      {
-        trackPIDA[iTrack] = pida->PIDA();
-      } // if pida plane == fCaloPlane
-    } // for pida
-    //// Match track to MCParticle
-    mf::LogInfo("Track") << std::fixed << std::setprecision(1)
-        << "Track: "<< iTrack 
-        << " len: " << trkLength 
-        <<"  start: " << trackStartX[iTrack] << ", " << trackStartY[iTrack] << ", " << trackStartZ[iTrack]
-        <<"  end: " << trackEndX[iTrack] << ", " << trackEndY[iTrack] << ", " << trackEndZ[iTrack]
-        ;//<< std::endl;
-    if (isMC && fmHitsForTracks.isValid())
-    {
-	    std::vector< art::Ptr<recob::Hit> > trackHits = fmHitsForTracks.at(iTrack);
-	    std::vector< art::Ptr<recob::Hit> > trackHitsU;
-	    std::vector< art::Ptr<recob::Hit> > trackHitsV;
-	    std::vector< art::Ptr<recob::Hit> > trackHitsZ;
-        for (const auto & trackHit : trackHits)
-        {
-          if (trackHit->View() == geo::kU) trackHitsU.push_back(trackHit);
-          else if (trackHit->View() == geo::kV) trackHitsV.push_back(trackHit);
-          else if (trackHit->View() == geo::kZ) trackHitsZ.push_back(trackHit);
-        }
-	    int TrackID = DEFAULTNEG;
-        std::set<int> setOfTrackIDs = bt->GetSetOfTrackIds(trackHits);
-        std::set<int> setOfPosTrackIDs;
-        for (const auto & trackID : setOfTrackIDs)
-        {
-          //std::cout << "Track: "<<iTrack<<" has TrackID: "<< trackID << std::endl;
-          setOfPosTrackIDs.insert(abs(trackID));
-        }
-        std::set<int> thisTrackIDSet;
-        for (const auto & trackID : setOfPosTrackIDs)
-        {
-          thisTrackIDSet.clear();
-          thisTrackIDSet.insert(trackID);
-          thisTrackIDSet.insert(-trackID);
-          float purity = bt->HitChargeCollectionPurity(thisTrackIDSet,trackHits);
-          if (purity > trackTrueChargePurity[iTrack])
-          {
-              TrackID = trackID;
-              trackTrueChargePurity[iTrack] = purity;
-          }
-        }
-        thisTrackIDSet.clear();
-        if (TrackID > DEFAULTNEG)
-        {
-          trackTrueID[iTrack] = TrackID;
-          thisTrackIDSet.insert(TrackID);
-          thisTrackIDSet.insert(-TrackID);
-          // In LArIAT, view V is collection, U is induction.
-          // Was taking 90% of the time spent in analyze!!! (valgrind callgrind)
-          //trackTrueChargeEfficiencyU[iTrack] = bt->HitChargeCollectionEfficiency(
-          //                        thisTrackIDSet,trackHitsU,allHitsVec,geo::kU);
-          //trackTrueChargeEfficiencyV[iTrack] = bt->HitChargeCollectionEfficiency(
-          //                        thisTrackIDSet,trackHitsV,allHitsVec,geo::kV);
-          //trackTrueChargeEfficiencyZ[iTrack] = bt->HitChargeCollectionEfficiency(
-          //                        thisTrackIDSet,trackHitsZ,allHitsVec,geo::kZ);
-
-          // Find the MCParticle corresponding to this trackID
-          art::Ptr<simb::MCParticle> particle;
-          for(auto mcpart: truePartVec)
-          {
-            if (mcpart->TrackId() == TrackID)
-            {
-                particle = mcpart;
-                break;
-            }
-          }
-          if (particle.isNull())
-          {
-            std::string message = "Couldn't find MCParticle for Track: ";
-            message.append(std::to_string(iTrack));
-            message.append(" TrackID: ");
-            message.append(std::to_string(TrackID));
-            throw cet::exception("MCParticleNotFound",message);
-          } // if can't find MCParticle for highest Track ID
-
-          // This is where you can do some analysis of the true particle and compare it to the reco
-          trackTrueMotherID[iTrack] = particle->Mother();
-          trackTruePdg[iTrack] = particle->PdgCode();
-          if (beamOrCosmic)
-          {
-            trackTrueIsBeam[iTrack] = beamOrCosmic->isBeam(particle);
-          }
-          trackTrueKin[iTrack] = 1000*(particle->E()-particle->Mass());
-          trackTrueEndKin[iTrack] = 1000*(particle->EndE()-particle->Mass());
-          trackTrueTrajLen[iTrack] = particle->Trajectory().TotalLength();
-
-          trackTrueStartX[iTrack] = particle->Vx();
-          trackTrueStartY[iTrack] = particle->Vy();
-          trackTrueStartZ[iTrack] = particle->Vz();
-          trackTrueStartT[iTrack] = particle->T();
-
-          trackTrueEndX[iTrack] = particle->EndX();
-          trackTrueEndY[iTrack] = particle->EndY();
-          trackTrueEndZ[iTrack] = particle->EndZ();
-          trackTrueEndT[iTrack] = particle->EndT();
-
-          const TVector3 particleFrontTPCPoint = lsu::mcPartStartZPlane(0,*particle);
-          trackTrueXFrontTPC[iTrack] = particleFrontTPCPoint.X();
-          trackTrueYFrontTPC[iTrack] = particleFrontTPCPoint.Y();
-
-          //std::cout << "Truth matching info: " << std::endl;
-          //std::cout << "  iTrack:                 " << iTrack << std::endl;
-          //std::cout << "  ID:                     " << trackTrueID[iTrack] << std::endl;
-          //std::cout << "  MotherID:               " << trackTrueMotherID[iTrack] << std::endl;
-          //std::cout << "  PDG:                    " << trackTruePdg[iTrack] << std::endl;
-          //std::cout << "  IsBeam:                 " << trackTrueIsBeam[iTrack] << std::endl;
-          //std::cout << "  KE:                     " << trackTrueKin[iTrack] << std::endl;
-          //std::cout << "  EndKE:                  " << trackTrueEndKin[iTrack] << std::endl;
-          //std::cout << "  TrajLen                 " << trackTrueTrajLen[iTrack] << std::endl;
-          //std::cout << "  ChargePurity:           " << trackTrueChargePurity[iTrack] << std::endl;
-          //std::cout << "  ChargeEfficiencyU:      " << trackTrueChargeEfficiencyU[iTrack] << std::endl;
-          //std::cout << "  ChargeEfficiencyV:      " << trackTrueChargeEfficiencyV[iTrack] << std::endl;
-          //std::cout << "  ChargeEfficiencyZ:      " << trackTrueChargeEfficiencyZ[iTrack] << std::endl;
-          //std::cout << "  HitPurity:              " << bt->HitCollectionPurity(thisTrackIDSet,trackHits) << std::endl;
-          //std::cout << "  HitEfficiencyU:         " << bt->HitCollectionEfficiency(thisTrackIDSet,trackHitsU,allHitsVec,geo::kU) << std::endl;
-          //std::cout << "  HitEfficiencyV:         " << bt->HitCollectionEfficiency(thisTrackIDSet,trackHitsV,allHitsVec,geo::kV) << std::endl;
-          //std::cout << "  HitEfficiencyZ:         " << bt->HitCollectionEfficiency(thisTrackIDSet,trackHitsZ,allHitsVec,geo::kZ) << std::endl;
-          //std::cout <<"   Process:                " << particle->Process() << std::endl;
-          //std::cout <<"   EndProcess:             " << particle->EndProcess() << std::endl;
-          //std::cout <<"   Momentum:               " << particle->Momentum().Vect().Mag() << std::endl;
-          //std::cout <<"   EndMomentum:            " << particle->EndMomentum().Vect().Mag() << std::endl;
-
-        } // if TrackID >= 0
-        else
-        {
-            //std::cout<<"Error: Couldn't find TrackID: for Track "<<iTrack<<"\n";
-            std::string message = "Couldn't find TrackID for Track ";
-            message.append(std::to_string(iTrack));
-            throw cet::exception("TrackIDNotFound",message);
-        }
-    } // if isMC && fmHItsForTracks.isValid
-
-  } // for track
+  ProcessAllTracks(trackVec, truePartVec,tracksCaloVec,fmHitsForTracks,beamOrCosmic,e);
 
   //Match the primary track to the WCTrack or MCParticle
   const art::Ptr<recob::Track> primaryTrack = MatchRecoToTruthOrWCTrack(trackVec,e.isRealData()); // also sets deltaX, deltaY, etc.
@@ -3035,5 +2812,244 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
   return primaryParticle;
 
 } // ProcessMCParticles
+
+void lana::PionAbsSelector::ProcessAllTracks(const std::vector<art::Ptr<recob::Track>>& trackVec, 
+        const std::vector<art::Ptr<simb::MCParticle>>& truePartVec,
+        const art::FindManyP<anab::Calorimetry>& tracksCaloVec, 
+        const art::FindManyP<recob::Hit>& fmHitsForTracks,
+        const pdana::MCBeamOrCosmicAlg * const beamOrCosmic,
+        const art::Event& e)
+{
+  nTracks = trackVec.size();
+  if (nTracks > MAXTRACKS)
+  {
+    mf::LogError("Track") << "Too many tracks in event to record: "
+        << nTracks << " > " << MAXTRACKS << ", not saving event to tree.";
+    return;
+  }
+  for(size_t iTrack=0; iTrack < trackVec.size(); iTrack++)
+  {
+    const art::Ptr<recob::Track> track = trackVec[iTrack];
+    const size_t nPoints = track->NumberTrajectoryPoints();
+
+    if (nPoints > 0)
+    {
+      trackStartX[iTrack] = track->Vertex().X();
+      trackStartY[iTrack] = track->Vertex().Y();
+      trackStartZ[iTrack] = track->Vertex().Z();
+      trackStartTheta[iTrack] = track->VertexDirection().Theta();
+      trackStartPhi[iTrack] = track->VertexDirection().Phi();
+      if (nPoints > 1)
+      {
+        trackEndX[iTrack] = track->End().X();
+        trackEndY[iTrack] = track->End().Y();
+        trackEndZ[iTrack] = track->End().Z();
+      }
+      else
+      {
+        trackEndX[iTrack] = track->Vertex().X();
+        trackEndY[iTrack] = track->Vertex().Y();
+        trackEndZ[iTrack] = track->Vertex().Z();
+      }
+      trackLength[iTrack] = track->Length();
+    }
+
+    const TVector3 trackIntersectionPoint = lsu::trackZPlane(0.,*track);
+    trackXFrontTPC[iTrack] = trackIntersectionPoint.X();
+    trackYFrontTPC[iTrack] = trackIntersectionPoint.Y();
+
+    double minz=1000.;
+    for(size_t iPoint=0; iPoint < nPoints; iPoint++)
+    {
+      const double pointZ = track->LocationAtPoint(iPoint).Z();
+      if(pointZ < minz)
+      {
+        minz = pointZ;
+      }
+    } // for iPoint
+    for(size_t z=0; z < MAXZINT; z++)
+    {
+      if(minz < z)
+      {
+        // the number of tracks with a space point in [0,i] cm where i is the index
+        nTracksInFirstZ[z]++;
+      }
+    } // for z
+    const double trkLength = track->Length();
+    for(size_t l=0; l < MAXLINT; l++)
+    {
+      if(trkLength < l)
+      {
+        // the number of tracks with length less than i cm where i is the index
+        nTracksLengthLt[l]++;
+      }
+    } // for l
+    // calo info
+    const auto calos = tracksCaloVec.at(iTrack);
+    for(const auto& calo:calos)
+    {
+      if(calo->PlaneID().Plane == fCaloPlane)
+      {
+          trackCaloKin[iTrack] = calo->KineticEnergy();
+          //for(size_t cRangeIt = 0; cRangeIt < calo->ResidualRange().size() && cRangeIt < calo->dEdx().size(); cRangeIt++)
+          //{
+          //  trackResRanges[iTrk].push_back(primTrkCalo->ResidualRange().at(cRangeIt));
+          //  trackdEdxs[iTrk].push_back(primTrkCalo->dEdx().at(cRangeIt));
+          //}
+        } // if plane == fCaloPlane
+    } //for calo in caloVec
+    //const auto lhpids = fmlhpid.at(iTrack);
+    //for (const auto& lhpid: lhpids)
+    //{
+    //  if(lhpid->PlaneID().Plane == fCaloPlane)
+    //  {
+    //    trackLLHPion[iTrack] = lhpid->Chi2Pion();
+    //    trackLLHProton[iTrack] = lhpid->Chi2Proton();
+    //    trackLLHMuon[iTrack] = lhpid->Chi2Muon();
+    //    trackLLHKaon[iTrack] = lhpid->Chi2Kaon();
+    //  } // if lhpid plane == fCaloPlane
+    //} // for lhpid
+    //const auto pidas = fmpida.at(iTrack);
+    //for (const auto& pida: pidas)
+    //{
+    //  if(pida->PlaneID().Plane == fCaloPlane)
+    //  {
+    //    trackPIDA[iTrack] = pida->PIDA();
+    //  } // if pida plane == fCaloPlane
+    //} // for pida
+    //// Match track to MCParticle
+    mf::LogInfo("Track") << std::fixed << std::setprecision(1)
+        << "Track: "<< iTrack 
+        << " len: " << trkLength 
+        <<"  start: " << trackStartX[iTrack] << ", " << trackStartY[iTrack] << ", " << trackStartZ[iTrack]
+        <<"  end: " << trackEndX[iTrack] << ", " << trackEndY[iTrack] << ", " << trackEndZ[iTrack]
+        ;//<< std::endl;
+    if (isMC && fmHitsForTracks.isValid())
+    {
+	    std::vector< art::Ptr<recob::Hit> > trackHits = fmHitsForTracks.at(iTrack);
+	    std::vector< art::Ptr<recob::Hit> > trackHitsU;
+	    std::vector< art::Ptr<recob::Hit> > trackHitsV;
+	    std::vector< art::Ptr<recob::Hit> > trackHitsZ;
+        for (const auto & trackHit : trackHits)
+        {
+          if (trackHit->View() == geo::kU) trackHitsU.push_back(trackHit);
+          else if (trackHit->View() == geo::kV) trackHitsV.push_back(trackHit);
+          else if (trackHit->View() == geo::kZ) trackHitsZ.push_back(trackHit);
+        }
+	    int TrackID = DEFAULTNEG;
+        std::set<int> setOfTrackIDs = bt->GetSetOfTrackIds(trackHits);
+        std::set<int> setOfPosTrackIDs;
+        for (const auto & trackID : setOfTrackIDs)
+        {
+          //std::cout << "Track: "<<iTrack<<" has TrackID: "<< trackID << std::endl;
+          setOfPosTrackIDs.insert(abs(trackID));
+        }
+        std::set<int> thisTrackIDSet;
+        for (const auto & trackID : setOfPosTrackIDs)
+        {
+          thisTrackIDSet.clear();
+          thisTrackIDSet.insert(trackID);
+          thisTrackIDSet.insert(-trackID);
+          float purity = bt->HitChargeCollectionPurity(thisTrackIDSet,trackHits);
+          if (purity > trackTrueChargePurity[iTrack])
+          {
+              TrackID = trackID;
+              trackTrueChargePurity[iTrack] = purity;
+          }
+        }
+        thisTrackIDSet.clear();
+        if (TrackID > DEFAULTNEG)
+        {
+          trackTrueID[iTrack] = TrackID;
+          thisTrackIDSet.insert(TrackID);
+          thisTrackIDSet.insert(-TrackID);
+          // In LArIAT, view V is collection, U is induction.
+          // Was taking 90% of the time spent in analyze!!! (valgrind callgrind)
+          //trackTrueChargeEfficiencyU[iTrack] = bt->HitChargeCollectionEfficiency(
+          //                        thisTrackIDSet,trackHitsU,allHitsVec,geo::kU);
+          //trackTrueChargeEfficiencyV[iTrack] = bt->HitChargeCollectionEfficiency(
+          //                        thisTrackIDSet,trackHitsV,allHitsVec,geo::kV);
+          //trackTrueChargeEfficiencyZ[iTrack] = bt->HitChargeCollectionEfficiency(
+          //                        thisTrackIDSet,trackHitsZ,allHitsVec,geo::kZ);
+
+          // Find the MCParticle corresponding to this trackID
+          art::Ptr<simb::MCParticle> particle;
+          for(auto mcpart: truePartVec)
+          {
+            if (mcpart->TrackId() == TrackID)
+            {
+                particle = mcpart;
+                break;
+            }
+          }
+          if (particle.isNull())
+          {
+            std::string message = "Couldn't find MCParticle for Track: ";
+            message.append(std::to_string(iTrack));
+            message.append(" TrackID: ");
+            message.append(std::to_string(TrackID));
+            throw cet::exception("MCParticleNotFound",message);
+          } // if can't find MCParticle for highest Track ID
+
+          // This is where you can do some analysis of the true particle and compare it to the reco
+          trackTrueMotherID[iTrack] = particle->Mother();
+          trackTruePdg[iTrack] = particle->PdgCode();
+          if (beamOrCosmic)
+          {
+            trackTrueIsBeam[iTrack] = beamOrCosmic->isBeam(particle);
+          }
+          trackTrueKin[iTrack] = 1000*(particle->E()-particle->Mass());
+          trackTrueEndKin[iTrack] = 1000*(particle->EndE()-particle->Mass());
+          trackTrueTrajLen[iTrack] = particle->Trajectory().TotalLength();
+
+          trackTrueStartX[iTrack] = particle->Vx();
+          trackTrueStartY[iTrack] = particle->Vy();
+          trackTrueStartZ[iTrack] = particle->Vz();
+          trackTrueStartT[iTrack] = particle->T();
+
+          trackTrueEndX[iTrack] = particle->EndX();
+          trackTrueEndY[iTrack] = particle->EndY();
+          trackTrueEndZ[iTrack] = particle->EndZ();
+          trackTrueEndT[iTrack] = particle->EndT();
+
+          const TVector3 particleFrontTPCPoint = lsu::mcPartStartZPlane(0,*particle);
+          trackTrueXFrontTPC[iTrack] = particleFrontTPCPoint.X();
+          trackTrueYFrontTPC[iTrack] = particleFrontTPCPoint.Y();
+
+          //std::cout << "Truth matching info: " << std::endl;
+          //std::cout << "  iTrack:                 " << iTrack << std::endl;
+          //std::cout << "  ID:                     " << trackTrueID[iTrack] << std::endl;
+          //std::cout << "  MotherID:               " << trackTrueMotherID[iTrack] << std::endl;
+          //std::cout << "  PDG:                    " << trackTruePdg[iTrack] << std::endl;
+          //std::cout << "  IsBeam:                 " << trackTrueIsBeam[iTrack] << std::endl;
+          //std::cout << "  KE:                     " << trackTrueKin[iTrack] << std::endl;
+          //std::cout << "  EndKE:                  " << trackTrueEndKin[iTrack] << std::endl;
+          //std::cout << "  TrajLen                 " << trackTrueTrajLen[iTrack] << std::endl;
+          //std::cout << "  ChargePurity:           " << trackTrueChargePurity[iTrack] << std::endl;
+          //std::cout << "  ChargeEfficiencyU:      " << trackTrueChargeEfficiencyU[iTrack] << std::endl;
+          //std::cout << "  ChargeEfficiencyV:      " << trackTrueChargeEfficiencyV[iTrack] << std::endl;
+          //std::cout << "  ChargeEfficiencyZ:      " << trackTrueChargeEfficiencyZ[iTrack] << std::endl;
+          //std::cout << "  HitPurity:              " << bt->HitCollectionPurity(thisTrackIDSet,trackHits) << std::endl;
+          //std::cout << "  HitEfficiencyU:         " << bt->HitCollectionEfficiency(thisTrackIDSet,trackHitsU,allHitsVec,geo::kU) << std::endl;
+          //std::cout << "  HitEfficiencyV:         " << bt->HitCollectionEfficiency(thisTrackIDSet,trackHitsV,allHitsVec,geo::kV) << std::endl;
+          //std::cout << "  HitEfficiencyZ:         " << bt->HitCollectionEfficiency(thisTrackIDSet,trackHitsZ,allHitsVec,geo::kZ) << std::endl;
+          //std::cout <<"   Process:                " << particle->Process() << std::endl;
+          //std::cout <<"   EndProcess:             " << particle->EndProcess() << std::endl;
+          //std::cout <<"   Momentum:               " << particle->Momentum().Vect().Mag() << std::endl;
+          //std::cout <<"   EndMomentum:            " << particle->EndMomentum().Vect().Mag() << std::endl;
+
+        } // if TrackID >= 0
+        else
+        {
+            //std::cout<<"Error: Couldn't find TrackID: for Track "<<iTrack<<"\n";
+            std::string message = "Couldn't find TrackID for Track ";
+            message.append(std::to_string(iTrack));
+            throw cet::exception("TrackIDNotFound",message);
+        }
+    } // if isMC && fmHItsForTracks.isValid
+
+  } // for track
+
+}
 
 DEFINE_ART_MODULE(lana::PionAbsSelector)
