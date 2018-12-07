@@ -622,6 +622,11 @@ private:
         const art::FindManyP<recob::Hit>& fmHitsForTracks,
         const pdana::MCBeamOrCosmicAlg * const beamOrCosmic,
         const art::Event& e);
+  void ProcessPrimaryTrack(const std::vector<art::Ptr<recob::Track>>& trackVec,
+        const art::Ptr<simb::MCParticle>& primaryParticle,
+        const art::FindManyP<anab::Calorimetry>& tracksCaloVec, 
+        const pdana::MotherDaughterWalkerAlg& motherDaughterWalker,
+        const art::Event& e); // returns primary track candidate
 
   void ResetTreeVars();
 
@@ -886,278 +891,8 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
 
   ProcessAllTracks(trackVec, truePartVec,tracksCaloVec,fmHitsForTracks,beamOrCosmic,e);
 
-  //Match the primary track to the WCTrack or MCParticle
-  const art::Ptr<recob::Track> primaryTrack = MatchRecoToTruthOrWCTrack(trackVec,e.isRealData()); // also sets deltaX, deltaY, etc.
-  //Get Primary Track Variables
-  recob::Track::Point_t primTrkStart;
-  recob::Track::Point_t primTrkEnd;
-  recob::Track::Vector_t primTrkStartDir;
-  recob::Track::Vector_t primTrkEndDir;
-  if(iBestMatch < 0)
-  {
-    mf::LogWarning("PionAbsorption") << "Event " << e.id().event() << " thrown out because a primary track could not be identified.\n";
-  }
-  else if (primaryTrack.isNull())
-  {
-    mf::LogError("PionAbsorption") << "Event " << e.id().event() << " thrown out because a primary track pointer is unexpectedly null.\n";
-  }
-  else if (primaryTrack->NumberTrajectoryPoints() == 0)
-  {
-    mf::LogWarning("PionAbsorption") << "Event " << e.id().event() << " thrown out because a primary track had no trajectory points.\n";
-  }
-  else // good primaryTrack
-  {
-    primTrkStart = primaryTrack->LocationAtPoint(0);
-    primTrkEnd = primaryTrack->LocationAtPoint(primaryTrack->NumberTrajectoryPoints()-1);
-    primTrkStartDir = primaryTrack->DirectionAtPoint(0);
-    primTrkEndDir = primaryTrack->DirectionAtPoint(primaryTrack->NumberTrajectoryPoints()-1);
-    primTrkStartMomTrking = primaryTrack->MomentumAtPoint(0)*1000.; // MeV/c
-    primTrkStartTheta = primTrkStartDir.Theta();
-    primTrkStartPhi = primTrkStartDir.Phi();
-    primTrkLength = primaryTrack->Length();
-    primTrkStartX = primTrkStart.X();
-    primTrkStartY = primTrkStart.Y();
-    primTrkStartZ = primTrkStart.Z();
-    primTrkEndX = primTrkEnd.X();
-    primTrkEndY = primTrkEnd.Y();
-    primTrkEndZ = primTrkEnd.Z();
-    primTrkXFrontTPC = trackTrueXFrontTPC[iBestMatch];
-    primTrkYFrontTPC = trackTrueYFrontTPC[iBestMatch];
-    primTrkEndInFid = InPrimaryFiducial(primTrkEnd);
+  ProcessPrimaryTrack(trackVec,primaryParticle,tracksCaloVec,motherDaughterWalker,e);
 
-    primTrkCaloKin = trackCaloKin[iBestMatch];
-    primTrkEndKin = kinWCInTPC - primTrkCaloKin;
-    if(primTrkEndKin < 0.) primTrkEndKin = 0;
-    if(primTrkEndInFid) primTrkEndKinFid = primTrkEndKin;
-    primTrkLLHPion = trackLLHPion[iBestMatch];
-    primTrkLLHProton = trackLLHProton[iBestMatch];
-    primTrkLLHMuon = trackLLHMuon[iBestMatch];
-    primTrkLLHKaon = trackLLHKaon[iBestMatch];
-    primTrkPIDA = trackPIDA[iBestMatch];
-
-    mf::LogInfo("PrimaryTrack") << "Primary Track start point: (" << std::fixed << std::setprecision(1) << primTrkStart.X() << "," << primTrkStart.Y() << "," << primTrkStart.Z() << ")";
-    mf::LogInfo("PrimaryTrack") << "Primary Track end point: (" << std::fixed << std::setprecision(1) << primTrkEnd.X() << "," << primTrkEnd.Y() << "," << primTrkEnd.Z() << ")";
-
-    // Primary Track Truth Match Info
-    if(isMC)
-    {
-      primTrkIsMatchPrimary = trackTrueID[iBestMatch] == truePrimaryTrackID;
-      if (!primTrkIsMatchPrimary)
-      {
-        const auto thisMatchedParticle = motherDaughterWalker.getParticle(trackTrueID[iBestMatch]);
-        if(thisMatchedParticle.isNull())
-        {
-            throw cet::exception("CantFindMCParticle","Couldn't find MCParticle for best match TrackID");
-        }
-        const auto greatestGrandmother = motherDaughterWalker.getGreatestGrandmother(*thisMatchedParticle);
-        
-        if (greatestGrandmother.isNonnull())
-        {
-          primTrkIsMatchPrimaryDaughter = greatestGrandmother->TrackId() == truePrimaryTrackID;
-        }
-      }
-      primTrkIsMatchBeam = trackTrueIsBeam[iBestMatch];
-      primTrkIsMatchAPrimary = trackTrueMotherID[iBestMatch] == 0;
-    }
-
-    // Primary Track Calorimetry
-    const auto primTrkCalos = tracksCaloVec.at(iBestMatch);
-    for(const auto& primTrkCalo:primTrkCalos)
-    {
-      if(primTrkCalo->PlaneID().Plane == fCaloPlane)
-      {
-          primTrkCaloRange = primTrkCalo->Range();
-          double intE = 0.;
-          size_t IBackwards = primTrkCalo->dEdx().size()-1;
-          mctrue::TrajectoryInterpExtrapAlg trajInterpAlg;
-          for(size_t cRangeIt = 0; cRangeIt < primTrkCalo->ResidualRange().size() && cRangeIt < primTrkCalo->dEdx().size(); cRangeIt++)
-          {
-            primTrkResRanges.push_back(primTrkCalo->ResidualRange().at(cRangeIt));
-            primTrkRangeSoFars.push_back(primTrkLength-primTrkCalo->ResidualRange().at(cRangeIt));
-            primTrkdEdxs.push_back(primTrkCalo->dEdx().at(cRangeIt));
-            primTrkPitches.push_back(primTrkCalo->TrkPitchVec().at(cRangeIt));
-            primTrkIBackwards.push_back(IBackwards);
-            IBackwards--;
-            const auto thisPoint = primTrkCalo->XYZ().at(cRangeIt); // PositionVector3D
-            primTrkXs.push_back(thisPoint.X());
-            primTrkYs.push_back(thisPoint.Y());
-            primTrkZs.push_back(thisPoint.Z());
-
-            bool thisInFid = InPrimaryFiducial(thisPoint);
-            primTrkInFids.push_back(thisInFid);
-            double thisKin = kinWCInTPC-intE;
-            primTrkKins.push_back(thisKin);
-            double thisKinProton = kinWCInTPCProton-intE;
-            primTrkKinsProton.push_back(thisKinProton);
-            if(thisInFid)
-            {
-              primTrkKinInteract = thisKin;
-              primTrkKinInteractProton = thisKinProton;
-            }
-            else
-            {
-              primTrkKinInteract = DEFAULTNEG;
-              primTrkKinInteractProton = DEFAULTNEG;
-            }
-            intE += primTrkCalo->dEdx().at(cRangeIt)*primTrkCalo->TrkPitchVec().at(cRangeIt);
-
-            // true trajectory matching
-            if(primaryParticle)
-            {
-              double distanceToTraj;
-              TLorentzVector trueMomVec;
-              size_t iClosestTrajPoint;
-              double distanceToClosestTrajPoint;
-              const TVector3 truePosVec = trajInterpAlg.pointOfClosestApproach(primaryParticle->Trajectory(),thisPoint,distanceToTraj,trueMomVec,iClosestTrajPoint,distanceToClosestTrajPoint);
-              double trueKin = trueMomVec.E() - trueMomVec.M();
-              trueKin *= 1000.;
-              primTrkKinsTrue.push_back(trueKin);
-              primTrkDistToTrueTraj.push_back(distanceToTraj);
-              primTrkDistToTrueTrajPoint.push_back(distanceToClosestTrajPoint);
-            } // if primaryParticle
-          } // for cRangeIt
-          primTrkResRangesFlipped = (primTrkResRanges.front() - primTrkResRanges.back()) < 0.;
-          // look into the end of the track
-          const size_t dEdxSize = primTrkdEdxs.size();
-          const std::vector<float>::const_iterator dEdxBegin = primTrkdEdxs.begin();
-          const std::vector<float>::const_iterator dEdxEnd = primTrkdEdxs.end();
-          if (dEdxSize >= 3)
-          {
-            primTrkdEdxMedianLast3Hits = findQuantile(0.5,dEdxEnd - 3, dEdxEnd);
-            primTrkdEdxAverageLast3Hits = findAverage(dEdxEnd - 3, dEdxEnd);
-          }
-          if (dEdxSize >= 5)
-          {
-            primTrkdEdxMedianLast5Hits = findQuantile(0.5,dEdxEnd - 5, dEdxEnd);
-            primTrkdEdxAverageLast5Hits = findAverage(dEdxEnd - 5, dEdxEnd);
-          }
-          if (dEdxSize >= 7)
-          {
-            primTrkdEdxMedianLast7Hits = findQuantile(0.5,dEdxEnd - 7, dEdxEnd);
-            primTrkdEdxAverageLast7Hits = findAverage(dEdxEnd - 7, dEdxEnd);
-          }
-          const std::vector<float>::const_iterator resRangesBegin = primTrkResRanges.begin();
-          const std::vector<float>::const_iterator resRangesEnd = primTrkResRanges.end();
-          if(!primTrkResRangesFlipped)
-          {
-            primTrkdEdxMedianRRL1 = findQuantileResRangeFunc(0.5,resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x < 1;});
-            primTrkdEdxAverageRRL1 = findAverageResRangeFunc(resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x < 1;});
-            primTrkdEdxMedianRRL2 = findQuantileResRangeFunc(0.5,resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x < 2;});
-            primTrkdEdxAverageRRL2 = findAverageResRangeFunc(resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x < 2;});
-            primTrkdEdxMedianRRL3 = findQuantileResRangeFunc(0.5,resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x < 3;});
-            primTrkdEdxAverageRRL3 = findAverageResRangeFunc(resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x < 3;});
-            primTrkdEdxMedianRRL5 = findQuantileResRangeFunc(0.5,resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x < 5;});
-            primTrkdEdxAverageRRL5 = findAverageResRangeFunc(resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x < 5;});
-            primTrkdEdxMedianRRL7 = findQuantileResRangeFunc(0.5,resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x < 7;});
-            primTrkdEdxAverageRRL7 = findAverageResRangeFunc(resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x < 7;});
-            primTrkdEdxMedianRRL3G1 = findQuantileResRangeFunc(0.5,resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x>1. && x < 3;});
-            primTrkdEdxAverageRRL3G1 = findAverageResRangeFunc(resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x>1. && x < 3;});
-            primTrkdEdxMedianRRL5G1 = findQuantileResRangeFunc(0.5,resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x>1. && x < 5;});
-            primTrkdEdxAverageRRL5G1 = findAverageResRangeFunc(resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x>1. && x < 5;});
-            primTrkdEdxMedianRRL7G1 = findQuantileResRangeFunc(0.5,resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x>1. && x < 7;});
-            primTrkdEdxAverageRRL7G1 = findAverageResRangeFunc(resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x>1. && x < 7;});
-          }
-        } // if plane == fCaloPlane
-    } //for calo in caloVec
-    primTrkNHits = primTrkdEdxs.size();
-  
-    // Find secondary tracks
-    for(size_t iTrack=0; iTrack < nTracks; iTrack++)
-    { 
-      const auto track = trackVec[iTrack];
-      if(track != primaryTrack)
-      {
-        //mf::LogInfo("SecondaryTrack") << "Got a secondary track to analyze that is not the primary in event " << e.id().event() << ".";
-        const auto secTrkStart = track->LocationAtPoint(0);
-        const auto secTrkEnd = track->LocationAtPoint(track->NumberTrajectoryPoints()-1);
-        mf::LogInfo("SecondaryTrack") << std::fixed << std::setprecision(1) 
-                << "Start: (" << secTrkStart.X() << "," << secTrkStart.Y() << "," << secTrkStart.Z() << ") "
-                << "End: (" << secTrkEnd.X() << "," << secTrkEnd.Y() << "," << secTrkEnd.Z() << ")";
-        const float secTrkStartDistToPrimEnd = (secTrkStart-primTrkEnd).R();
-        const float secTrkEndDistToPrimEnd = (secTrkEnd-primTrkEnd).R();
-        trackStartDistToPrimTrkEnd[iTrack] = secTrkStartDistToPrimEnd;
-        trackEndDistToPrimTrkEnd[iTrack] = secTrkEndDistToPrimEnd;
-        trackClosestDistToPrimTrkEnd[iTrack] = secTrkEndDistToPrimEnd;
-        trackStartClosestToPrimTrkEnd[iTrack] = false;
-	if(secTrkStartDistToPrimEnd <= secTrkEndDistToPrimEnd)
-	{
-          trackClosestDistToPrimTrkEnd[iTrack] = secTrkStartDistToPrimEnd;
-          trackStartClosestToPrimTrkEnd[iTrack] = true;
-	}
-	  
-        const auto secTrkCalos = tracksCaloVec.at(iTrack);
-        for(const auto& secTrkCalo:secTrkCalos)
-        {
-          if(secTrkCalo->PlaneID().Plane == fCaloPlane)
-	  {
-            size_t secTrkdEdxs = secTrkCalo->dEdx().size();
-	    if(secTrkdEdxs > 4) SecTrkPID[iTrack] = true;
-	  }
-	}
-
-        const double secTrkLLR = trackLLHPion[iTrack] - trackLLHProton[iTrack];
-        const double secTrkLLRPro = trackLLHProton[iTrack] - trackLLHPion[iTrack];
-        if(trackClosestDistToPrimTrkEnd[iTrack] < 2.5)
-        {
-          iSecTrkID[nSecTrk] = iTrack;
-          nSecTrk++;
-          if(SecTrkPID[iTrack]) 
-          {
-	    if(secTrkLLRPro > nSecLLRProtonToPionMax) nSecLLRProtonToPionMax = secTrkLLRPro;
-	    if(secTrkLLRPro < nSecLLRProtonToPionMin) 
-            {
-	      nSecLLRProtonToPionMin = secTrkLLRPro;
-	      iSecMin = iTrack;
-            }
-	  }
-          if(secTrkLLR > 0.) nSecTrkLLRG0++;
-          if(secTrkLLR > 100.) nSecTrkLLRG100++;
-          if(secTrkLLR > 200.) nSecTrkLLRG200++;
-          if(secTrkLLR > 300.) nSecTrkLLRG300++;
-          if(secTrkLLR > 400.) nSecTrkLLRG400++;
-          if(secTrkLLR > 500.) nSecTrkLLRG500++;
-          if(secTrkLLR > 600.) nSecTrkLLRG600++;
-          if(secTrkLLR > 700.) nSecTrkLLRG700++;
-          if(secTrkLLR > 800.) nSecTrkLLRG800++;
-          if(secTrkLLR > 900.) nSecTrkLLRG900++;
-          if(trackPIDA[iTrack] < 8 ) nSecTrkPIDAL8++;
-          if(trackPIDA[iTrack] < 10 ) nSecTrkPIDAL10++;
-          if(trackPIDA[iTrack] < 14 ) nSecTrkPIDAL14++;
-          if(trackPIDA[iTrack] < 16 ) nSecTrkPIDAL16++;
-          if(trackPIDA[iTrack] < 18 ) nSecTrkPIDAL18++;
-        }
-      } //if this track is not the primary
-    } // for track in trackVec
-
-//    // SecMin Calorimetry
-//    int itc = tracksCaloVec.size();
-//    if(iSecMin >= 0 && iSecMin < itc)
-//    {
-//      const auto secMinTrkCalos = tracksCaloVec.at(iSecMin);
-//      for(const auto& secMinTrkCalo:secMinTrkCalos)
-//      {
-//        if(secMinTrkCalo->PlaneID().Plane == fCaloPlane)
-//        {
-//          size_t IBackwards = secMinTrkCalo->dEdx().size()-1;
-//          for(size_t cRangeIt = 0; cRangeIt < secMinTrkCalo->ResidualRange().size() && cRangeIt < secMinTrkCalo->dEdx().size(); cRangeIt++)
-//          {
-//            secMinTrkResRanges.push_back(secMinTrkCalo->ResidualRange().at(cRangeIt));
-//            secMinTrkdEdxs.push_back(secMinTrkCalo->dEdx().at(cRangeIt));
-//            secMinTrkPitches.push_back(secMinTrkCalo->TrkPitchVec().at(cRangeIt));
-//            secMinTrkIBackwards.push_back(IBackwards);
-//            IBackwards--;
-//            const auto thisPoint = secMinTrkCalo->XYZ().at(cRangeIt); // PositionVector3D
-//            secMinTrkXs.push_back(thisPoint.X());
-//            secMinTrkYs.push_back(thisPoint.Y());
-//            secMinTrkZs.push_back(thisPoint.Z());
-//            bool thisInFid = InPrimaryFiducial(thisPoint);
-//            secMinTrkInFids.push_back(thisInFid);
-//          } // for cRangeIt
-//        } // if plane == fCaloPlane
-//      } // for calo in caloVec
-//    } // have good secondary
-
-  } // good primaryTrack
   if (isMC && nTracksInFirstZ[2] >= 1 && nTracksInFirstZ[14] < 4 && nTracksLengthLt[5] < 3
             && iBestMatch >= 0 && nMatchedTracks == 1
             && primTrkEndX > 5.4 && primTrkEndX < 42.9
@@ -3050,6 +2785,289 @@ void lana::PionAbsSelector::ProcessAllTracks(const std::vector<art::Ptr<recob::T
 
   } // for track
 
-}
+} // ProcessAllTracks()
+
+void lana::PionAbsSelector::ProcessPrimaryTrack(const std::vector<art::Ptr<recob::Track>>& trackVec,
+        const art::Ptr<simb::MCParticle>& primaryParticle,
+        const art::FindManyP<anab::Calorimetry>& tracksCaloVec, 
+        const pdana::MotherDaughterWalkerAlg& motherDaughterWalker,
+        const art::Event& e) // returns primary track candidate
+{
+  //Match the primary track to the WCTrack or MCParticle
+  const art::Ptr<recob::Track> primaryTrack = MatchRecoToTruthOrWCTrack(trackVec,e.isRealData()); // also sets deltaX, deltaY, etc.
+  //Get Primary Track Variables
+  if(iBestMatch < 0)
+  {
+    mf::LogWarning("PionAbsorption") << "Event " << e.id().event() << " thrown out because a primary track could not be identified.\n";
+  }
+  else if (primaryTrack.isNull())
+  {
+    mf::LogError("PionAbsorption") << "Event " << e.id().event() << " thrown out because a primary track pointer is unexpectedly null.\n";
+  }
+  else if (primaryTrack->NumberTrajectoryPoints() == 0)
+  {
+    mf::LogWarning("PionAbsorption") << "Event " << e.id().event() << " thrown out because a primary track had no trajectory points.\n";
+  }
+  else // good primaryTrack
+  {
+    recob::Track::Point_t primTrkStart;
+    recob::Track::Point_t primTrkEnd;
+    recob::Track::Vector_t primTrkStartDir;
+    recob::Track::Vector_t primTrkEndDir;
+    primTrkStart = primaryTrack->LocationAtPoint(0);
+    primTrkEnd = primaryTrack->LocationAtPoint(primaryTrack->NumberTrajectoryPoints()-1);
+    primTrkStartDir = primaryTrack->DirectionAtPoint(0);
+    primTrkEndDir = primaryTrack->DirectionAtPoint(primaryTrack->NumberTrajectoryPoints()-1);
+    primTrkStartMomTrking = primaryTrack->MomentumAtPoint(0)*1000.; // MeV/c
+    primTrkStartTheta = primTrkStartDir.Theta();
+    primTrkStartPhi = primTrkStartDir.Phi();
+    primTrkLength = primaryTrack->Length();
+    primTrkStartX = primTrkStart.X();
+    primTrkStartY = primTrkStart.Y();
+    primTrkStartZ = primTrkStart.Z();
+    primTrkEndX = primTrkEnd.X();
+    primTrkEndY = primTrkEnd.Y();
+    primTrkEndZ = primTrkEnd.Z();
+    primTrkXFrontTPC = trackTrueXFrontTPC[iBestMatch];
+    primTrkYFrontTPC = trackTrueYFrontTPC[iBestMatch];
+    primTrkEndInFid = InPrimaryFiducial(primTrkEnd);
+
+    primTrkCaloKin = trackCaloKin[iBestMatch];
+    primTrkEndKin = kinWCInTPC - primTrkCaloKin;
+    if(primTrkEndKin < 0.) primTrkEndKin = 0;
+    if(primTrkEndInFid) primTrkEndKinFid = primTrkEndKin;
+    primTrkLLHPion = trackLLHPion[iBestMatch];
+    primTrkLLHProton = trackLLHProton[iBestMatch];
+    primTrkLLHMuon = trackLLHMuon[iBestMatch];
+    primTrkLLHKaon = trackLLHKaon[iBestMatch];
+    primTrkPIDA = trackPIDA[iBestMatch];
+
+    mf::LogInfo("PrimaryTrack") << "Primary Track start point: (" << std::fixed << std::setprecision(1) << primTrkStart.X() << "," << primTrkStart.Y() << "," << primTrkStart.Z() << ")";
+    mf::LogInfo("PrimaryTrack") << "Primary Track end point: (" << std::fixed << std::setprecision(1) << primTrkEnd.X() << "," << primTrkEnd.Y() << "," << primTrkEnd.Z() << ")";
+
+    // Primary Track Truth Match Info
+    if(isMC)
+    {
+      primTrkIsMatchPrimary = trackTrueID[iBestMatch] == truePrimaryTrackID;
+      if (!primTrkIsMatchPrimary)
+      {
+        const auto thisMatchedParticle = motherDaughterWalker.getParticle(trackTrueID[iBestMatch]);
+        if(thisMatchedParticle.isNull())
+        {
+            throw cet::exception("CantFindMCParticle","Couldn't find MCParticle for best match TrackID");
+        }
+        const auto greatestGrandmother = motherDaughterWalker.getGreatestGrandmother(*thisMatchedParticle);
+        
+        if (greatestGrandmother.isNonnull())
+        {
+          primTrkIsMatchPrimaryDaughter = greatestGrandmother->TrackId() == truePrimaryTrackID;
+        }
+      }
+      primTrkIsMatchBeam = trackTrueIsBeam[iBestMatch];
+      primTrkIsMatchAPrimary = trackTrueMotherID[iBestMatch] == 0;
+    }
+
+    // Primary Track Calorimetry
+    const auto primTrkCalos = tracksCaloVec.at(iBestMatch);
+    for(const auto& primTrkCalo:primTrkCalos)
+    {
+      if(primTrkCalo->PlaneID().Plane == fCaloPlane)
+      {
+          primTrkCaloRange = primTrkCalo->Range();
+          double intE = 0.;
+          size_t IBackwards = primTrkCalo->dEdx().size()-1;
+          mctrue::TrajectoryInterpExtrapAlg trajInterpAlg;
+          for(size_t cRangeIt = 0; cRangeIt < primTrkCalo->ResidualRange().size() && cRangeIt < primTrkCalo->dEdx().size(); cRangeIt++)
+          {
+            primTrkResRanges.push_back(primTrkCalo->ResidualRange().at(cRangeIt));
+            primTrkRangeSoFars.push_back(primTrkLength-primTrkCalo->ResidualRange().at(cRangeIt));
+            primTrkdEdxs.push_back(primTrkCalo->dEdx().at(cRangeIt));
+            primTrkPitches.push_back(primTrkCalo->TrkPitchVec().at(cRangeIt));
+            primTrkIBackwards.push_back(IBackwards);
+            IBackwards--;
+            const auto thisPoint = primTrkCalo->XYZ().at(cRangeIt); // PositionVector3D
+            primTrkXs.push_back(thisPoint.X());
+            primTrkYs.push_back(thisPoint.Y());
+            primTrkZs.push_back(thisPoint.Z());
+
+            bool thisInFid = InPrimaryFiducial(thisPoint);
+            primTrkInFids.push_back(thisInFid);
+            double thisKin = kinWCInTPC-intE;
+            primTrkKins.push_back(thisKin);
+            double thisKinProton = kinWCInTPCProton-intE;
+            primTrkKinsProton.push_back(thisKinProton);
+            if(thisInFid)
+            {
+              primTrkKinInteract = thisKin;
+              primTrkKinInteractProton = thisKinProton;
+            }
+            else
+            {
+              primTrkKinInteract = DEFAULTNEG;
+              primTrkKinInteractProton = DEFAULTNEG;
+            }
+            intE += primTrkCalo->dEdx().at(cRangeIt)*primTrkCalo->TrkPitchVec().at(cRangeIt);
+
+            // true trajectory matching
+            if(primaryParticle)
+            {
+              double distanceToTraj;
+              TLorentzVector trueMomVec;
+              size_t iClosestTrajPoint;
+              double distanceToClosestTrajPoint;
+              const TVector3 truePosVec = trajInterpAlg.pointOfClosestApproach(primaryParticle->Trajectory(),thisPoint,distanceToTraj,trueMomVec,iClosestTrajPoint,distanceToClosestTrajPoint);
+              double trueKin = trueMomVec.E() - trueMomVec.M();
+              trueKin *= 1000.;
+              primTrkKinsTrue.push_back(trueKin);
+              primTrkDistToTrueTraj.push_back(distanceToTraj);
+              primTrkDistToTrueTrajPoint.push_back(distanceToClosestTrajPoint);
+            } // if primaryParticle
+          } // for cRangeIt
+          primTrkResRangesFlipped = (primTrkResRanges.front() - primTrkResRanges.back()) < 0.;
+          // look into the end of the track
+          const size_t dEdxSize = primTrkdEdxs.size();
+          const std::vector<float>::const_iterator dEdxBegin = primTrkdEdxs.begin();
+          const std::vector<float>::const_iterator dEdxEnd = primTrkdEdxs.end();
+          if (dEdxSize >= 3)
+          {
+            primTrkdEdxMedianLast3Hits = findQuantile(0.5,dEdxEnd - 3, dEdxEnd);
+            primTrkdEdxAverageLast3Hits = findAverage(dEdxEnd - 3, dEdxEnd);
+          }
+          if (dEdxSize >= 5)
+          {
+            primTrkdEdxMedianLast5Hits = findQuantile(0.5,dEdxEnd - 5, dEdxEnd);
+            primTrkdEdxAverageLast5Hits = findAverage(dEdxEnd - 5, dEdxEnd);
+          }
+          if (dEdxSize >= 7)
+          {
+            primTrkdEdxMedianLast7Hits = findQuantile(0.5,dEdxEnd - 7, dEdxEnd);
+            primTrkdEdxAverageLast7Hits = findAverage(dEdxEnd - 7, dEdxEnd);
+          }
+          const std::vector<float>::const_iterator resRangesBegin = primTrkResRanges.begin();
+          const std::vector<float>::const_iterator resRangesEnd = primTrkResRanges.end();
+          if(!primTrkResRangesFlipped)
+          {
+            primTrkdEdxMedianRRL1 = findQuantileResRangeFunc(0.5,resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x < 1;});
+            primTrkdEdxAverageRRL1 = findAverageResRangeFunc(resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x < 1;});
+            primTrkdEdxMedianRRL2 = findQuantileResRangeFunc(0.5,resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x < 2;});
+            primTrkdEdxAverageRRL2 = findAverageResRangeFunc(resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x < 2;});
+            primTrkdEdxMedianRRL3 = findQuantileResRangeFunc(0.5,resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x < 3;});
+            primTrkdEdxAverageRRL3 = findAverageResRangeFunc(resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x < 3;});
+            primTrkdEdxMedianRRL5 = findQuantileResRangeFunc(0.5,resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x < 5;});
+            primTrkdEdxAverageRRL5 = findAverageResRangeFunc(resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x < 5;});
+            primTrkdEdxMedianRRL7 = findQuantileResRangeFunc(0.5,resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x < 7;});
+            primTrkdEdxAverageRRL7 = findAverageResRangeFunc(resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x < 7;});
+            primTrkdEdxMedianRRL3G1 = findQuantileResRangeFunc(0.5,resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x>1. && x < 3;});
+            primTrkdEdxAverageRRL3G1 = findAverageResRangeFunc(resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x>1. && x < 3;});
+            primTrkdEdxMedianRRL5G1 = findQuantileResRangeFunc(0.5,resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x>1. && x < 5;});
+            primTrkdEdxAverageRRL5G1 = findAverageResRangeFunc(resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x>1. && x < 5;});
+            primTrkdEdxMedianRRL7G1 = findQuantileResRangeFunc(0.5,resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x>1. && x < 7;});
+            primTrkdEdxAverageRRL7G1 = findAverageResRangeFunc(resRangesBegin,resRangesEnd,dEdxBegin,dEdxEnd,[](auto x){return x>1. && x < 7;});
+          }
+        } // if plane == fCaloPlane
+    } //for calo in caloVec
+    primTrkNHits = primTrkdEdxs.size();
+
+
+    // Find secondary tracks
+    for(size_t iTrack=0; iTrack < nTracks; iTrack++)
+    { 
+      const auto track = trackVec[iTrack];
+      if(track != primaryTrack)
+      {
+        //mf::LogInfo("SecondaryTrack") << "Got a secondary track to analyze that is not the primary in event " << e.id().event() << ".";
+        const auto secTrkStart = track->LocationAtPoint(0);
+        const auto secTrkEnd = track->LocationAtPoint(track->NumberTrajectoryPoints()-1);
+        mf::LogInfo("SecondaryTrack") << std::fixed << std::setprecision(1) 
+                << "Start: (" << secTrkStart.X() << "," << secTrkStart.Y() << "," << secTrkStart.Z() << ") "
+                << "End: (" << secTrkEnd.X() << "," << secTrkEnd.Y() << "," << secTrkEnd.Z() << ")";
+        const float secTrkStartDistToPrimEnd = (secTrkStart-primTrkEnd).R();
+        const float secTrkEndDistToPrimEnd = (secTrkEnd-primTrkEnd).R();
+        trackStartDistToPrimTrkEnd[iTrack] = secTrkStartDistToPrimEnd;
+        trackEndDistToPrimTrkEnd[iTrack] = secTrkEndDistToPrimEnd;
+        trackClosestDistToPrimTrkEnd[iTrack] = secTrkEndDistToPrimEnd;
+        trackStartClosestToPrimTrkEnd[iTrack] = false;
+	if(secTrkStartDistToPrimEnd <= secTrkEndDistToPrimEnd)
+	{
+          trackClosestDistToPrimTrkEnd[iTrack] = secTrkStartDistToPrimEnd;
+          trackStartClosestToPrimTrkEnd[iTrack] = true;
+	}
+	  
+        const auto secTrkCalos = tracksCaloVec.at(iTrack);
+        for(const auto& secTrkCalo:secTrkCalos)
+        {
+          if(secTrkCalo->PlaneID().Plane == fCaloPlane)
+	  {
+            size_t secTrkdEdxs = secTrkCalo->dEdx().size();
+	    if(secTrkdEdxs > 4) SecTrkPID[iTrack] = true;
+	  }
+	}
+
+        const double secTrkLLR = trackLLHPion[iTrack] - trackLLHProton[iTrack];
+        const double secTrkLLRPro = trackLLHProton[iTrack] - trackLLHPion[iTrack];
+        if(trackClosestDistToPrimTrkEnd[iTrack] < 2.5)
+        {
+          iSecTrkID[nSecTrk] = iTrack;
+          nSecTrk++;
+          if(SecTrkPID[iTrack]) 
+          {
+	    if(secTrkLLRPro > nSecLLRProtonToPionMax) nSecLLRProtonToPionMax = secTrkLLRPro;
+	    if(secTrkLLRPro < nSecLLRProtonToPionMin) 
+            {
+	      nSecLLRProtonToPionMin = secTrkLLRPro;
+	      iSecMin = iTrack;
+            }
+	  }
+          if(secTrkLLR > 0.) nSecTrkLLRG0++;
+          if(secTrkLLR > 100.) nSecTrkLLRG100++;
+          if(secTrkLLR > 200.) nSecTrkLLRG200++;
+          if(secTrkLLR > 300.) nSecTrkLLRG300++;
+          if(secTrkLLR > 400.) nSecTrkLLRG400++;
+          if(secTrkLLR > 500.) nSecTrkLLRG500++;
+          if(secTrkLLR > 600.) nSecTrkLLRG600++;
+          if(secTrkLLR > 700.) nSecTrkLLRG700++;
+          if(secTrkLLR > 800.) nSecTrkLLRG800++;
+          if(secTrkLLR > 900.) nSecTrkLLRG900++;
+          if(trackPIDA[iTrack] < 8 ) nSecTrkPIDAL8++;
+          if(trackPIDA[iTrack] < 10 ) nSecTrkPIDAL10++;
+          if(trackPIDA[iTrack] < 14 ) nSecTrkPIDAL14++;
+          if(trackPIDA[iTrack] < 16 ) nSecTrkPIDAL16++;
+          if(trackPIDA[iTrack] < 18 ) nSecTrkPIDAL18++;
+        }
+      } //if this track is not the primary
+    } // for track in trackVec
+
+//    // SecMin Calorimetry
+//    int itc = tracksCaloVec.size();
+//    if(iSecMin >= 0 && iSecMin < itc)
+//    {
+//      const auto secMinTrkCalos = tracksCaloVec.at(iSecMin);
+//      for(const auto& secMinTrkCalo:secMinTrkCalos)
+//      {
+//        if(secMinTrkCalo->PlaneID().Plane == fCaloPlane)
+//        {
+//          size_t IBackwards = secMinTrkCalo->dEdx().size()-1;
+//          for(size_t cRangeIt = 0; cRangeIt < secMinTrkCalo->ResidualRange().size() && cRangeIt < secMinTrkCalo->dEdx().size(); cRangeIt++)
+//          {
+//            secMinTrkResRanges.push_back(secMinTrkCalo->ResidualRange().at(cRangeIt));
+//            secMinTrkdEdxs.push_back(secMinTrkCalo->dEdx().at(cRangeIt));
+//            secMinTrkPitches.push_back(secMinTrkCalo->TrkPitchVec().at(cRangeIt));
+//            secMinTrkIBackwards.push_back(IBackwards);
+//            IBackwards--;
+//            const auto thisPoint = secMinTrkCalo->XYZ().at(cRangeIt); // PositionVector3D
+//            secMinTrkXs.push_back(thisPoint.X());
+//            secMinTrkYs.push_back(thisPoint.Y());
+//            secMinTrkZs.push_back(thisPoint.Z());
+//            bool thisInFid = InPrimaryFiducial(thisPoint);
+//            secMinTrkInFids.push_back(thisInFid);
+//          } // for cRangeIt
+//        } // if plane == fCaloPlane
+//      } // for calo in caloVec
+//    } // have good secondary
+
+  } // good primaryTrack
+  
+} // ProcessPrimaryTrack
+
 
 DEFINE_ART_MODULE(lana::PionAbsSelector)
