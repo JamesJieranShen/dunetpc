@@ -615,6 +615,7 @@ private:
  
   //Internal functions
   const art::Ptr<recob::Track> MatchRecoToTruthOrWCTrack(const std::vector<art::Ptr<recob::Track>>& tracks, bool isData); 
+  const art::Ptr<simb::MCParticle> ProcessMCParticles(const std::vector<art::Ptr<simb::MCParticle>>& truePartVec, const pdana::MCBeamOrCosmicAlg * const beamOrCosmic, const art::Event& e); // returns primary particle candidate
 
   void ResetTreeVars();
 
@@ -875,378 +876,7 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     }
   }
 
-  //Get MCParticle Variables and find MCC11 primaryParticleCandidates
-  std::vector<art::Ptr<simb::MCParticle> > primaryParticleCandidates;
-  std::vector<size_t> primaryParticleCandidateIs;
-  for(const auto& truth:(truePartVec))
-  {
-    if (truth->PdgCode() != 2112 && truth->PdgCode() < 1000000000)
-    {
-      bool isBeam = false;
-      if (beamOrCosmic)
-      {
-        isBeam= beamOrCosmic->isBeam(truth);
-      }
-      mf::LogInfo("MCParticle") << std::fixed << std::setprecision(1) 
-          << "TrackId: "<<truth->TrackId()
-          <<" MotherId: "<<truth->Mother()
-          <<" PDG "<< truth->PdgCode()
-          <<" KE "<<1000*(truth->E()-truth->Mass()) 
-          <<" len: " << truth->Trajectory().TotalLength() 
-          <<" start: " << truth->Vx() << ", " << truth->Vy() << ", " << truth->Vz()
-          <<" end: " << truth->EndX() << ", " << truth->EndY() << ", " << truth->EndZ()
-          <<" Process: " << truth->Process()
-          <<" EndProcess: " << truth->EndProcess();
-
-      if (nMCParts >= MAXMCPARTS)
-      {
-        mf::LogError("MCParticle") << "Too many MCParticles in event to record.";
-        continue;
-      }
-
-      mcPartIsBeam[nMCParts] = isBeam;
-      mcPartIsPrimary[nMCParts] = truth->Process() == "primary";
-      mcPartTrackID[nMCParts] = truth->TrackId();
-      mcPartPDG[nMCParts] = truth->PdgCode();
-      mcPartStartX[nMCParts] = truth->Vx();
-      mcPartStartY[nMCParts] = truth->Vy();
-      mcPartStartZ[nMCParts] = truth->Vz();
-      mcPartStartT[nMCParts] = truth->T();
-      mcPartEndX[nMCParts] = truth->EndX();
-      mcPartEndY[nMCParts] = truth->EndY();
-      mcPartEndZ[nMCParts] = truth->EndZ();
-      mcPartEndT[nMCParts] = truth->EndT();
-      mcPartStartTheta[nMCParts] = truth->Momentum().Theta();
-      mcPartStartPhi[nMCParts] = truth->Momentum().Phi();
-      mcPartStartMom[nMCParts] = 1000.*truth->Momentum().Vect().Mag();
-      mcPartStartE[nMCParts] = 1000.*truth->E();
-      mcPartStartKin[nMCParts] = 1000.*(truth->E()-truth->Mass());
-      mcPartEndMom[nMCParts] = 1000.*truth->EndMomentum().Vect().Mag();
-      mcPartEndE[nMCParts] = 1000.*truth->EndE();
-      mcPartEndKin[nMCParts] = 1000.*(truth->EndE()-truth->Mass());
-      mcPartDeltaAngle[nMCParts] = truth->Momentum().Vect().Angle(truth->EndMomentum().Vect());
-
-      const TVector3 particleFrontTPCPoint = lsu::mcPartStartZPlane(0,*truth);
-      mcPartXFrontTPC[nMCParts] = particleFrontTPCPoint.X();
-      mcPartYFrontTPC[nMCParts] = particleFrontTPCPoint.Y();
-
-      // for MCC11 primary particle should have start T = 0
-      if(mcPartIsBeam[nMCParts] && mcPartIsPrimary[nMCParts]
-            && fabs(mcPartStartT[nMCParts]) < 1e-6
-        )
-      {
-        primaryParticleCandidates.push_back(truth);
-        primaryParticleCandidateIs.push_back(nMCParts);
-      }
-
-      nMCParts++;
-    } // if not neturon or nucleus
-  } // for true (mcPart)
-
-  // Debugging printing of primaryParticleCandidates
-  for(const size_t & iMCPart: primaryParticleCandidateIs)
-  {
-    std::cout << "PrimaryParticle Candidate for: "<< eventNumber <<"\n"
-              << "  iMCPart:   " << iMCPart << "\n"
-              << "  TrackID:   " << mcPartTrackID[iMCPart] << "\n"
-              //<< "  IsPrimary: " << mcPartIsPrimary[iMCPart] << "\n"
-              << "  PDG:       " << mcPartPDG[iMCPart] << "\n"
-              //<< "  StartX:    " << mcPartStartX[iMCPart] << "\n"
-              //<< "  StartY:    " << mcPartStartY[iMCPart] << "\n"
-              << "  StartZ:    " << mcPartStartZ[iMCPart] << "\n"
-              << "  StartT:    " << mcPartStartT[iMCPart] << "\n"
-              //<< "  EndX:      " << mcPartEndX[iMCPart] << "\n"
-              //<< "  EndY:      " << mcPartEndY[iMCPart] << "\n"
-              << "  EndZ:      " << mcPartEndZ[iMCPart] << "\n"
-              << "  StartMom:  " << mcPartStartMom[iMCPart] << "\n"
-              //<< "  EndMom:    " << mcPartEndMom[iMCPart] << "\n"
-              //<< "  XFrontTPC: " << mcPartXFrontTPC[iMCPart] << "\n"
-              //<< "  YFrontTPC: " << mcPartYFrontTPC[iMCPart] << "\n"
-              ;
-    if(nBeamTracks >= MAXBEAMTRACKS)
-    {
-      throw cet::exception("TooManyBeamTracks","Too many beam tracks in this event, ran out of room in array");
-    }
-    beamTrackXFrontTPC[nBeamTracks] = mcPartXFrontTPC[iMCPart];
-    beamTrackYFrontTPC[nBeamTracks] = mcPartYFrontTPC[iMCPart];
-    beamTrackTheta[nBeamTracks] = mcPartStartTheta[iMCPart];
-    beamTrackPhi[nBeamTracks] = mcPartStartPhi[iMCPart];
-    beamTrackMom[nBeamTracks] = mcPartStartMom[iMCPart]*1e-3; // beam in GeV/c
-    beamTrackEPion[nBeamTracks] = sqrt(pow(beamTrackMom[nBeamTracks],2)+pow(MCHARGEDPION,2));
-    beamTrackKinPion[nBeamTracks] = beamTrackEPion[nBeamTracks] - MCHARGEDPION;
-    beamTrackEProton[nBeamTracks] = sqrt(pow(beamTrackMom[nBeamTracks],2)+pow(MPROTON,2));
-    beamTrackKinProton[nBeamTracks] = beamTrackEProton[nBeamTracks] - MPROTON;
-    beamTrackTruePDG[nBeamTracks] = mcPartPDG[iMCPart];
-    nBeamTracks++;
-  }
-
-  // Select primaryParticle
-  art::Ptr<simb::MCParticle> primaryParticle;
-  nPrimaryParticleCandidates = primaryParticleCandidates.size();
-  if(nPrimaryParticleCandidates > 0)
-  {
-    primaryParticle = primaryParticleCandidates.at(0);
-  }
-
-  recob::Track::Point_t trueStartPos;
-  recob::Track::Point_t trueEndPos;
-  recob::Track::Point_t trueSecondToEndPos;
-  ROOT::Math::XYZTVector trueStartMomVec4;
-  ROOT::Math::XYZTVector trueEndMomVec4;
-  ROOT::Math::XYZTVector trueSecondToEndMomVec4;
-
-  if(primaryParticle)
-  {
-    trueStartPos = lsu::toPoint(primaryParticle->Trajectory().begin()->first.Vect());
-    trueEndPos = lsu::toPoint(std::prev(primaryParticle->Trajectory().end())->first.Vect());
-    trueSecondToEndPos = lsu::toPoint(std::prev(std::prev(primaryParticle->Trajectory().end()))->first.Vect());
-
-    trueStartMomVec4 = lsu::toVector4(primaryParticle->Trajectory().begin()->second);
-    trueEndMomVec4 = lsu::toVector4(std::prev(primaryParticle->Trajectory().end())->second);
-    trueSecondToEndMomVec4 = lsu::toVector4(std::prev(std::prev(primaryParticle->Trajectory().end()))->second);
-
-    trueStartX = trueStartPos.X();
-    trueStartY = trueStartPos.Y();
-    trueStartZ = trueStartPos.Z();
-    trueStartT = primaryParticle->T();
-    xWC4Hit = trueStartPos.X();
-    yWC4Hit = trueStartPos.Y();
-    zWC4Hit = trueStartPos.Z();
-    trueEndX = trueEndPos.X();
-    trueEndY = trueEndPos.Y();
-    trueEndZ = trueEndPos.Z();
-    trueEndT = primaryParticle->EndT();
-    trueStartTheta = trueStartMomVec4.Vect().Theta();
-    trueStartPhi = trueStartMomVec4.Vect().Phi();
-    thetaWC = trueStartMomVec4.Vect().Theta();
-    phiWC = trueStartMomVec4.Vect().Phi();
-    trueStartMom = trueStartMomVec4.R()*1000.; //in MeV/c
-    trueStartE = trueStartMomVec4.E()*1000.;// in MeV
-    trueStartKin = trueStartE - primaryParticle->Mass()*1000.; // in MeV
-    trueEndMom = trueEndMomVec4.R()*1000.; // in MeV/c
-    trueEndE = trueEndMomVec4.E()*1000.; // in MeV
-    trueEndKin = trueEndE - primaryParticle->Mass()*1000.; // in MeV
-    trueSecondToEndMom = trueSecondToEndMomVec4.R()*1000.; // in MeV/c
-    trueSecondToEndE = trueSecondToEndMomVec4.E()*1000.; // in MeV
-    trueSecondToEndKin = trueSecondToEndE - primaryParticle->Mass()*1000.; // in MeV
-    std::string processStr = primaryParticle->Process();
-    std::string endProcessStr = primaryParticle->EndProcess();
-    trueNDaughters = primaryParticle->NumberDaughters();
-    truePrimaryPDG = primaryParticle->PdgCode();
-    truePrimaryTrackID = primaryParticle->TrackId();
-    nSecTracks = 0;
-    for(size_t iDaughter=0; iDaughter < trueNDaughters; iDaughter++)
-    {
-      int daughterTrackID = primaryParticle->Daughter(iDaughter);
-      for(const auto& truth:(truePartVec))
-      {
-        if(truth->TrackId() == daughterTrackID)
-        {
-          int pdgid = truth->PdgCode();
-	  TLorentzVector secMom4 = TLorentzVector(truth->Trajectory().begin()->second);
-	  float secKin = (secMom4.E()-truth->Mass())*1000.;
-	  if(nSecTracks < MAXDAUGHTER && secKin > 3.0) 
-	  {
-	    trueSecondPDG[nSecTracks] = pdgid;
-	    trueSecondKin[nSecTracks] = secKin;
-	    nSecTracks++;
-	  }
-          if(abs(pdgid) == 211)
-          {
-            trueNSecondaryChPions++;
-          }
-          else if(abs(pdgid) == 2212)
-          {
-            if(truth->Trajectory().TotalLength() > 1.)
-            {
-                trueNSecondaryProtons++;
-            }
-          }
-          else if(abs(pdgid) == 111)
-          {
-            trueNSecondaryPiZeros++;
-          }
-          else if(pdgid == (-truePrimaryPDG))
-          {
-            trueNSecondaryOppChPions++;
-          }
-          else if(abs(pdgid) == 13)
-          {
-            trueNSecondaryMuons++;
-          }
-          break;
-        }
-      }
-    }
-
-	if(trueNSecondaryChPions == 0) trueSignalT = true;
-	if(trueNSecondaryChPions > 0) trueSignalNT = true;
-	if(endProcessStr == "primary") // created via particle gun or something
-	   {trueEndProcess = 0;}
-	if(endProcessStr == "pi-Inelastic")
-	   {trueEndProcess = 1;}
-	if(endProcessStr == "neutronInelastic")
-	   {trueEndProcess = 2;}
-	if(endProcessStr == "hadElastic")
-	   {trueEndProcess = 3;}
-	if(endProcessStr == "nCapture")
-	   {trueEndProcess = 4;}
-	if(endProcessStr == "CHIPSNuclearCaptureAtRest")
-	   {trueEndProcess = 5;}
-	if(endProcessStr == "Decay")
-	   {trueEndProcess = 6;}
-	if(endProcessStr == "KaonZeroLInelastic")
-	   {trueEndProcess = 7;}
-	if(endProcessStr == "CoulombScat")
-	   {trueEndProcess = 8;}
-	if(endProcessStr == "muMinusCaptureAtRest")
-	   {trueEndProcess = 9;}
-	if(endProcessStr == "protonInelastic")
-	   {trueEndProcess = 10;}
-	if(endProcessStr == "kaon+Inelastic")
-	   {trueEndProcess = 11;}
-	if(endProcessStr == "hBertiniCaptureAtRest")
-	   {trueEndProcess = 12;}
-	if(endProcessStr == "pi+Inelastic")
-	   {trueEndProcess = 13;}
-	if(endProcessStr == "LArVoxelReadoutScoringProcess") // just ionizes
-	   {trueEndProcess = 14;}
-	if(endProcessStr == "CoupledTransportation") // exits world
-	   {trueEndProcess = 15;}
-	if(endProcessStr == "annihil") // positron
-	   {trueEndProcess = 16;}
-    mf::LogInfo("PrimaryParticle") <<"process: "<<processStr <<", endProcess: "<< endProcessStr
-                        <<", trueEndProcess: "<<trueEndProcess
-                        <<", nDaughters: "<< trueNDaughters
-                        <<", trueNSecondaryChPions: "<< trueNSecondaryChPions
-                        <<", trueNSecondaryPiZeros: "<< trueNSecondaryPiZeros
-                        <<", trueNSecondaryProtons: "<< trueNSecondaryProtons
-                        << std::setprecision(4) 
-                        << ", End: "<<trueEndX<<", "<<trueEndY<<", "<<trueEndZ;
-
-    bool interactedBeforeTPC = false;
-    bool interactedOutsideTPC = false;
-    if (trueEndZ < 0.) interactedBeforeTPC = true;
-    if (trueEndZ > 90.
-        || trueEndX < 0.4 || trueEndX > 47.9
-        || trueEndY < -20. || trueEndY > 20.
-        ) interactedOutsideTPC = true;
-
-    // Set trueCategory
-    if (abs(truePrimaryPDG) != 211)
-    {
-      if (abs(truePrimaryPDG) == 11)
-      {
-        trueCategory = 11; // electron
-      }
-      else if (abs(truePrimaryPDG) == 2212)
-      {
-        trueCategory = 12; // proton
-      }
-      else if (abs(truePrimaryPDG) == 13)
-      {
-        trueCategory = 13; // muon
-      }
-      else if (abs(truePrimaryPDG) == 321)
-      {
-        trueCategory = 14; // kaon
-      }
-      else
-      {
-        trueCategory = 15; // other non-pion primary PDG
-      }
-    }
-    else if (trueEndProcess == 15)
-    {
-      trueCategory = 8; // through-going
-    }
-    else if (interactedBeforeTPC)
-    {
-      trueCategory = 7; // interacted before TPC
-    }
-    else if (interactedOutsideTPC)
-    {
-      trueCategory = 6; // interacted outside TPC
-    }
-    else if (trueEndProcess == 13 || trueEndProcess == 1)
-    {
-      if (trueNSecondaryOppChPions > 0)
-      {
-        trueCategory = 4; // pion double charge exchange
-      }
-      else if(trueNSecondaryChPions > 0)
-      {
-        trueCategory = 1; // pion inelastic scattering
-      }
-      else
-      {
-        if (trueNSecondaryPiZeros > 0)
-        {
-          trueCategory = 3; // pion charge exchange
-        }
-        else
-        {
-          trueCategory = 2; // pion absorption
-        }
-      }
-    }
-    else if (trueEndProcess == 6)
-    {
-      trueCategory = 10; // decay-in-flight
-    }
-    else if (trueEndProcess == 14) // stopping
-    {
-      if (trueNSecondaryMuons == 1)
-      {
-        trueCategory = 9; // Pion Decay At Rest
-      }
-      else
-      {
-        trueCategory = 16; // Other Stopping
-      }
-    }
-    else
-    {
-      trueCategory = 0; // unknown
-    }
-
-    const TVector3 particleFrontTPCPoint = lsu::mcPartStartZPlane(0,*primaryParticle);
-    trueXFrontTPC = particleFrontTPCPoint.X();
-    trueYFrontTPC = particleFrontTPCPoint.Y();
-    xWC = trueXFrontTPC;
-    yWC = trueYFrontTPC;
-    pzWC = trueStartMomVec4.Z()*1000.; //in MeV/c
-    pWC = trueStartMom; //in MeV/c
-
-
-    // Get SimChannel Info
-    protoana::ProtoDUNETruthUtils pdTruthUtils;
-    const auto ides = pdTruthUtils.GetIDEsFromParticle(*primaryParticle,e);
-    for(const sim::IDE & ide: ides)
-    {
-      if (nIDEs >= MAXIDES - 1)
-      {
-          throw cet::exception("TooManyIDEs","Too many IDEs in this event, ran out of room in array");
-      }
-      simIDENumElectrons[nIDEs] = ide.numElectrons;
-      simIDEEnergy[nIDEs] = ide.energy; // MeV
-      simIDEX[nIDEs] = ide.x; // cm
-      simIDEY[nIDEs] = ide.y;
-      simIDEZ[nIDEs] = ide.z;
-      nIDEs++;
-    } // for ide
-
-  } // if primaryParticle
-
-  eWC = sqrt(pWC*pWC+MCHARGEDPION*MCHARGEDPION); // assume charged pion in MeV
-  kinWC = eWC - MCHARGEDPION; // assume charged pion in MeV
-  kinWCInTPC = kinWC - KINLOSTBEFORETPC;
-
-  // for proton
-  eWCProton = sqrt(pWC*pWC+MPROTON*MPROTON);
-  kinWCProton = eWCProton - MPROTON;
-  kinWCInTPCProton = kinWCProton - KINLOSTBEFORETPCPROTON;
-
+  const art::Ptr<simb::MCParticle> primaryParticle = ProcessMCParticles(truePartVec,beamOrCosmic,e);
 
   //Get Variables using all tracks
   nTracks = trackVec.size();
@@ -3027,5 +2657,383 @@ void lana::PionAbsSelector::ResetTreeVars()
   }
 
 } // ResetTreeVars
+
+const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const std::vector<art::Ptr<simb::MCParticle>>& truePartVec, const pdana::MCBeamOrCosmicAlg * const beamOrCosmic, const art::Event& e) // returns primary particle candidate
+{
+  //Get MCParticle Variables and find MCC11 primaryParticleCandidates
+  std::vector<art::Ptr<simb::MCParticle> > primaryParticleCandidates;
+  std::vector<size_t> primaryParticleCandidateIs;
+  for(const auto& truth:(truePartVec))
+  {
+    if (truth->PdgCode() != 2112 && truth->PdgCode() < 1000000000)
+    {
+      bool isBeam = false;
+      if (beamOrCosmic)
+      {
+        isBeam= beamOrCosmic->isBeam(truth);
+      }
+      mf::LogInfo("MCParticle") << std::fixed << std::setprecision(1) 
+          << "TrackId: "<<truth->TrackId()
+          <<" MotherId: "<<truth->Mother()
+          <<" PDG "<< truth->PdgCode()
+          <<" KE "<<1000*(truth->E()-truth->Mass()) 
+          <<" len: " << truth->Trajectory().TotalLength() 
+          <<" start: " << truth->Vx() << ", " << truth->Vy() << ", " << truth->Vz()
+          <<" end: " << truth->EndX() << ", " << truth->EndY() << ", " << truth->EndZ()
+          <<" Process: " << truth->Process()
+          <<" EndProcess: " << truth->EndProcess();
+
+      if (nMCParts >= MAXMCPARTS)
+      {
+        mf::LogError("MCParticle") << "Too many MCParticles in event to record.";
+        continue;
+      }
+
+      mcPartIsBeam[nMCParts] = isBeam;
+      mcPartIsPrimary[nMCParts] = truth->Process() == "primary";
+      mcPartTrackID[nMCParts] = truth->TrackId();
+      mcPartPDG[nMCParts] = truth->PdgCode();
+      mcPartStartX[nMCParts] = truth->Vx();
+      mcPartStartY[nMCParts] = truth->Vy();
+      mcPartStartZ[nMCParts] = truth->Vz();
+      mcPartStartT[nMCParts] = truth->T();
+      mcPartEndX[nMCParts] = truth->EndX();
+      mcPartEndY[nMCParts] = truth->EndY();
+      mcPartEndZ[nMCParts] = truth->EndZ();
+      mcPartEndT[nMCParts] = truth->EndT();
+      mcPartStartTheta[nMCParts] = truth->Momentum().Theta();
+      mcPartStartPhi[nMCParts] = truth->Momentum().Phi();
+      mcPartStartMom[nMCParts] = 1000.*truth->Momentum().Vect().Mag();
+      mcPartStartE[nMCParts] = 1000.*truth->E();
+      mcPartStartKin[nMCParts] = 1000.*(truth->E()-truth->Mass());
+      mcPartEndMom[nMCParts] = 1000.*truth->EndMomentum().Vect().Mag();
+      mcPartEndE[nMCParts] = 1000.*truth->EndE();
+      mcPartEndKin[nMCParts] = 1000.*(truth->EndE()-truth->Mass());
+      mcPartDeltaAngle[nMCParts] = truth->Momentum().Vect().Angle(truth->EndMomentum().Vect());
+
+      const TVector3 particleFrontTPCPoint = lsu::mcPartStartZPlane(0,*truth);
+      mcPartXFrontTPC[nMCParts] = particleFrontTPCPoint.X();
+      mcPartYFrontTPC[nMCParts] = particleFrontTPCPoint.Y();
+
+      // for MCC11 primary particle should have start T = 0
+      if(mcPartIsBeam[nMCParts] && mcPartIsPrimary[nMCParts]
+            && fabs(mcPartStartT[nMCParts]) < 1e-6
+        )
+      {
+        primaryParticleCandidates.push_back(truth);
+        primaryParticleCandidateIs.push_back(nMCParts);
+      }
+
+      nMCParts++;
+    } // if not neturon or nucleus
+  } // for true (mcPart)
+
+  // Debugging printing of primaryParticleCandidates
+  for(const size_t & iMCPart: primaryParticleCandidateIs)
+  {
+    std::cout << "PrimaryParticle Candidate for: "<< eventNumber <<"\n"
+              << "  iMCPart:   " << iMCPart << "\n"
+              << "  TrackID:   " << mcPartTrackID[iMCPart] << "\n"
+              //<< "  IsPrimary: " << mcPartIsPrimary[iMCPart] << "\n"
+              << "  PDG:       " << mcPartPDG[iMCPart] << "\n"
+              //<< "  StartX:    " << mcPartStartX[iMCPart] << "\n"
+              //<< "  StartY:    " << mcPartStartY[iMCPart] << "\n"
+              << "  StartZ:    " << mcPartStartZ[iMCPart] << "\n"
+              << "  StartT:    " << mcPartStartT[iMCPart] << "\n"
+              //<< "  EndX:      " << mcPartEndX[iMCPart] << "\n"
+              //<< "  EndY:      " << mcPartEndY[iMCPart] << "\n"
+              << "  EndZ:      " << mcPartEndZ[iMCPart] << "\n"
+              << "  StartMom:  " << mcPartStartMom[iMCPart] << "\n"
+              //<< "  EndMom:    " << mcPartEndMom[iMCPart] << "\n"
+              //<< "  XFrontTPC: " << mcPartXFrontTPC[iMCPart] << "\n"
+              //<< "  YFrontTPC: " << mcPartYFrontTPC[iMCPart] << "\n"
+              ;
+    if(nBeamTracks >= MAXBEAMTRACKS)
+    {
+      throw cet::exception("TooManyBeamTracks","Too many beam tracks in this event, ran out of room in array");
+    }
+    beamTrackXFrontTPC[nBeamTracks] = mcPartXFrontTPC[iMCPart];
+    beamTrackYFrontTPC[nBeamTracks] = mcPartYFrontTPC[iMCPart];
+    beamTrackTheta[nBeamTracks] = mcPartStartTheta[iMCPart];
+    beamTrackPhi[nBeamTracks] = mcPartStartPhi[iMCPart];
+    beamTrackMom[nBeamTracks] = mcPartStartMom[iMCPart]*1e-3; // beam in GeV/c
+    beamTrackEPion[nBeamTracks] = sqrt(pow(beamTrackMom[nBeamTracks],2)+pow(MCHARGEDPION,2));
+    beamTrackKinPion[nBeamTracks] = beamTrackEPion[nBeamTracks] - MCHARGEDPION;
+    beamTrackEProton[nBeamTracks] = sqrt(pow(beamTrackMom[nBeamTracks],2)+pow(MPROTON,2));
+    beamTrackKinProton[nBeamTracks] = beamTrackEProton[nBeamTracks] - MPROTON;
+    beamTrackTruePDG[nBeamTracks] = mcPartPDG[iMCPart];
+    nBeamTracks++;
+  }
+
+  // Select primaryParticle
+  art::Ptr<simb::MCParticle> primaryParticle;
+  nPrimaryParticleCandidates = primaryParticleCandidates.size();
+  if(nPrimaryParticleCandidates > 0)
+  {
+    primaryParticle = primaryParticleCandidates.at(0);
+  }
+
+  recob::Track::Point_t trueStartPos;
+  recob::Track::Point_t trueEndPos;
+  recob::Track::Point_t trueSecondToEndPos;
+  ROOT::Math::XYZTVector trueStartMomVec4;
+  ROOT::Math::XYZTVector trueEndMomVec4;
+  ROOT::Math::XYZTVector trueSecondToEndMomVec4;
+
+  if(primaryParticle)
+  {
+    trueStartPos = lsu::toPoint(primaryParticle->Trajectory().begin()->first.Vect());
+    trueEndPos = lsu::toPoint(std::prev(primaryParticle->Trajectory().end())->first.Vect());
+    trueSecondToEndPos = lsu::toPoint(std::prev(std::prev(primaryParticle->Trajectory().end()))->first.Vect());
+
+    trueStartMomVec4 = lsu::toVector4(primaryParticle->Trajectory().begin()->second);
+    trueEndMomVec4 = lsu::toVector4(std::prev(primaryParticle->Trajectory().end())->second);
+    trueSecondToEndMomVec4 = lsu::toVector4(std::prev(std::prev(primaryParticle->Trajectory().end()))->second);
+
+    trueStartX = trueStartPos.X();
+    trueStartY = trueStartPos.Y();
+    trueStartZ = trueStartPos.Z();
+    trueStartT = primaryParticle->T();
+    xWC4Hit = trueStartPos.X();
+    yWC4Hit = trueStartPos.Y();
+    zWC4Hit = trueStartPos.Z();
+    trueEndX = trueEndPos.X();
+    trueEndY = trueEndPos.Y();
+    trueEndZ = trueEndPos.Z();
+    trueEndT = primaryParticle->EndT();
+    trueStartTheta = trueStartMomVec4.Vect().Theta();
+    trueStartPhi = trueStartMomVec4.Vect().Phi();
+    thetaWC = trueStartMomVec4.Vect().Theta();
+    phiWC = trueStartMomVec4.Vect().Phi();
+    trueStartMom = trueStartMomVec4.R()*1000.; //in MeV/c
+    trueStartE = trueStartMomVec4.E()*1000.;// in MeV
+    trueStartKin = trueStartE - primaryParticle->Mass()*1000.; // in MeV
+    trueEndMom = trueEndMomVec4.R()*1000.; // in MeV/c
+    trueEndE = trueEndMomVec4.E()*1000.; // in MeV
+    trueEndKin = trueEndE - primaryParticle->Mass()*1000.; // in MeV
+    trueSecondToEndMom = trueSecondToEndMomVec4.R()*1000.; // in MeV/c
+    trueSecondToEndE = trueSecondToEndMomVec4.E()*1000.; // in MeV
+    trueSecondToEndKin = trueSecondToEndE - primaryParticle->Mass()*1000.; // in MeV
+    std::string processStr = primaryParticle->Process();
+    std::string endProcessStr = primaryParticle->EndProcess();
+    trueNDaughters = primaryParticle->NumberDaughters();
+    truePrimaryPDG = primaryParticle->PdgCode();
+    truePrimaryTrackID = primaryParticle->TrackId();
+    nSecTracks = 0;
+    for(size_t iDaughter=0; iDaughter < trueNDaughters; iDaughter++)
+    {
+      int daughterTrackID = primaryParticle->Daughter(iDaughter);
+      for(const auto& truth:(truePartVec))
+      {
+        if(truth->TrackId() == daughterTrackID)
+        {
+          int pdgid = truth->PdgCode();
+	  TLorentzVector secMom4 = TLorentzVector(truth->Trajectory().begin()->second);
+	  float secKin = (secMom4.E()-truth->Mass())*1000.;
+	  if(nSecTracks < MAXDAUGHTER && secKin > 3.0) 
+	  {
+	    trueSecondPDG[nSecTracks] = pdgid;
+	    trueSecondKin[nSecTracks] = secKin;
+	    nSecTracks++;
+	  }
+          if(abs(pdgid) == 211)
+          {
+            trueNSecondaryChPions++;
+          }
+          else if(abs(pdgid) == 2212)
+          {
+            if(truth->Trajectory().TotalLength() > 1.)
+            {
+                trueNSecondaryProtons++;
+            }
+          }
+          else if(abs(pdgid) == 111)
+          {
+            trueNSecondaryPiZeros++;
+          }
+          else if(pdgid == (-truePrimaryPDG))
+          {
+            trueNSecondaryOppChPions++;
+          }
+          else if(abs(pdgid) == 13)
+          {
+            trueNSecondaryMuons++;
+          }
+          break;
+        }
+      }
+    }
+
+	if(trueNSecondaryChPions == 0) trueSignalT = true;
+	if(trueNSecondaryChPions > 0) trueSignalNT = true;
+	if(endProcessStr == "primary") // created via particle gun or something
+	   {trueEndProcess = 0;}
+	if(endProcessStr == "pi-Inelastic")
+	   {trueEndProcess = 1;}
+	if(endProcessStr == "neutronInelastic")
+	   {trueEndProcess = 2;}
+	if(endProcessStr == "hadElastic")
+	   {trueEndProcess = 3;}
+	if(endProcessStr == "nCapture")
+	   {trueEndProcess = 4;}
+	if(endProcessStr == "CHIPSNuclearCaptureAtRest")
+	   {trueEndProcess = 5;}
+	if(endProcessStr == "Decay")
+	   {trueEndProcess = 6;}
+	if(endProcessStr == "KaonZeroLInelastic")
+	   {trueEndProcess = 7;}
+	if(endProcessStr == "CoulombScat")
+	   {trueEndProcess = 8;}
+	if(endProcessStr == "muMinusCaptureAtRest")
+	   {trueEndProcess = 9;}
+	if(endProcessStr == "protonInelastic")
+	   {trueEndProcess = 10;}
+	if(endProcessStr == "kaon+Inelastic")
+	   {trueEndProcess = 11;}
+	if(endProcessStr == "hBertiniCaptureAtRest")
+	   {trueEndProcess = 12;}
+	if(endProcessStr == "pi+Inelastic")
+	   {trueEndProcess = 13;}
+	if(endProcessStr == "LArVoxelReadoutScoringProcess") // just ionizes
+	   {trueEndProcess = 14;}
+	if(endProcessStr == "CoupledTransportation") // exits world
+	   {trueEndProcess = 15;}
+	if(endProcessStr == "annihil") // positron
+	   {trueEndProcess = 16;}
+    mf::LogInfo("PrimaryParticle") <<"process: "<<processStr <<", endProcess: "<< endProcessStr
+                        <<", trueEndProcess: "<<trueEndProcess
+                        <<", nDaughters: "<< trueNDaughters
+                        <<", trueNSecondaryChPions: "<< trueNSecondaryChPions
+                        <<", trueNSecondaryPiZeros: "<< trueNSecondaryPiZeros
+                        <<", trueNSecondaryProtons: "<< trueNSecondaryProtons
+                        << std::setprecision(4) 
+                        << ", End: "<<trueEndX<<", "<<trueEndY<<", "<<trueEndZ;
+
+    bool interactedBeforeTPC = false;
+    bool interactedOutsideTPC = false;
+    if (trueEndZ < 0.) interactedBeforeTPC = true;
+    if (trueEndZ > 90.
+        || trueEndX < 0.4 || trueEndX > 47.9
+        || trueEndY < -20. || trueEndY > 20.
+        ) interactedOutsideTPC = true;
+
+    // Set trueCategory
+    if (abs(truePrimaryPDG) != 211)
+    {
+      if (abs(truePrimaryPDG) == 11)
+      {
+        trueCategory = 11; // electron
+      }
+      else if (abs(truePrimaryPDG) == 2212)
+      {
+        trueCategory = 12; // proton
+      }
+      else if (abs(truePrimaryPDG) == 13)
+      {
+        trueCategory = 13; // muon
+      }
+      else if (abs(truePrimaryPDG) == 321)
+      {
+        trueCategory = 14; // kaon
+      }
+      else
+      {
+        trueCategory = 15; // other non-pion primary PDG
+      }
+    }
+    else if (trueEndProcess == 15)
+    {
+      trueCategory = 8; // through-going
+    }
+    else if (interactedBeforeTPC)
+    {
+      trueCategory = 7; // interacted before TPC
+    }
+    else if (interactedOutsideTPC)
+    {
+      trueCategory = 6; // interacted outside TPC
+    }
+    else if (trueEndProcess == 13 || trueEndProcess == 1)
+    {
+      if (trueNSecondaryOppChPions > 0)
+      {
+        trueCategory = 4; // pion double charge exchange
+      }
+      else if(trueNSecondaryChPions > 0)
+      {
+        trueCategory = 1; // pion inelastic scattering
+      }
+      else
+      {
+        if (trueNSecondaryPiZeros > 0)
+        {
+          trueCategory = 3; // pion charge exchange
+        }
+        else
+        {
+          trueCategory = 2; // pion absorption
+        }
+      }
+    }
+    else if (trueEndProcess == 6)
+    {
+      trueCategory = 10; // decay-in-flight
+    }
+    else if (trueEndProcess == 14) // stopping
+    {
+      if (trueNSecondaryMuons == 1)
+      {
+        trueCategory = 9; // Pion Decay At Rest
+      }
+      else
+      {
+        trueCategory = 16; // Other Stopping
+      }
+    }
+    else
+    {
+      trueCategory = 0; // unknown
+    }
+
+    const TVector3 particleFrontTPCPoint = lsu::mcPartStartZPlane(0,*primaryParticle);
+    trueXFrontTPC = particleFrontTPCPoint.X();
+    trueYFrontTPC = particleFrontTPCPoint.Y();
+    xWC = trueXFrontTPC;
+    yWC = trueYFrontTPC;
+    pzWC = trueStartMomVec4.Z()*1000.; //in MeV/c
+    pWC = trueStartMom; //in MeV/c
+
+
+    // Get SimChannel Info
+    protoana::ProtoDUNETruthUtils pdTruthUtils;
+    const auto ides = pdTruthUtils.GetIDEsFromParticle(*primaryParticle,e);
+    for(const sim::IDE & ide: ides)
+    {
+      if (nIDEs >= MAXIDES - 1)
+      {
+          throw cet::exception("TooManyIDEs","Too many IDEs in this event, ran out of room in array");
+      }
+      simIDENumElectrons[nIDEs] = ide.numElectrons;
+      simIDEEnergy[nIDEs] = ide.energy; // MeV
+      simIDEX[nIDEs] = ide.x; // cm
+      simIDEY[nIDEs] = ide.y;
+      simIDEZ[nIDEs] = ide.z;
+      nIDEs++;
+    } // for ide
+
+  } // if primaryParticle
+
+  eWC = sqrt(pWC*pWC+MCHARGEDPION*MCHARGEDPION); // assume charged pion in MeV
+  kinWC = eWC - MCHARGEDPION; // assume charged pion in MeV
+  kinWCInTPC = kinWC - KINLOSTBEFORETPC;
+
+  // for proton
+  eWCProton = sqrt(pWC*pWC+MPROTON*MPROTON);
+  kinWCProton = eWCProton - MPROTON;
+  kinWCInTPCProton = kinWCProton - KINLOSTBEFORETPCPROTON;
+
+  return primaryParticle;
+
+} // ProcessMCParticles
 
 DEFINE_ART_MODULE(lana::PionAbsSelector)

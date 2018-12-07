@@ -50,9 +50,9 @@ class pdana::MCBeamOrCosmicAlg
      * truth, and false if it came from a cosmic truth.
      *
      */
-    bool isBeam(simb::MCParticle const & particle);
+    bool isBeam(simb::MCParticle const & particle) const;
 
-    bool isBeam(art::Ptr<simb::MCParticle> const & particle);
+    bool isBeam(art::Ptr<simb::MCParticle> const & particle) const;
 
 
     /** \brief Find if trackId is from a beam or cosmic
@@ -65,7 +65,7 @@ class pdana::MCBeamOrCosmicAlg
      * cosmic particle.
      *
      */
-    bool isBeam(const int trackId);
+    bool isBeam(const int trackId) const;
 
   private:
 

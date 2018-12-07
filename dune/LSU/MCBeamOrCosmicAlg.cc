@@ -28,30 +28,30 @@ pdana::MCBeamOrCosmicAlg::MCBeamOrCosmicAlg(art::Event const & event, const art:
   }
 }
 
-bool pdana::MCBeamOrCosmicAlg::isBeam(simb::MCParticle const & particle)
+bool pdana::MCBeamOrCosmicAlg::isBeam(simb::MCParticle const & particle) const
 {
   const int trackId = particle.TrackId();
   return isBeam(trackId);
 }
 
-bool pdana::MCBeamOrCosmicAlg::isBeam(art::Ptr<simb::MCParticle> const & particle)
+bool pdana::MCBeamOrCosmicAlg::isBeam(art::Ptr<simb::MCParticle> const & particle) const
 {
   const int trackId = particle->TrackId();
   return isBeam(trackId);
 }
 
-bool pdana::MCBeamOrCosmicAlg::isBeam(const int trackId)
+bool pdana::MCBeamOrCosmicAlg::isBeam(const int trackId) const
 {
   std::vector<art::Ptr<simb::MCParticle>> const & beamParts = beamMatchedParticles.at(0);
   std::vector<art::Ptr<simb::MCParticle>> const & cosmicParts = cosmicMatchedParticles.at(0);
-  for(const auto beamPart: beamParts)
+  for(const auto& beamPart: beamParts)
   {
     if (beamPart->TrackId() == trackId)
     {
       return true;
     }
   }
-  for(const auto cosmicPart: cosmicParts)
+  for(const auto& cosmicPart: cosmicParts)
   {
     if (cosmicPart->TrackId() == trackId)
     {
