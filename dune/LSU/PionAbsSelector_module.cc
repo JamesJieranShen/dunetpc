@@ -627,6 +627,11 @@ private:
         const art::FindManyP<anab::Calorimetry>& tracksCaloVec, 
         const pdana::MotherDaughterWalkerAlg& motherDaughterWalker,
         const art::Event& e); // returns primary track candidate
+  void ProcessPFParticles(const art::Event& e,
+        //const art::Ptr<simb::MCParticle>& primaryParticle,
+        //const pdana::MotherDaughterWalkerAlg& motherDaughterWalker,
+        const pdana::MCBeamOrCosmicAlg * const beamOrCosmic
+        );
 
   void ResetTreeVars();
 
@@ -909,276 +914,8 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
             << " Min Proton/Pion LHR: " << nSecLLRProtonToPionMin;
   }
 
-  //////////////////////////////
-  //////////// PFParticle //////
-  //////////////////////////////
+  ProcessPFParticles(e,beamOrCosmic);
   
-
-  /**
-  LArPandoraHelper larPandoraHelper;
-  lar_pandora::PFParticleVector allPFParticles;
-  lar_pandora::PFParticlesToMetadata pfPartsToMetadata;
-  larPandoraHelper.CollectPFParticleMetadata(e,fPFParticleTag.encode(),allPFParticles,pfPartsToMetadata);
-  lar_pandora::PFParticleMap idToPFParticleMap; // map int to Ptr<PFParticle>
-  larPandoraHelper.BuildPFParticleMap(allPFParticles,pfPartsToTracks);
-  lar_pandora::TrackVector allPFTracks; // vector<Ptr<Track>>
-  lar_pandora::PFParticlesToTracks pfPartsToTracks; // map of Ptr<PFParticle> to Ptr<Track>
-  larPandoraHelper.CollectTracks(e,fPFParticleTag.encode(),allPFTracks,pfPartsToTracks);
-  lar_pandora::ShowerVector allPFShowers; // vector<Ptr<Shower>>
-  lar_pandora::PFParticlesToShowers pfPartsToShowers; // map of Ptr<PFParticle> to Ptr<Shower>
-  larPandoraHelper.CollectShowers(e,fPFParticleTag.encode(),allPFShowers,pfPartsToShowers);
-  **/
-
-  protoana::ProtoDUNEPFParticleUtils pfPartUtils;
-  std::cout << "Number of primary PFParticles: " << pfPartUtils.GetNumberPrimaryPFParticle(e,fPFParticleTag.encode()) << std::endl;
-  const std::vector<const recob::PFParticle*> pfFromBeamSlice = pfPartUtils.GetPFParticlesFromBeamSlice(e,fPFParticleTag.encode());
-
-  // All this just to get the calos and truth
-  auto allPFTrackHand = e.getValidHandle<std::vector<recob::Track>>(fPFTrackTag);
-  std::vector<art::Ptr<recob::Track>> allPFTrackVec;
-  if(allPFTrackHand.isValid())
-  {
-    art::fill_ptr_vector(allPFTrackVec, allPFTrackHand);
-  }
-  art::FindManyP<recob::Hit> fmHitsForPFTracks(allPFTrackHand, e, fPFTrackTag);
-  art::FindManyP<anab::Calorimetry>  fmPFCalo(allPFTrackHand, e, fPFCaloTag);
-  //auto allPFShowerHand = e.getValidHandle<std::vector<recob::Shower>>(fPFShowerTag);
-  //std::vector<art::Ptr<recob::Shower>> allPFShowerVec;
-  //if(allPFShowerHand.isValid())
-  //{
-  //  art::fill_ptr_vector(allPFShowerVec, allPFShowerHand);
-  //}
-  //art::FindManyP<recob::Hit> fmHitsForPFShowers(allPFShowerHand, e, fPFShowerTag);
-
-  PFNBeamSlices = pfFromBeamSlice.size();
-  std::cout << "Number of primary beam PFParticles: " << PFNBeamSlices << std::endl;
-  for(size_t iPF=0; iPF < PFNBeamSlices; iPF++)
-  {
-    const recob::PFParticle* pfBeamPart = pfFromBeamSlice.at(iPF);
-    PFBeamPrimPDG = pfBeamPart->PdgCode();
-    PFBeamPrimNDaughters = pfBeamPart->NumDaughters();
-    const bool isPFParticleTracklike = pfPartUtils.IsPFParticleTracklike(*pfBeamPart);
-    const bool isPFParticleShowerlike = pfPartUtils.IsPFParticleShowerlike(*pfBeamPart);
-    PFBeamPrimIsTracklike = isPFParticleTracklike;
-    PFBeamPrimIsShowerlike = isPFParticleShowerlike;
-    PFBeamPrimBeamCosmicScore = pfPartUtils.GetBeamCosmicScore(*pfBeamPart,e,fPFParticleTag.encode());
-
-    const TVector3 pfBeamVertex = pfPartUtils.GetPFParticleVertex(*pfBeamPart,e,fPFParticleTag.encode(),fPFTrackTag.encode());
-    PFBeamPrimStartX = pfBeamVertex.X();
-    PFBeamPrimStartY = pfBeamVertex.Y();
-    PFBeamPrimStartZ = pfBeamVertex.Z();
-
-    std::cout << "Beam PFParticle: "<< iPF 
-                << " is primary: " << pfBeamPart->IsPrimary() 
-                << " PDG: " << pfBeamPart->PdgCode()
-                << " is track-like: "<<isPFParticleTracklike
-                << " is shower-like: "<<isPFParticleShowerlike
-                << std::endl;
-
-    if(isPFParticleTracklike)
-    {
-      const recob::Track* pfTrack = pfPartUtils.GetPFParticleTrack(*pfBeamPart, e, fPFParticleTag.encode(),fPFTrackTag.encode());
-      
-      if(pfTrack)
-      {
-        const TVector3 pfTrackFrontTPCPoint = lsu::trackZPlane(0,*pfTrack);
-        PFBeamPrimXFrontTPC = pfTrackFrontTPCPoint.X();
-        PFBeamPrimYFrontTPC = pfTrackFrontTPCPoint.Y();
-        const TVector3 pfBeamSecondaryVertex = pfPartUtils.GetPFParticleSecondaryVertex(*pfBeamPart,e,fPFParticleTag.encode(),fPFTrackTag.encode());
-        PFBeamPrimEndX = pfBeamSecondaryVertex.X();
-        PFBeamPrimEndY = pfBeamSecondaryVertex.Y();
-        PFBeamPrimEndZ = pfBeamSecondaryVertex.Z();
-        PFBeamPrimStartTheta = pfTrack->Theta();
-        PFBeamPrimStartPhi = pfTrack->Phi();
-        if(pfTrack->NPoints() > 1)
-        {
-          PFBeamPrimTrkLen = pfTrack->Length();
-        }
-
-        const auto& shouldBeThisTrackToo = allPFTrackVec.at(pfTrack->ID());
-        if(pfTrack->ID() != shouldBeThisTrackToo->ID() 
-            || pfTrack->NPoints() != shouldBeThisTrackToo->NPoints())
-        {
-          throw cet::exception("PionAbsSelector","track->ID() isn't the track index in the list for primary track!");
-        }
-        const auto& pfTrackCalos = fmPFCalo.at(pfTrack->ID());
-        for(const auto& pfTrackCalo:pfTrackCalos)
-        {
-          if(pfTrackCalo->PlaneID().Plane == fCaloPlane)
-          {
-            const auto& dEdxSize = pfTrackCalo->dEdx().size();
-            //const auto& dEdxBegin = pfTrackCalo->dEdx().begin();
-            const auto& dEdxEnd = pfTrackCalo->dEdx().end();
-            if (dEdxSize >= 3)
-            {
-              PFBeamPrimdEdxAverageLast3Hits = findAverage(dEdxEnd - 3, dEdxEnd);
-            }
-            if (dEdxSize >= 5)
-            {
-              PFBeamPrimdEdxAverageLast5Hits = findAverage(dEdxEnd - 5, dEdxEnd);
-            }
-            if (dEdxSize >= 7)
-            {
-              PFBeamPrimdEdxAverageLast7Hits = findAverage(dEdxEnd - 7, dEdxEnd);
-            }
-
-            double intE = 0.;
-            for(size_t cRangeIt = 0; cRangeIt < pfTrackCalo->ResidualRange().size() 
-                                && cRangeIt < pfTrackCalo->dEdx().size(); cRangeIt++)
-            {
-              PFBeamPrimResRanges.push_back(pfTrackCalo->ResidualRange().at(cRangeIt));
-              PFBeamPrimdEdxs.push_back(pfTrackCalo->dEdx().at(cRangeIt));
-              PFBeamPrimPitches.push_back(pfTrackCalo->TrkPitchVec().at(cRangeIt));
-              const auto& thisPoint = pfTrackCalo->XYZ().at(cRangeIt); // PositionVector3D
-              PFBeamPrimXs.push_back(thisPoint.X());
-              PFBeamPrimYs.push_back(thisPoint.Y());
-              PFBeamPrimZs.push_back(thisPoint.Z());
-
-              const bool thisInFid = InPrimaryFiducial(thisPoint);
-              PFBeamPrimInFids.push_back(thisInFid);
-              const double thisKin = kinWCInTPC-intE;
-              PFBeamPrimKins.push_back(thisKin);
-              const double thisKinProton = kinWCInTPCProton-intE;
-              PFBeamPrimKinsProton.push_back(thisKinProton);
-              if(thisInFid)
-              {
-                PFBeamPrimKinInteract = thisKin;
-                PFBeamPrimKinInteractProton = thisKinProton;
-              }
-              else
-              {
-                PFBeamPrimKinInteract = DEFAULTNEG;
-                PFBeamPrimKinInteractProton = DEFAULTNEG;
-              }
-              intE += pfTrackCalo->dEdx().at(cRangeIt)*pfTrackCalo->TrkPitchVec().at(cRangeIt);
-            } // for cRangeIt
-          } // if Plane is fCaloPlane
-        } // for pfTrackCalo
-
-        if(isMC) // Now MCTruth Matching
-        {
-          const auto& pfTrackHits = fmHitsForPFTracks.at(pfTrack->ID());
-          lsu::BackTrackerAlg btAlg;
-          bool trackIDIsNeg = false;
-          const auto pfTrackMCPart = btAlg.getMCParticle(pfTrackHits,e,trackIDIsNeg);
-          bool isTrueBeam = false;
-          if (beamOrCosmic)
-          {
-            isTrueBeam = beamOrCosmic->isBeam(pfTrackMCPart);
-          }
-          std::cout << "PFPrimaryTrack MCPart: PDG: " << pfTrackMCPart.PdgCode() <<"  Mom: "<< pfTrackMCPart.Momentum().Vect().Mag() << " isBeam: "<<isTrueBeam<<" process: "<<pfTrackMCPart.Process() << " end process: "<<pfTrackMCPart.EndProcess()<< std::endl;
-
-        } // if isMC
-      } // if pfTrack
-    } // if isPFParticleTracklike
-    if(isPFParticleShowerlike)
-    {
-      const recob::Shower* pfShower = pfPartUtils.GetPFParticleShower(*pfBeamPart, e, fPFParticleTag.encode(),fPFShowerTag.encode());
-      if(pfShower)
-      {
-        //const TVector3 showerStart = pfShower->ShowerStart();
-        const TVector3 showerDir = pfShower->Direction();
-        PFBeamPrimStartTheta = showerDir.Theta();
-        PFBeamPrimStartPhi = showerDir.Phi();
-
-        const TVector3 showerFrontTPCPoint = lsu::lineZPlane(0,pfBeamVertex,showerDir);
-        PFBeamPrimXFrontTPC = showerFrontTPCPoint.X();
-        PFBeamPrimYFrontTPC = showerFrontTPCPoint.Y();
-
-        if(pfShower->has_open_angle())
-        {
-          PFBeamPrimShwrOpenAngle = pfShower->OpenAngle();
-        }
-        if(pfShower->has_length())
-        {
-          PFBeamPrimShwrLen = pfShower->Length();
-        }
-        std::cout << "    Shower: "
-                  << " has open angle: " << pfShower->has_open_angle()
-                  << " has length: " << pfShower->has_length()
-                  << " open angle: " << pfShower->OpenAngle()
-                  << " length: " << pfShower->Length()
-                  << std::endl;
-        std::cout << "        Shower Dir:   "
-                  << "(" << showerDir.X()
-                  << "," << showerDir.Y()
-                  << "," << showerDir.Z()
-                  << ")"
-                  << std::endl;
-        //if(isMC) // Now MCTruth Matching
-        //{
-        //  const auto& pfShowerHits = fmHitsForPFShowers.at(pfShower->ID());
-        //  lsu::BackTrackerAlg btAlg;
-        //  bool trackIDIsNeg = false;
-        //  const auto pfShowerMCPart = btAlg.getMCParticle(pfShowerHits,e,trackIDIsNeg);
-        //  bool isTrueBeam = false;
-        //  if (beamOrCosmic)
-        //  {
-        //    isTrueBeam = beamOrCosmic->isBeam(pfShowerMCPart);
-        //  }
-        //  std::cout << "PFPrimaryShower MCPart: PDG: " << pfShowerMCPart.PdgCode() <<"  Mom: "<< pfShowerMCPart.Momentum().Vect().Mag() << " isBeam: "<<isTrueBeam<<" process: "<<pfShowerMCPart.Process() << " end process: "<<pfShowerMCPart.EndProcess()<< std::endl;
-
-        //} // if isMC
-      } // if pfShower
-    } // if isPFParticleShowerlike
-
-    const auto& pfBeamDaughterTracks = pfPartUtils.GetPFParticleDaughterTracks(*pfBeamPart,e,fPFParticleTag.encode(),fPFTrackTag.encode());
-    const auto& pfBeamDaughterShowers = pfPartUtils.GetPFParticleDaughterShowers(*pfBeamPart,e,fPFParticleTag.encode(),fPFShowerTag.encode());
-    PFBeamPrimNDaughterTracks = pfBeamDaughterTracks.size();
-    PFBeamPrimNDaughterShowers = pfBeamDaughterShowers.size();
-    
-    std::cout << "    N daughters: " << pfBeamPart->NumDaughters()
-                << " N daughter tracks: " << pfBeamDaughterTracks.size()
-                << " N daughter showers: " << pfBeamDaughterShowers.size()
-                << std::endl;
-    std::cout << "    Vertex:           "
-                << "(" << pfBeamVertex.X()
-                << "," << pfBeamVertex.Y()
-                << "," << pfBeamVertex.Z()
-                << ")"
-                << std::endl;
-    for(size_t iSec=0; iSec < pfBeamDaughterTracks.size(); iSec++)
-    {
-        const auto& pfBeamDaughterTrack = pfBeamDaughterTracks.at(iSec);
-        std::cout << "Daughter "<<iSec<<" track len: " << pfBeamDaughterTrack->Length() << std::endl;
-        PFBeamSecTrkLen[iSec] = pfBeamDaughterTrack->Length();
-
-        const auto& shouldBeThisTrackToo = allPFTrackVec.at(pfBeamDaughterTrack->ID());
-        if(pfBeamDaughterTrack->ID() != shouldBeThisTrackToo->ID() 
-            || pfBeamDaughterTrack->NPoints() != shouldBeThisTrackToo->NPoints())
-        {
-          throw cet::exception("PionAbsSelector","track->ID() isn't the track index in the list for daughter track!");
-        }
-        const auto& pfBeamDaughterTrackCalos = fmPFCalo.at(pfBeamDaughterTrack->ID());
-
-        for(const auto& pfTrackCalo:pfBeamDaughterTrackCalos)
-        {
-          if(pfTrackCalo->PlaneID().Plane == fCaloPlane)
-          {
-            const auto& dEdxSize = pfTrackCalo->dEdx().size();
-            //const auto& dEdxBegin = pfTrackCalo->dEdx().begin();
-            const auto& dEdxEnd = pfTrackCalo->dEdx().end();
-            if (dEdxSize >= 3)
-            {
-              PFBeamSecTrkdEdxAverageLast3Hits[iSec] = findAverage(dEdxEnd - 3, dEdxEnd);
-            }
-            if (dEdxSize >= 5)
-            {
-              PFBeamSecTrkdEdxAverageLast5Hits[iSec] = findAverage(dEdxEnd - 5, dEdxEnd);
-            }
-            if (dEdxSize >= 7)
-            {
-              PFBeamSecTrkdEdxAverageLast7Hits[iSec] = findAverage(dEdxEnd - 7, dEdxEnd);
-            }
-          } // if Plane is fCaloPlane
-        } // for pfTrackCalo
-    } // for pfBeamDaughterTrack
-    
-    break; // only look at first PFSlice
-  } // for iPF
-
-  // Done with PFParticles
-
   tree->Fill();
 
   const float flangeRadiusCutSquared = pow(fFlangeRadiusCut,2);
@@ -2791,7 +2528,7 @@ void lana::PionAbsSelector::ProcessPrimaryTrack(const std::vector<art::Ptr<recob
         const art::Ptr<simb::MCParticle>& primaryParticle,
         const art::FindManyP<anab::Calorimetry>& tracksCaloVec, 
         const pdana::MotherDaughterWalkerAlg& motherDaughterWalker,
-        const art::Event& e) // returns primary track candidate
+        const art::Event& e)
 {
   //Match the primary track to the WCTrack or MCParticle
   const art::Ptr<recob::Track> primaryTrack = MatchRecoToTruthOrWCTrack(trackVec,e.isRealData()); // also sets deltaX, deltaY, etc.
@@ -3069,5 +2806,274 @@ void lana::PionAbsSelector::ProcessPrimaryTrack(const std::vector<art::Ptr<recob
   
 } // ProcessPrimaryTrack
 
+void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
+        //const art::Ptr<simb::MCParticle>& primaryParticle,
+        //const pdana::MotherDaughterWalkerAlg& motherDaughterWalker,
+        const pdana::MCBeamOrCosmicAlg * const beamOrCosmic
+        )
+{
+  /**
+  LArPandoraHelper larPandoraHelper;
+  lar_pandora::PFParticleVector allPFParticles;
+  lar_pandora::PFParticlesToMetadata pfPartsToMetadata;
+  larPandoraHelper.CollectPFParticleMetadata(e,fPFParticleTag.encode(),allPFParticles,pfPartsToMetadata);
+  lar_pandora::PFParticleMap idToPFParticleMap; // map int to Ptr<PFParticle>
+  larPandoraHelper.BuildPFParticleMap(allPFParticles,pfPartsToTracks);
+  lar_pandora::TrackVector allPFTracks; // vector<Ptr<Track>>
+  lar_pandora::PFParticlesToTracks pfPartsToTracks; // map of Ptr<PFParticle> to Ptr<Track>
+  larPandoraHelper.CollectTracks(e,fPFParticleTag.encode(),allPFTracks,pfPartsToTracks);
+  lar_pandora::ShowerVector allPFShowers; // vector<Ptr<Shower>>
+  lar_pandora::PFParticlesToShowers pfPartsToShowers; // map of Ptr<PFParticle> to Ptr<Shower>
+  larPandoraHelper.CollectShowers(e,fPFParticleTag.encode(),allPFShowers,pfPartsToShowers);
+  **/
+
+  protoana::ProtoDUNEPFParticleUtils pfPartUtils;
+  std::cout << "Number of primary PFParticles: " << pfPartUtils.GetNumberPrimaryPFParticle(e,fPFParticleTag.encode()) << std::endl;
+  const std::vector<const recob::PFParticle*> pfFromBeamSlice = pfPartUtils.GetPFParticlesFromBeamSlice(e,fPFParticleTag.encode());
+
+  // All this just to get the calos and truth
+  auto allPFTrackHand = e.getValidHandle<std::vector<recob::Track>>(fPFTrackTag);
+  std::vector<art::Ptr<recob::Track>> allPFTrackVec;
+  if(allPFTrackHand.isValid())
+  {
+    art::fill_ptr_vector(allPFTrackVec, allPFTrackHand);
+  }
+  art::FindManyP<recob::Hit> fmHitsForPFTracks(allPFTrackHand, e, fPFTrackTag);
+  art::FindManyP<anab::Calorimetry>  fmPFCalo(allPFTrackHand, e, fPFCaloTag);
+  //auto allPFShowerHand = e.getValidHandle<std::vector<recob::Shower>>(fPFShowerTag);
+  //std::vector<art::Ptr<recob::Shower>> allPFShowerVec;
+  //if(allPFShowerHand.isValid())
+  //{
+  //  art::fill_ptr_vector(allPFShowerVec, allPFShowerHand);
+  //}
+  //art::FindManyP<recob::Hit> fmHitsForPFShowers(allPFShowerHand, e, fPFShowerTag);
+
+  PFNBeamSlices = pfFromBeamSlice.size();
+  std::cout << "Number of primary beam PFParticles: " << PFNBeamSlices << std::endl;
+  for(size_t iPF=0; iPF < PFNBeamSlices; iPF++)
+  {
+    const recob::PFParticle* pfBeamPart = pfFromBeamSlice.at(iPF);
+    PFBeamPrimPDG = pfBeamPart->PdgCode();
+    PFBeamPrimNDaughters = pfBeamPart->NumDaughters();
+    const bool isPFParticleTracklike = pfPartUtils.IsPFParticleTracklike(*pfBeamPart);
+    const bool isPFParticleShowerlike = pfPartUtils.IsPFParticleShowerlike(*pfBeamPart);
+    PFBeamPrimIsTracklike = isPFParticleTracklike;
+    PFBeamPrimIsShowerlike = isPFParticleShowerlike;
+    PFBeamPrimBeamCosmicScore = pfPartUtils.GetBeamCosmicScore(*pfBeamPart,e,fPFParticleTag.encode());
+
+    const TVector3 pfBeamVertex = pfPartUtils.GetPFParticleVertex(*pfBeamPart,e,fPFParticleTag.encode(),fPFTrackTag.encode());
+    PFBeamPrimStartX = pfBeamVertex.X();
+    PFBeamPrimStartY = pfBeamVertex.Y();
+    PFBeamPrimStartZ = pfBeamVertex.Z();
+
+    std::cout << "Beam PFParticle: "<< iPF 
+                << " is primary: " << pfBeamPart->IsPrimary() 
+                << " PDG: " << pfBeamPart->PdgCode()
+                << " is track-like: "<<isPFParticleTracklike
+                << " is shower-like: "<<isPFParticleShowerlike
+                << std::endl;
+
+    if(isPFParticleTracklike)
+    {
+      const recob::Track* pfTrack = pfPartUtils.GetPFParticleTrack(*pfBeamPart, e, fPFParticleTag.encode(),fPFTrackTag.encode());
+      
+      if(pfTrack)
+      {
+        const TVector3 pfTrackFrontTPCPoint = lsu::trackZPlane(0,*pfTrack);
+        PFBeamPrimXFrontTPC = pfTrackFrontTPCPoint.X();
+        PFBeamPrimYFrontTPC = pfTrackFrontTPCPoint.Y();
+        const TVector3 pfBeamSecondaryVertex = pfPartUtils.GetPFParticleSecondaryVertex(*pfBeamPart,e,fPFParticleTag.encode(),fPFTrackTag.encode());
+        PFBeamPrimEndX = pfBeamSecondaryVertex.X();
+        PFBeamPrimEndY = pfBeamSecondaryVertex.Y();
+        PFBeamPrimEndZ = pfBeamSecondaryVertex.Z();
+        PFBeamPrimStartTheta = pfTrack->Theta();
+        PFBeamPrimStartPhi = pfTrack->Phi();
+        if(pfTrack->NPoints() > 1)
+        {
+          PFBeamPrimTrkLen = pfTrack->Length();
+        }
+
+        const auto& shouldBeThisTrackToo = allPFTrackVec.at(pfTrack->ID());
+        if(pfTrack->ID() != shouldBeThisTrackToo->ID() 
+            || pfTrack->NPoints() != shouldBeThisTrackToo->NPoints())
+        {
+          throw cet::exception("PionAbsSelector","track->ID() isn't the track index in the list for primary track!");
+        }
+        const auto& pfTrackCalos = fmPFCalo.at(pfTrack->ID());
+        for(const auto& pfTrackCalo:pfTrackCalos)
+        {
+          if(pfTrackCalo->PlaneID().Plane == fCaloPlane)
+          {
+            const auto& dEdxSize = pfTrackCalo->dEdx().size();
+            //const auto& dEdxBegin = pfTrackCalo->dEdx().begin();
+            const auto& dEdxEnd = pfTrackCalo->dEdx().end();
+            if (dEdxSize >= 3)
+            {
+              PFBeamPrimdEdxAverageLast3Hits = findAverage(dEdxEnd - 3, dEdxEnd);
+            }
+            if (dEdxSize >= 5)
+            {
+              PFBeamPrimdEdxAverageLast5Hits = findAverage(dEdxEnd - 5, dEdxEnd);
+            }
+            if (dEdxSize >= 7)
+            {
+              PFBeamPrimdEdxAverageLast7Hits = findAverage(dEdxEnd - 7, dEdxEnd);
+            }
+
+            double intE = 0.;
+            for(size_t cRangeIt = 0; cRangeIt < pfTrackCalo->ResidualRange().size() 
+                                && cRangeIt < pfTrackCalo->dEdx().size(); cRangeIt++)
+            {
+              PFBeamPrimResRanges.push_back(pfTrackCalo->ResidualRange().at(cRangeIt));
+              PFBeamPrimdEdxs.push_back(pfTrackCalo->dEdx().at(cRangeIt));
+              PFBeamPrimPitches.push_back(pfTrackCalo->TrkPitchVec().at(cRangeIt));
+              const auto& thisPoint = pfTrackCalo->XYZ().at(cRangeIt); // PositionVector3D
+              PFBeamPrimXs.push_back(thisPoint.X());
+              PFBeamPrimYs.push_back(thisPoint.Y());
+              PFBeamPrimZs.push_back(thisPoint.Z());
+
+              const bool thisInFid = InPrimaryFiducial(thisPoint);
+              PFBeamPrimInFids.push_back(thisInFid);
+              const double thisKin = kinWCInTPC-intE;
+              PFBeamPrimKins.push_back(thisKin);
+              const double thisKinProton = kinWCInTPCProton-intE;
+              PFBeamPrimKinsProton.push_back(thisKinProton);
+              if(thisInFid)
+              {
+                PFBeamPrimKinInteract = thisKin;
+                PFBeamPrimKinInteractProton = thisKinProton;
+              }
+              else
+              {
+                PFBeamPrimKinInteract = DEFAULTNEG;
+                PFBeamPrimKinInteractProton = DEFAULTNEG;
+              }
+              intE += pfTrackCalo->dEdx().at(cRangeIt)*pfTrackCalo->TrkPitchVec().at(cRangeIt);
+            } // for cRangeIt
+          } // if Plane is fCaloPlane
+        } // for pfTrackCalo
+
+        if(isMC) // Now MCTruth Matching
+        {
+          const auto& pfTrackHits = fmHitsForPFTracks.at(pfTrack->ID());
+          lsu::BackTrackerAlg btAlg;
+          bool trackIDIsNeg = false;
+          const auto pfTrackMCPart = btAlg.getMCParticle(pfTrackHits,e,trackIDIsNeg);
+          bool isTrueBeam = false;
+          if (beamOrCosmic)
+          {
+            isTrueBeam = beamOrCosmic->isBeam(pfTrackMCPart);
+          }
+          std::cout << "PFPrimaryTrack MCPart: PDG: " << pfTrackMCPart.PdgCode() <<"  Mom: "<< pfTrackMCPart.Momentum().Vect().Mag() << " isBeam: "<<isTrueBeam<<" process: "<<pfTrackMCPart.Process() << " end process: "<<pfTrackMCPart.EndProcess()<< std::endl;
+
+        } // if isMC
+      } // if pfTrack
+    } // if isPFParticleTracklike
+    if(isPFParticleShowerlike)
+    {
+      const recob::Shower* pfShower = pfPartUtils.GetPFParticleShower(*pfBeamPart, e, fPFParticleTag.encode(),fPFShowerTag.encode());
+      if(pfShower)
+      {
+        //const TVector3 showerStart = pfShower->ShowerStart();
+        const TVector3 showerDir = pfShower->Direction();
+        PFBeamPrimStartTheta = showerDir.Theta();
+        PFBeamPrimStartPhi = showerDir.Phi();
+
+        const TVector3 showerFrontTPCPoint = lsu::lineZPlane(0,pfBeamVertex,showerDir);
+        PFBeamPrimXFrontTPC = showerFrontTPCPoint.X();
+        PFBeamPrimYFrontTPC = showerFrontTPCPoint.Y();
+
+        if(pfShower->has_open_angle())
+        {
+          PFBeamPrimShwrOpenAngle = pfShower->OpenAngle();
+        }
+        if(pfShower->has_length())
+        {
+          PFBeamPrimShwrLen = pfShower->Length();
+        }
+        std::cout << "    Shower: "
+                  << " has open angle: " << pfShower->has_open_angle()
+                  << " has length: " << pfShower->has_length()
+                  << " open angle: " << pfShower->OpenAngle()
+                  << " length: " << pfShower->Length()
+                  << std::endl;
+        std::cout << "        Shower Dir:   "
+                  << "(" << showerDir.X()
+                  << "," << showerDir.Y()
+                  << "," << showerDir.Z()
+                  << ")"
+                  << std::endl;
+        //if(isMC) // Now MCTruth Matching
+        //{
+        //  const auto& pfShowerHits = fmHitsForPFShowers.at(pfShower->ID());
+        //  lsu::BackTrackerAlg btAlg;
+        //  bool trackIDIsNeg = false;
+        //  const auto pfShowerMCPart = btAlg.getMCParticle(pfShowerHits,e,trackIDIsNeg);
+        //  bool isTrueBeam = false;
+        //  if (beamOrCosmic)
+        //  {
+        //    isTrueBeam = beamOrCosmic->isBeam(pfShowerMCPart);
+        //  }
+        //  std::cout << "PFPrimaryShower MCPart: PDG: " << pfShowerMCPart.PdgCode() <<"  Mom: "<< pfShowerMCPart.Momentum().Vect().Mag() << " isBeam: "<<isTrueBeam<<" process: "<<pfShowerMCPart.Process() << " end process: "<<pfShowerMCPart.EndProcess()<< std::endl;
+
+        //} // if isMC
+      } // if pfShower
+    } // if isPFParticleShowerlike
+
+    const auto& pfBeamDaughterTracks = pfPartUtils.GetPFParticleDaughterTracks(*pfBeamPart,e,fPFParticleTag.encode(),fPFTrackTag.encode());
+    const auto& pfBeamDaughterShowers = pfPartUtils.GetPFParticleDaughterShowers(*pfBeamPart,e,fPFParticleTag.encode(),fPFShowerTag.encode());
+    PFBeamPrimNDaughterTracks = pfBeamDaughterTracks.size();
+    PFBeamPrimNDaughterShowers = pfBeamDaughterShowers.size();
+    
+    std::cout << "    N daughters: " << pfBeamPart->NumDaughters()
+                << " N daughter tracks: " << pfBeamDaughterTracks.size()
+                << " N daughter showers: " << pfBeamDaughterShowers.size()
+                << std::endl;
+    std::cout << "    Vertex:           "
+                << "(" << pfBeamVertex.X()
+                << "," << pfBeamVertex.Y()
+                << "," << pfBeamVertex.Z()
+                << ")"
+                << std::endl;
+    for(size_t iSec=0; iSec < pfBeamDaughterTracks.size(); iSec++)
+    {
+        const auto& pfBeamDaughterTrack = pfBeamDaughterTracks.at(iSec);
+        std::cout << "Daughter "<<iSec<<" track len: " << pfBeamDaughterTrack->Length() << std::endl;
+        PFBeamSecTrkLen[iSec] = pfBeamDaughterTrack->Length();
+
+        const auto& shouldBeThisTrackToo = allPFTrackVec.at(pfBeamDaughterTrack->ID());
+        if(pfBeamDaughterTrack->ID() != shouldBeThisTrackToo->ID() 
+            || pfBeamDaughterTrack->NPoints() != shouldBeThisTrackToo->NPoints())
+        {
+          throw cet::exception("PionAbsSelector","track->ID() isn't the track index in the list for daughter track!");
+        }
+        const auto& pfBeamDaughterTrackCalos = fmPFCalo.at(pfBeamDaughterTrack->ID());
+
+        for(const auto& pfTrackCalo:pfBeamDaughterTrackCalos)
+        {
+          if(pfTrackCalo->PlaneID().Plane == fCaloPlane)
+          {
+            const auto& dEdxSize = pfTrackCalo->dEdx().size();
+            //const auto& dEdxBegin = pfTrackCalo->dEdx().begin();
+            const auto& dEdxEnd = pfTrackCalo->dEdx().end();
+            if (dEdxSize >= 3)
+            {
+              PFBeamSecTrkdEdxAverageLast3Hits[iSec] = findAverage(dEdxEnd - 3, dEdxEnd);
+            }
+            if (dEdxSize >= 5)
+            {
+              PFBeamSecTrkdEdxAverageLast5Hits[iSec] = findAverage(dEdxEnd - 5, dEdxEnd);
+            }
+            if (dEdxSize >= 7)
+            {
+              PFBeamSecTrkdEdxAverageLast7Hits[iSec] = findAverage(dEdxEnd - 7, dEdxEnd);
+            }
+          } // if Plane is fCaloPlane
+        } // for pfTrackCalo
+    } // for pfBeamDaughterTrack
+    
+    break; // only look at first PFSlice
+  } // for iPF
+} // ProcessPFParticles
 
 DEFINE_ART_MODULE(lana::PionAbsSelector)
