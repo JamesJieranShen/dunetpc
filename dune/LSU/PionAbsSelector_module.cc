@@ -875,7 +875,9 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     }
   }
 
-  //Get MCParticle Variables
+  //Get MCParticle Variables and find MCC11 primaryParticleCandidates
+  std::vector<art::Ptr<simb::MCParticle> > primaryParticleCandidates;
+  std::vector<size_t> primaryParticleCandidateIs;
   for(const auto& truth:(truePartVec))
   {
     if (truth->PdgCode() != 2112 && truth->PdgCode() < 1000000000)
@@ -928,42 +930,18 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       mcPartXFrontTPC[nMCParts] = particleFrontTPCPoint.X();
       mcPartYFrontTPC[nMCParts] = particleFrontTPCPoint.Y();
 
+      // for MCC11 primary particle should have start T = 0
+      if(mcPartIsBeam[nMCParts] && mcPartIsPrimary[nMCParts]
+            && fabs(mcPartStartT[nMCParts]) < 1e-6
+        )
+      {
+        primaryParticleCandidates.push_back(truth);
+        primaryParticleCandidateIs.push_back(nMCParts);
+      }
+
       nMCParts++;
     } // if not neturon or nucleus
   } // for true (mcPart)
-
-  // Get list of primaryParticle candidates
-  std::vector<art::Ptr<simb::MCParticle> > primaryParticleCandidates;
-  std::vector<size_t> primaryParticleCandidateIs;
-  for(size_t iMCPart=0; iMCPart < truePartVec.size(); iMCPart++)
-  {
-      // for MCC11 primary particle should have start T = 0
-      if(mcPartIsBeam[iMCPart] 
-            && fabs(mcPartStartT[iMCPart]) < 1e-6
-        )
-      {
-        primaryParticleCandidates.push_back(truePartVec.at(iMCPart));
-        primaryParticleCandidateIs.push_back(iMCPart);
-      }
-  }
-  if (primaryParticleCandidateIs.size() == 0) // for MCC10
-  {
-    for(size_t iMCPart=0; iMCPart < truePartVec.size(); iMCPart++)
-    {
-        if(mcPartIsBeam[iMCPart] 
-              && fabs(mcPartStartT[iMCPart]) < 20.
-              && mcPartPDG[iMCPart] != 22
-              //&& mcPartIsPrimary[iMCPart]
-              //&& mcPartXFrontTPC[iMCPart] > -40 && mcPartXFrontTPC[iMCPart] < 15.
-              //&& mcPartYFrontTPC[iMCPart] > 400. && mcPartYFrontTPC[iMCPart] < 445.
-              //&& mcPartStartMom[iMCPart] > 500. && mcPartStartMom[iMCPart] < 10000.
-          )
-        {
-          primaryParticleCandidates.push_back(truePartVec.at(iMCPart));
-          primaryParticleCandidateIs.push_back(iMCPart);
-        }
-    }
-  }
 
   // Debugging printing of primaryParticleCandidates
   for(const size_t & iMCPart: primaryParticleCandidateIs)
@@ -1009,7 +987,6 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   {
     primaryParticle = primaryParticleCandidates.at(0);
   }
-
 
   recob::Track::Point_t trueStartPos;
   recob::Track::Point_t trueEndPos;
