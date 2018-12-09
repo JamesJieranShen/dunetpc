@@ -1,0 +1,12 @@
+#include "ProtoDUNEFembFilter.fcl"
+#include "piAbsSelector_redo_beamevent.fcl"
+
+process_name: PiAbsSelectorFilterFEMBsRedoBeam
+
+services.FileCatalogMetadata:  @local::art_file_catalog_data
+
+physics.filters: {
+    fembfilter: @local::pdsp_fembfilter_beamside
+}
+physics.reco: [ fembfilter, beamevent ]
+physics.trigger_paths: [ reco ]

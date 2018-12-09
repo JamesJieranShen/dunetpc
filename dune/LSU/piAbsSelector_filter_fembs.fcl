@@ -1,0 +1,13 @@
+#include "ProtoDUNEFembFilter.fcl"
+#include "piAbsSelector.fcl"
+
+process_name: PiAbsSelectorFilterFEMBs
+
+services.FileCatalogMetadata:  @local::art_file_catalog_data
+
+physics.filters: {
+    fembfilter: @local::pdsp_fembfilter_beamside
+}
+physics.reco: [ fembfilter ]
+physics.trigger_paths: [ reco ]
+
