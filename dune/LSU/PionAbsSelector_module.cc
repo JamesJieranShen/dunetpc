@@ -49,7 +49,10 @@
 #include "TH2F.h"
 #include "TFile.h"
 #include "TTree.h"
+#include "Math/Vector3Dfwd.h" // for 3D genvectors
 #include "Math/Vector4Dfwd.h" // for 4D genvectors
+#include "Math/GenVector/DisplacementVector3D.h"
+#include "Math/GenVector/Polar3D.h"
 #include "Math/GenVector/VectorUtil.h"
 
 //c++ includes
@@ -572,6 +575,7 @@ private:
   float PFBeamPrimEndZ;
   float PFBeamPrimStartTheta;
   float PFBeamPrimStartPhi;
+  float PFBeamPrimAngleToBeamTrk;
   float PFBeamPrimTrkLen;
   float PFBeamPrimShwrLen;
   float PFBeamPrimShwrOpenAngle;
@@ -849,11 +853,14 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       }
       nBeamTracks++;
 
-      xWC = track.End().X();
-      yWC = track.End().Y();
-      thetaWC = track.EndDirection().Theta();
-      phiWC = track.EndDirection().Phi();
-    
+      if(iTrack == 0)
+      {
+        xWC = track.End().X();
+        yWC = track.End().Y();
+        thetaWC = track.EndDirection().Theta();
+        phiWC = track.EndDirection().Phi();
+      }
+
       if(PRINTBEAMEVENT)
       {
         std::cout << "  Beam Track: "<< iTrack <<"\n";
@@ -1285,6 +1292,7 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("PFBeamPrimEndZ",&PFBeamPrimEndZ,"PFBeamPrimEndZ/F");
   tree->Branch("PFBeamPrimStartTheta",&PFBeamPrimStartTheta,"PFBeamPrimStartTheta/F");
   tree->Branch("PFBeamPrimStartPhi",&PFBeamPrimStartPhi,"PFBeamPrimStartPhi/F");
+  tree->Branch("PFBeamPrimAngleToBeamTrk",&PFBeamPrimAngleToBeamTrk,"PFBeamPrimAngleToBeamTrk/F");
   tree->Branch("PFBeamPrimTrkLen",&PFBeamPrimTrkLen,"PFBeamPrimTrkLen/F");
   tree->Branch("PFBeamPrimShwrLen",&PFBeamPrimShwrLen,"PFBeamPrimShwrLen/F");
   tree->Branch("PFBeamPrimShwrOpenAngle",&PFBeamPrimShwrOpenAngle,"PFBeamPrimShwrOpenAngle/F");
@@ -1878,6 +1886,7 @@ void lana::PionAbsSelector::ResetTreeVars()
   PFBeamPrimEndZ = DEFAULTNEG;
   PFBeamPrimStartTheta = DEFAULTNEG;
   PFBeamPrimStartPhi = DEFAULTNEG;
+  PFBeamPrimAngleToBeamTrk = DEFAULTNEG;
   PFBeamPrimTrkLen = DEFAULTNEG;
   PFBeamPrimShwrLen = DEFAULTNEG;
   PFBeamPrimShwrOpenAngle = DEFAULTNEG;
@@ -3019,6 +3028,13 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
         //} // if isMC
       } // if pfShower
     } // if isPFParticleShowerlike
+
+    if(nBeamTracks>0)
+    {
+      const ROOT::Math::Polar3DVector dirVecPFBeamPrim(1.,PFBeamPrimStartTheta,PFBeamPrimStartPhi);
+      const ROOT::Math::Polar3DVector dirVecBeamTrk(1.,thetaWC,phiWC);
+      PFBeamPrimAngleToBeamTrk = ROOT::Math::VectorUtil::Angle(dirVecPFBeamPrim,dirVecBeamTrk);
+    }
 
     const auto& pfBeamDaughterTracks = pfPartUtils.GetPFParticleDaughterTracks(*pfBeamPart,e,fPFParticleTag.encode(),fPFTrackTag.encode());
     const auto& pfBeamDaughterShowers = pfPartUtils.GetPFParticleDaughterShowers(*pfBeamPart,e,fPFParticleTag.encode(),fPFShowerTag.encode());
