@@ -49,10 +49,11 @@
 #include "TH2F.h"
 #include "TFile.h"
 #include "TTree.h"
-#include "Math/Vector3Dfwd.h" // for 3D genvectors
+#include "Math/Point3D.h" // for 3D genvector points
+#include "Math/Vector3D.h" // for 3D genvectors
 #include "Math/Vector4Dfwd.h" // for 4D genvectors
-#include "Math/GenVector/DisplacementVector3D.h"
-#include "Math/GenVector/Polar3D.h"
+//#include "Math/GenVector/DisplacementVector3D.h"
+//#include "Math/GenVector/Polar3D.h"
 #include "Math/GenVector/VectorUtil.h"
 
 //c++ includes
@@ -577,6 +578,8 @@ private:
   float PFBeamPrimStartPhi;
   float PFBeamPrimAngleToBeamTrk;
   float PFBeamPrimTrkLen;
+  float PFBeamPrimTrkMaxKink;
+  float PFBeamPrimMaxAngleToSecTrks;
   float PFBeamPrimShwrLen;
   float PFBeamPrimShwrOpenAngle;
   float PFBeamPrimdEdxAverageLast3Hits;
@@ -595,10 +598,30 @@ private:
   float PFBeamPrimKinInteract;
   float PFBeamPrimKinInteractProton;
 
+  Int_t PFBeamPrimTrueTrackID;
+  bool PFBeamPrimTrueTrackIDIsNeg;
+  Int_t PFBeamPrimTrueMotherTrackID;
+  Int_t PFBeamPrimTruePDG;
+  float PFBeamPrimTrueKin;
+  float PFBeamPrimTrueEndKin;
+  UInt_t PFBeamPrimTrueTrajLen;
+  bool PFBeamPrimTrueIsBeam;
+  float PFBeamPrimTrueStartX;
+  float PFBeamPrimTrueStartY;
+  float PFBeamPrimTrueStartZ;
+  float PFBeamPrimTrueStartT;
+  float PFBeamPrimTrueEndX;
+  float PFBeamPrimTrueEndY;
+  float PFBeamPrimTrueEndZ;
+  float PFBeamPrimTrueEndT;
+  float PFBeamPrimTrueMaxKink;
+
   float PFBeamSecTrkLen[MAXPFSECTRKS];
   float PFBeamSecTrkdEdxAverageLast3Hits[MAXPFSECTRKS];
   float PFBeamSecTrkdEdxAverageLast5Hits[MAXPFSECTRKS];
   float PFBeamSecTrkdEdxAverageLast7Hits[MAXPFSECTRKS];
+  float PFBeamSecTrkDistToPrimEnd[MAXPFSECTRKS];
+  float PFBeamSecTrkAngleToPrimEnd[MAXPFSECTRKS];
 
   /////////////////////////////
   //Histograms
@@ -1294,6 +1317,8 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("PFBeamPrimStartPhi",&PFBeamPrimStartPhi,"PFBeamPrimStartPhi/F");
   tree->Branch("PFBeamPrimAngleToBeamTrk",&PFBeamPrimAngleToBeamTrk,"PFBeamPrimAngleToBeamTrk/F");
   tree->Branch("PFBeamPrimTrkLen",&PFBeamPrimTrkLen,"PFBeamPrimTrkLen/F");
+  tree->Branch("PFBeamPrimTrkMaxKink",&PFBeamPrimTrkMaxKink,"PFBeamPrimTrkMaxKink/F");
+  tree->Branch("PFBeamPrimMaxAngleToSecTrks",&PFBeamPrimMaxAngleToSecTrks,"PFBeamPrimMaxAngleToSecTrks/F");
   tree->Branch("PFBeamPrimShwrLen",&PFBeamPrimShwrLen,"PFBeamPrimShwrLen/F");
   tree->Branch("PFBeamPrimShwrOpenAngle",&PFBeamPrimShwrOpenAngle,"PFBeamPrimShwrOpenAngle/F");
   tree->Branch("PFBeamPrimdEdxAverageLast3Hits",&PFBeamPrimdEdxAverageLast3Hits,"PFBeamPrimdEdxAverageLast3Hits/F");
@@ -1312,10 +1337,31 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("PFBeamPrimKinInteract",&PFBeamPrimKinInteract,"PFBeamPrimKinInteract/F");
   tree->Branch("PFBeamPrimKinInteractProton",&PFBeamPrimKinInteractProton,"PFBeamPrimKinInteractProton/F");
 
+  tree->Branch("PFBeamPrimTrueTrackID",&PFBeamPrimTrueTrackID,"PFBeamPrimTrueTrackID/I");
+  tree->Branch("PFBeamPrimTrueTrackIDIsNeg",&PFBeamPrimTrueTrackIDIsNeg,"PFBeamPrimTrueTrackIDIsNeg/O");
+  tree->Branch("PFBeamPrimTrueMotherTrackID",&PFBeamPrimTrueMotherTrackID,"PFBeamPrimTrueMotherTrackID/I");
+  tree->Branch("PFBeamPrimTruePDG",&PFBeamPrimTruePDG,"PFBeamPrimTruePDG/I");
+  tree->Branch("PFBeamPrimTrueKin",&PFBeamPrimTrueKin,"PFBeamPrimTrueKin/F");
+  tree->Branch("PFBeamPrimTrueEndKin",&PFBeamPrimTrueEndKin,"PFBeamPrimTrueEndKin/F");
+  tree->Branch("PFBeamPrimTrueTrajLen",&PFBeamPrimTrueTrajLen,"PFBeamPrimTrueTrajLen/i");
+  tree->Branch("PFBeamPrimTrueIsBeam",&PFBeamPrimTrueIsBeam,"PFBeamPrimTrueIsBeam/O");
+  tree->Branch("PFBeamPrimTrueStartX",&PFBeamPrimTrueStartX,"PFBeamPrimTrueStartX/F");
+  tree->Branch("PFBeamPrimTrueStartY",&PFBeamPrimTrueStartY,"PFBeamPrimTrueStartY/F");
+  tree->Branch("PFBeamPrimTrueStartZ",&PFBeamPrimTrueStartZ,"PFBeamPrimTrueStartZ/F");
+  tree->Branch("PFBeamPrimTrueStartT",&PFBeamPrimTrueStartT,"PFBeamPrimTrueStartT/F");
+  tree->Branch("PFBeamPrimTrueEndX",&PFBeamPrimTrueEndX,"PFBeamPrimTrueEndX/F");
+  tree->Branch("PFBeamPrimTrueEndY",&PFBeamPrimTrueEndY,"PFBeamPrimTrueEndY/F");
+  tree->Branch("PFBeamPrimTrueEndZ",&PFBeamPrimTrueEndZ,"PFBeamPrimTrueEndZ/F");
+  tree->Branch("PFBeamPrimTrueEndT",&PFBeamPrimTrueEndT,"PFBeamPrimTrueEndT/F");
+  tree->Branch("PFBeamPrimTrueMaxKink",&PFBeamPrimTrueMaxKink,"PFBeamPrimTrueMaxKink/F");
+
+
   tree->Branch("PFBeamSecTrkLen",&PFBeamSecTrkLen,"PFBeamSecTrkLen[PFBeamPrimNDaughterTracks]/F");
   tree->Branch("PFBeamSecTrkdEdxAverageLast3Hits",&PFBeamSecTrkdEdxAverageLast3Hits,"PFBeamSecTrkdEdxAverageLast3Hits[PFBeamPrimNDaughterTracks]/F");
   tree->Branch("PFBeamSecTrkdEdxAverageLast5Hits",&PFBeamSecTrkdEdxAverageLast5Hits,"PFBeamSecTrkdEdxAverageLast5Hits[PFBeamPrimNDaughterTracks]/F");
   tree->Branch("PFBeamSecTrkdEdxAverageLast7Hits",&PFBeamSecTrkdEdxAverageLast7Hits,"PFBeamSecTrkdEdxAverageLast7Hits[PFBeamPrimNDaughterTracks]/F");
+  tree->Branch("PFBeamSecTrkDistToPrimEnd",&PFBeamSecTrkDistToPrimEnd,"PFBeamSecTrkDistToPrimEnd[PFBeamPrimNDaughterTracks]/F");
+  tree->Branch("PFBeamSecTrkAngleToPrimEnd",&PFBeamSecTrkAngleToPrimEnd,"PFBeamSecTrkAngleToPrimEnd[PFBeamPrimNDaughterTracks]/F");
 
   ////////////////////////////////////////
   // Book histograms
@@ -1888,6 +1934,8 @@ void lana::PionAbsSelector::ResetTreeVars()
   PFBeamPrimStartPhi = DEFAULTNEG;
   PFBeamPrimAngleToBeamTrk = DEFAULTNEG;
   PFBeamPrimTrkLen = DEFAULTNEG;
+  PFBeamPrimTrkMaxKink = DEFAULTNEG;
+  PFBeamPrimMaxAngleToSecTrks = DEFAULTNEG;
   PFBeamPrimShwrLen = DEFAULTNEG;
   PFBeamPrimShwrOpenAngle = DEFAULTNEG;
   PFBeamPrimdEdxAverageLast3Hits = DEFAULTNEG;
@@ -1906,12 +1954,32 @@ void lana::PionAbsSelector::ResetTreeVars()
   PFBeamPrimKinInteract = DEFAULTNEG;
   PFBeamPrimKinInteractProton = DEFAULTNEG;
 
+  PFBeamPrimTrueTrackID = DEFAULTNEG;
+  PFBeamPrimTrueTrackIDIsNeg = false;
+  PFBeamPrimTrueMotherTrackID = DEFAULTNEG;
+  PFBeamPrimTruePDG = DEFAULTNEG;
+  PFBeamPrimTrueKin = DEFAULTNEG;
+  PFBeamPrimTrueEndKin = DEFAULTNEG;
+  PFBeamPrimTrueTrajLen = 0;
+  PFBeamPrimTrueIsBeam = false;
+  PFBeamPrimTrueStartX = DEFAULTNEG;
+  PFBeamPrimTrueStartY = DEFAULTNEG;
+  PFBeamPrimTrueStartZ = DEFAULTNEG;
+  PFBeamPrimTrueStartT = DEFAULTNEG;
+  PFBeamPrimTrueEndX = DEFAULTNEG;
+  PFBeamPrimTrueEndY = DEFAULTNEG;
+  PFBeamPrimTrueEndZ = DEFAULTNEG;
+  PFBeamPrimTrueEndT = DEFAULTNEG;
+  PFBeamPrimTrueMaxKink = DEFAULTNEG;
+
   for(size_t iSec=0; iSec < MAXPFSECTRKS; iSec++)
   {
     PFBeamSecTrkLen[iSec] = DEFAULTNEG;
     PFBeamSecTrkdEdxAverageLast3Hits[iSec] = DEFAULTNEG;
     PFBeamSecTrkdEdxAverageLast5Hits[iSec] = DEFAULTNEG;
     PFBeamSecTrkdEdxAverageLast7Hits[iSec] = DEFAULTNEG;
+    PFBeamSecTrkDistToPrimEnd[iSec] = DEFAULTNEG;
+    PFBeamSecTrkAngleToPrimEnd[iSec] = DEFAULTNEG;
   }
 
 } // ResetTreeVars
@@ -2882,6 +2950,8 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
                 << " is shower-like: "<<isPFParticleShowerlike
                 << std::endl;
 
+    TVector3 pfBeamSecondaryVertex;
+    recob::Track::Vector_t pfBeamPrimTrkEndDir;
     if(isPFParticleTracklike)
     {
       const recob::Track* pfTrack = pfPartUtils.GetPFParticleTrack(*pfBeamPart, e, fPFParticleTag.encode(),fPFTrackTag.encode());
@@ -2891,16 +2961,25 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
         const TVector3 pfTrackFrontTPCPoint = lsu::trackZPlane(0,*pfTrack);
         PFBeamPrimXFrontTPC = pfTrackFrontTPCPoint.X();
         PFBeamPrimYFrontTPC = pfTrackFrontTPCPoint.Y();
-        const TVector3 pfBeamSecondaryVertex = pfPartUtils.GetPFParticleSecondaryVertex(*pfBeamPart,e,fPFParticleTag.encode(),fPFTrackTag.encode());
+        pfBeamSecondaryVertex = pfPartUtils.GetPFParticleSecondaryVertex(*pfBeamPart,e,fPFParticleTag.encode(),fPFTrackTag.encode());
         PFBeamPrimEndX = pfBeamSecondaryVertex.X();
         PFBeamPrimEndY = pfBeamSecondaryVertex.Y();
         PFBeamPrimEndZ = pfBeamSecondaryVertex.Z();
         PFBeamPrimStartTheta = pfTrack->Theta();
         PFBeamPrimStartPhi = pfTrack->Phi();
+
         if(pfTrack->NPoints() > 1)
         {
           PFBeamPrimTrkLen = pfTrack->Length();
+          pfBeamPrimTrkEndDir = pfTrack->EndDirection();
         }
+
+        const auto& pfTrackTraj = pfTrack->Trajectory();
+        for(size_t iTP=0; iTP < pfTrackTraj.NumberTrajectoryPoints()-1; iTP++)
+        {
+          float thisKink = ROOT::Math::VectorUtil::Angle(pfTrackTraj.DirectionAtPoint(iTP),pfTrackTraj.DirectionAtPoint(iTP+1));
+          PFBeamPrimTrkMaxKink = std::max(PFBeamPrimTrkMaxKink,thisKink);
+        } // for iTP
 
         const auto& shouldBeThisTrackToo = allPFTrackVec.at(pfTrack->ID());
         if(pfTrack->ID() != shouldBeThisTrackToo->ID() 
@@ -2966,14 +3045,42 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
         {
           const auto& pfTrackHits = fmHitsForPFTracks.at(pfTrack->ID());
           lsu::BackTrackerAlg btAlg;
-          bool trackIDIsNeg = false;
-          const auto pfTrackMCPart = btAlg.getMCParticle(pfTrackHits,e,trackIDIsNeg);
-          bool isTrueBeam = false;
+          const auto pfTrackMCPart = btAlg.getMCParticle(pfTrackHits,e,PFBeamPrimTrueTrackIDIsNeg);
+          const auto& pfTrackMCTraj = pfTrackMCPart.Trajectory();
+          PFBeamPrimTrueTrackID = pfTrackMCPart.TrackId();
+          PFBeamPrimTrueMotherTrackID = pfTrackMCPart.Mother();
+          PFBeamPrimTruePDG = pfTrackMCPart.PdgCode();
+          PFBeamPrimTrueKin = 1000*(pfTrackMCPart.E()-pfTrackMCPart.Mass());
+          if(pfTrackMCTraj.size()>2)
+          {
+            PFBeamPrimTrueEndKin = 1000*(std::prev(std::prev(pfTrackMCTraj.end()))->first.E()-pfTrackMCPart.Mass());
+          }
+          PFBeamPrimTrueTrajLen = pfTrackMCTraj.TotalLength();
           if (beamOrCosmic)
           {
-            isTrueBeam = beamOrCosmic->isBeam(pfTrackMCPart);
+            PFBeamPrimTrueIsBeam = beamOrCosmic->isBeam(pfTrackMCPart);
           }
-          std::cout << "PFPrimaryTrack MCPart: PDG: " << pfTrackMCPart.PdgCode() <<"  Mom: "<< pfTrackMCPart.Momentum().Vect().Mag() << " isBeam: "<<isTrueBeam<<" process: "<<pfTrackMCPart.Process() << " end process: "<<pfTrackMCPart.EndProcess()<< std::endl;
+
+          PFBeamPrimTrueStartX = pfTrackMCPart.Vx();
+          PFBeamPrimTrueStartY = pfTrackMCPart.Vy();
+          PFBeamPrimTrueStartZ = pfTrackMCPart.Vz();
+          PFBeamPrimTrueStartT = pfTrackMCPart.T();
+
+          PFBeamPrimTrueEndX = pfTrackMCPart.EndX();
+          PFBeamPrimTrueEndY = pfTrackMCPart.EndY();
+          PFBeamPrimTrueEndZ = pfTrackMCPart.EndZ();
+          PFBeamPrimTrueEndT = pfTrackMCPart.EndT();
+
+          for(size_t iTP=0; iTP < pfTrackMCTraj.size()-1; iTP++)
+          {
+            float thisKink = ROOT::Math::VectorUtil::Angle(
+                                    lsu::toVector(pfTrackMCTraj.Momentum(iTP)),
+                                    lsu::toVector(pfTrackMCTraj.Momentum(iTP+1))
+                    );
+            PFBeamPrimTrueMaxKink = std::max(PFBeamPrimTrueMaxKink,thisKink);
+          } // for iTP
+
+          std::cout << "PFPrimaryTrack MCPart: PDG: " << pfTrackMCPart.PdgCode() <<"  Mom: "<< pfTrackMCPart.Momentum().Vect().Mag() << " isBeam: "<<PFBeamPrimTrueIsBeam<<" process: "<<pfTrackMCPart.Process() << " end process: "<<pfTrackMCPart.EndProcess()<< std::endl;
 
         } // if isMC
       } // if pfTrack
@@ -3056,6 +3163,14 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
         const auto& pfBeamDaughterTrack = pfBeamDaughterTracks.at(iSec);
         std::cout << "Daughter "<<iSec<<" track len: " << pfBeamDaughterTrack->Length() << std::endl;
         PFBeamSecTrkLen[iSec] = pfBeamDaughterTrack->Length();
+        if(PFBeamPrimEndZ > -9999.) // there was an end point (and is primary track)
+        {
+          const auto primTrkEnd = lsu::toPoint(pfBeamSecondaryVertex);
+          PFBeamSecTrkDistToPrimEnd[iSec] = (pfBeamDaughterTrack->Start()-primTrkEnd).R();
+
+          PFBeamSecTrkAngleToPrimEnd[iSec] = ROOT::Math::VectorUtil::Angle(pfBeamPrimTrkEndDir,pfBeamDaughterTrack->StartDirection());
+          PFBeamPrimMaxAngleToSecTrks = std::max(PFBeamSecTrkAngleToPrimEnd[iSec],PFBeamPrimMaxAngleToSecTrks);
+        }
 
         const auto& shouldBeThisTrackToo = allPFTrackVec.at(pfBeamDaughterTrack->ID());
         if(pfBeamDaughterTrack->ID() != shouldBeThisTrackToo->ID() 
