@@ -397,6 +397,7 @@ private:
   Float_t simIDEX[MAXIDES]; // true X position cm
   Float_t simIDEY[MAXIDES]; // true Y position cm
   Float_t simIDEZ[MAXIDES]; // true Z position cm
+  Float_t simIDEEnergySum; // sum of all simIDEEnergy
 
   UInt_t nTracks;
   UInt_t nTracksInFirstZ[MAXZINT]; // the number of tracks with a space point in (0,i) cm where i is the index
@@ -1141,6 +1142,7 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("simIDEX",&simIDEX,"simIDEX[nIDEs]/F");
   tree->Branch("simIDEY",&simIDEY,"simIDEY[nIDEs]/F");
   tree->Branch("simIDEZ",&simIDEZ,"simIDEZ[nIDEs]/F");
+  tree->Branch("simIDEEnergySum",&simIDEEnergySum,"simIDEEnergySum/F");
   
   tree->Branch("nTracks",&nTracks,"nTracks/i");
   tree->Branch("nTracksInFirstZ",&nTracksInFirstZ,("nTracksInFirstZ["+std::to_string(MAXZINT)+"]/i").c_str());
@@ -1747,6 +1749,7 @@ void lana::PionAbsSelector::ResetTreeVars()
     simIDEY[iIDE] = DEFAULTNEG;
     simIDEZ[iIDE] = DEFAULTNEG;
   }
+  simIDEEnergySum = DEFAULTNEG;
 
   nTracks = 0;
   for(size_t z=0; z < MAXZINT; z++)
@@ -2238,9 +2241,9 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
     bool interactedBeforeTPC = false;
     bool interactedOutsideTPC = false;
     if (trueEndZ < 0.) interactedBeforeTPC = true;
-    if (trueEndZ > 90.
-        || trueEndX < 0.4 || trueEndX > 47.9
-        || trueEndY < -20. || trueEndY > 20.
+    if (trueEndZ > 695.
+        || trueEndX < 360. || trueEndX > 360.
+        || trueEndY < 0. || trueEndY > 608.
         ) interactedOutsideTPC = true;
 
     // Set trueCategory
@@ -2333,6 +2336,7 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
     // Get SimChannel Info
     protoana::ProtoDUNETruthUtils pdTruthUtils;
     const auto ides = pdTruthUtils.GetIDEsFromParticleSortZ(*primaryParticle,e);
+    simIDEEnergySum = 0.;
     for(const sim::IDE & ide: ides)
     {
       if (nIDEs >= MAXIDES - 1)
@@ -2345,6 +2349,7 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
       simIDEY[nIDEs] = ide.y;
       simIDEZ[nIDEs] = ide.z;
       nIDEs++;
+      simIDEEnergySum += ide.energy;
     } // for ide
 
   } // if primaryParticle
