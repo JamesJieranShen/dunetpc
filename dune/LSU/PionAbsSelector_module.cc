@@ -2522,10 +2522,10 @@ void lana::PionAbsSelector::ProcessAllTracks(const std::vector<art::Ptr<recob::T
         } // if TrackID >= 0
         else
         {
-            //std::cout<<"Error: Couldn't find TrackID: for Track "<<iTrack<<"\n";
-            std::string message = "Couldn't find TrackID for Track ";
-            message.append(std::to_string(iTrack));
-            throw cet::exception("TrackIDNotFound",message);
+            mf::LogError("lana::PiAbsSelector::ProcessAllTracks") << "Run: "<<e.run()<<" Event " << e.id().event() << " Couldn't find TrackID. File: "<<infilename<<" Track hits: "<<trackHits.size()<<" Z plane hits: "<<trackHitsZ.size()<<"\n";
+            //std::string message = "Couldn't find TrackID for Track ";
+            //message.append(std::to_string(iTrack));
+            //throw cet::exception("TrackIDNotFound",message);
         }
     } // if isMC && fmHItsForTracks.isValid
 
