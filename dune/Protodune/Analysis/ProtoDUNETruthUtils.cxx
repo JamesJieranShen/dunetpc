@@ -176,7 +176,7 @@ const float protoana::ProtoDUNETruthUtils::ConvertTrueTimeToPandoraTimeMicro(con
   return detclock->G4ToElecTime(trueTime);
 }
 
-std::vector<std::tuple<raw::ChannelID_t,unsigned short, sim::IDE> > protoana::ProtoDUNETruthUtils::GetIDEsFromParticle(const simb::MCParticle & part, const art::Event & evt) const{
+std::vector<std::tuple<raw::ChannelID_t,unsigned short, sim::IDE> > protoana::ProtoDUNETruthUtils::GetIDEsFromParticle(const simb::MCParticle & part, const art::Event & evt, const bool includeNegativeTrackID) const{
 
   art::ServiceHandle<geo::Geometry> geom;
   std::vector<std::tuple<raw::ChannelID_t,unsigned short, sim::IDE> > result;
@@ -200,19 +200,63 @@ std::vector<std::tuple<raw::ChannelID_t,unsigned short, sim::IDE> > protoana::Pr
         {
           result.push_back(std::make_tuple(channelNumber,TDC,IDE));
         }
-        //else if (-IDE.trackID == partTrackID)
-        //{
-        //  result.push_back(std::make_tuple(channelNumber,TDC,IDE));
-        //}
+        else if (includeNegativeTrackID && (-IDE.trackID == partTrackID))
+        {
+          result.push_back(std::make_tuple(channelNumber,TDC,IDE));
+        }
       }
     } // for TDCIDE
   } // for channel
   return result;
 }
 
-std::vector<std::tuple<raw::ChannelID_t,unsigned short, sim::IDE> > protoana::ProtoDUNETruthUtils::GetIDEsFromParticleSortZ(const simb::MCParticle & part, const art::Event & evt) const{
-  auto result = GetIDEsFromParticle(part,evt);
+std::vector<std::tuple<raw::ChannelID_t,unsigned short, sim::IDE> > protoana::ProtoDUNETruthUtils::GetIDEsFromParticleSortZ(const simb::MCParticle & part, const art::Event & evt, const bool includeNegativeTrackID) const{
+  auto result = GetIDEsFromParticle(part,evt,includeNegativeTrackID);
   std::sort(result.begin(),result.end(),[](const auto& a, const auto& b){return std::get<2>(a).z < std::get<2>(b).z;});
   return result;
 }
 
+std::vector<std::tuple<raw::ChannelID_t,float, sim::IDE> > protoana::ProtoDUNETruthUtils::GetTotalChannelEnergyFromParticle(const simb::MCParticle & part, const art::Event & evt, const bool includeNegativeTrackID) const{
+
+  const auto& ideinfos = GetIDEsFromParticle(part,evt,includeNegativeTrackID);
+  std::map<raw::ChannelID_t,std::vector<std::pair<unsigned short, sim::IDE> > > ideChannelMap;
+  for (const auto& ideinfo: ideinfos) 
+  {
+    const auto& [channel, tdc, ide] = ideinfo;
+    if (ideChannelMap.count(channel) == 0)
+    {
+      ideChannelMap.emplace(channel,std::vector<std::pair<unsigned short, sim::IDE> >());
+    }
+    ideChannelMap.at(channel).push_back(std::make_pair(tdc,ide));
+  }
+  std::vector<std::tuple<raw::ChannelID_t,float, sim::IDE> >  result;
+  for(const auto& ideChannel: ideChannelMap)
+  {
+    const auto& channel = ideChannel.first;
+    float xAvg = 0;
+    float yAvg = 0;
+    float zAvg = 0;
+    float tdcAvg = 0;
+    float energy = 0;
+    float numElectrons = 0;
+    for(const auto& tdcide: ideChannel.second)
+    {
+      tdcAvg += tdcide.first;
+      const auto& tdc = tdcide.second;
+      xAvg += tdc.x;
+      yAvg += tdc.y;
+      zAvg += tdc.z;
+      energy += tdc.energy;
+      numElectrons += tdc.numElectrons;
+    }
+    const size_t nIDEs = ideChannel.second.size();
+    xAvg /= nIDEs;
+    yAvg /= nIDEs;
+    zAvg /= nIDEs;
+    tdcAvg /= nIDEs;
+    sim::IDE avgIDE(-1,numElectrons,energy,xAvg,yAvg,zAvg);
+    result.push_back(std::make_tuple(channel,tdcAvg,avgIDE));
+  }
+  std::sort(result.begin(),result.end(),[](const auto& a, const auto& b){return std::get<2>(a).z < std::get<2>(b).z;});
+  return result;
+}

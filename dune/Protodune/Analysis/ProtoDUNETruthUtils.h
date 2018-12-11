@@ -39,19 +39,31 @@ namespace protoana {
 
     /*
      * Get the list of sim::IDE for a particle. Only returns the collection plane IDEs.
+     *
+     * if includeNegativeTrackID: include also IDEs where the IDE abs(trackID) == part's trackID.
+     * This will include IDEs for electromagnetic activity caused by the given particle, but not
+     * tracked as independent MCParticles. An example is a delta ray off of a muon.
      * 
      * The return type is complicated, but you can use the 
      * C++17 "structured binding" trick to easily access it:
      *
-     * const auto& ideinfos = pdTruthUtils.GetIDEsFromParticle(p,e);
+     * const auto& ideinfos = pdTruthUtils.GetIDEsFromParticle(p,e,true);
      * for (const auto& ideinfo: ideinfos) {
      *   const auto& [channel, tdc, ide] = ideinfo;
      *   std::cout << "Channel: "<< channel << " tdc: "<< tdc << " energy: " << ide.energy << " MeV\n";
      * }
      *
      */
-    std::vector<std::tuple<raw::ChannelID_t,unsigned short, sim::IDE> > GetIDEsFromParticle(const simb::MCParticle & part, const art::Event & evt) const;
-    std::vector<std::tuple<raw::ChannelID_t,unsigned short, sim::IDE> > GetIDEsFromParticleSortZ(const simb::MCParticle & part, const art::Event & evt) const;
+    std::vector<std::tuple<raw::ChannelID_t,unsigned short, sim::IDE> > GetIDEsFromParticle(const simb::MCParticle & part, const art::Event & evt, const bool includeNegativeTrackID) const;
+    std::vector<std::tuple<raw::ChannelID_t,unsigned short, sim::IDE> > GetIDEsFromParticleSortZ(const simb::MCParticle & part, const art::Event & evt, const bool includeNegativeTrackID) const;
+
+    /*
+     * Just like GetIDEsFromParticleSortZ, but the tdc and sim::IDE are combinations of all IDEs on each channel
+     *
+     * There is only one entry per channel, the tdc and ide x, y, and z are all averages 
+     * over the IDEs on that channel. The ide energy and numElectrons are sums over the IDEs.
+     */
+    std::vector<std::tuple<raw::ChannelID_t,float, sim::IDE> > GetTotalChannelEnergyFromParticle(const simb::MCParticle & part, const art::Event & evt, const bool includeNegativeTrackID) const;
 
   private:
 

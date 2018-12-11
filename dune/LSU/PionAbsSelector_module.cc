@@ -404,7 +404,7 @@ private:
   Float_t simIDEY[MAXIDES]; // true Y position cm
   Float_t simIDEZ[MAXIDES]; // true Z position cm
   UInt_t simIDEChannel[MAXIDES]; // raw::ChannelID_t for this IDE
-  UShort_t simIDETDC[MAXIDES]; // TDC tick number for this IDE
+  Float_t simIDETDC[MAXIDES]; // TDC tick number for this IDE
   Float_t simIDEPartKin[MAXIDES]; // primary particle KE at this point MeV
   Float_t simIDEEnergySum; // sum of all simIDEEnergy
 
@@ -652,7 +652,9 @@ private:
  
   //Internal functions
   const art::Ptr<recob::Track> MatchRecoToTruthOrWCTrack(const std::vector<art::Ptr<recob::Track>>& tracks, bool isData); 
-  const art::Ptr<simb::MCParticle> ProcessMCParticles(const std::vector<art::Ptr<simb::MCParticle>>& truePartVec, const pdana::MCBeamOrCosmicAlg * const beamOrCosmic, const art::Event& e); // returns primary particle candidate
+  const art::Ptr<simb::MCParticle> ProcessMCParticles(const std::vector<art::Ptr<simb::MCParticle>>& truePartVec, 
+        const pdana::MCBeamOrCosmicAlg * const beamOrCosmic, 
+        const art::Event& e); // returns primary particle candidate
   void ProcessAllTracks(const std::vector<art::Ptr<recob::Track>>& trackVec,
         const std::vector<art::Ptr<simb::MCParticle>>& truePartVec,
         const art::FindManyP<anab::Calorimetry>& tracksCaloVec, 
@@ -1156,7 +1158,7 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("simIDEY",&simIDEY,"simIDEY[nIDEs]/F");
   tree->Branch("simIDEZ",&simIDEZ,"simIDEZ[nIDEs]/F");
   tree->Branch("simIDEChannel",&simIDEChannel,"simIDEChannel[nIDEs]/i");
-  tree->Branch("simIDETDC",&simIDETDC,"simIDETDC[nIDEs]/s");
+  tree->Branch("simIDETDC",&simIDETDC,"simIDETDC[nIDEs]/F");
   tree->Branch("simIDEPartKin",&simIDEPartKin,"simIDEPartKin[nIDEs]/F");
   tree->Branch("simIDEEnergySum",&simIDEEnergySum,"simIDEEnergySum/F");
   
@@ -1769,7 +1771,7 @@ void lana::PionAbsSelector::ResetTreeVars()
     simIDEY[iIDE] = DEFAULTNEG;
     simIDEZ[iIDE] = DEFAULTNEG;
     simIDEChannel[iIDE] = 0;
-    simIDETDC[iIDE] = 0;
+    simIDETDC[iIDE] = DEFAULTNEG;
     simIDEPartKin[iIDE] = DEFAULTNEG;
   }
   simIDEEnergySum = DEFAULTNEG;
@@ -2010,7 +2012,9 @@ void lana::PionAbsSelector::ResetTreeVars()
 
 } // ResetTreeVars
 
-const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const std::vector<art::Ptr<simb::MCParticle>>& truePartVec, const pdana::MCBeamOrCosmicAlg * const beamOrCosmic, const art::Event& e) // returns primary particle candidate
+const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const std::vector<art::Ptr<simb::MCParticle>>& truePartVec, 
+        const pdana::MCBeamOrCosmicAlg * const beamOrCosmic, 
+        const art::Event& e) // returns primary particle candidate
 {
   //Get MCParticle Variables and find MCC11 primaryParticleCandidates
   std::vector<art::Ptr<simb::MCParticle> > primaryParticleCandidates;
@@ -2379,11 +2383,11 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
 
     // Get SimChannel Info
     protoana::ProtoDUNETruthUtils pdTruthUtils;
-    const auto& ideinfos = pdTruthUtils.GetIDEsFromParticleSortZ(*primaryParticle,e);
+    const auto& ideinfos = pdTruthUtils.GetTotalChannelEnergyFromParticle(*primaryParticle,e,true);
     simIDEEnergySum = 0.;
     for (const auto& ideinfo: ideinfos) {
       const auto& [channel, tdc, ide] = ideinfo; // unsigned int, unsigned short, sim::IDE
-      std::cout << "Channel: "<< channel << " tdc: "<< tdc << " energy: " << ide.energy << " MeV\n";
+      //std::cout << "Channel: "<< channel << " tdc: "<< tdc << " energy: " << ide.energy << " MeV  x: "<<ide.x << "  z: "<<ide.z<<"\n";
       if (nIDEs >= MAXIDES - 1)
       {
           throw cet::exception("TooManyIDEs","Too many IDEs in this event, ran out of room in array");
