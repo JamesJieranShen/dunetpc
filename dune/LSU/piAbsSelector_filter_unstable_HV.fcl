@@ -1,0 +1,13 @@
+#include "ProtoDUNEUnstableHVFilter.fcl"
+#include "piAbsSelector.fcl"
+
+process_name: PiAbsSelectorFilterUnstableHV
+
+services.FileCatalogMetadata:  @local::art_file_catalog_data
+
+physics.filters: {
+    unstablehvfilter: @local::HVfilter
+}
+physics.reco: [ unstablehvfilter ]
+physics.trigger_paths: [ reco ]
+

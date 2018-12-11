@@ -1,0 +1,12 @@
+#include "ProtoDUNEUnstableHVFilter.fcl"
+#include "piAbsSelector_redo_beamevent.fcl"
+
+process_name: PiAbsSelectorFilterUnstableHVRedoBeam
+
+services.FileCatalogMetadata:  @local::art_file_catalog_data
+
+physics.filters: {
+    unstablehvfilter: @local::HVfilter
+}
+physics.reco: [ unstablehvfilter, beamevent ]
+physics.trigger_paths: [ reco ]

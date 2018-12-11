@@ -37,8 +37,21 @@ namespace protoana {
     const float ConvertTrueTimeToPandoraTimeMicro(const simb::MCParticle &part) const;
     const float ConvertTrueTimeToPandoraTimeMicro(const float trueTime) const;
 
-    std::vector<sim::IDE> GetIDEsFromParticle(const simb::MCParticle & part, const art::Event & evt) const;
-    std::vector<sim::IDE> GetIDEsFromParticleSortZ(const simb::MCParticle & part, const art::Event & evt) const;
+    /*
+     * Get the list of sim::IDE for a particle. Only returns the collection plane IDEs.
+     * 
+     * The return type is complicated, but you can use the 
+     * C++17 "structured binding" trick to easily access it:
+     *
+     * const auto& ideinfos = pdTruthUtils.GetIDEsFromParticle(p,e);
+     * for (const auto& ideinfo: ideinfos) {
+     *   const auto& [channel, tdc, ide] = ideinfo;
+     *   std::cout << "Channel: "<< channel << " tdc: "<< tdc << " energy: " << ide.energy << " MeV\n";
+     * }
+     *
+     */
+    std::vector<std::tuple<raw::ChannelID_t,unsigned short, sim::IDE> > GetIDEsFromParticle(const simb::MCParticle & part, const art::Event & evt) const;
+    std::vector<std::tuple<raw::ChannelID_t,unsigned short, sim::IDE> > GetIDEsFromParticleSortZ(const simb::MCParticle & part, const art::Event & evt) const;
 
   private:
 

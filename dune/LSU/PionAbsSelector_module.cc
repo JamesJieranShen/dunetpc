@@ -82,6 +82,8 @@ const auto MPROTON = 938.2720813; // MeV/c^2
 const auto KINLOSTBEFORETPC = 0.0; //MeV; from LArIAT pion total cross section group
 const auto KINLOSTBEFORETPCPROTON = 0.0; //MeV; from LArIAT pion total cross section group
 
+const auto ZSTARTOFTPC = -0.49375; //cm
+
 namespace lana {
   class PionAbsSelector;
   struct PiAbsSecondary;
@@ -401,6 +403,8 @@ private:
   Float_t simIDEX[MAXIDES]; // true X position cm
   Float_t simIDEY[MAXIDES]; // true Y position cm
   Float_t simIDEZ[MAXIDES]; // true Z position cm
+  UInt_t simIDEChannel[MAXIDES]; // raw::ChannelID_t for this IDE
+  UShort_t simIDETDC[MAXIDES]; // TDC tick number for this IDE
   Float_t simIDEPartKin[MAXIDES]; // primary particle KE at this point MeV
   Float_t simIDEEnergySum; // sum of all simIDEEnergy
 
@@ -1151,6 +1155,8 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("simIDEX",&simIDEX,"simIDEX[nIDEs]/F");
   tree->Branch("simIDEY",&simIDEY,"simIDEY[nIDEs]/F");
   tree->Branch("simIDEZ",&simIDEZ,"simIDEZ[nIDEs]/F");
+  tree->Branch("simIDEChannel",&simIDEChannel,"simIDEChannel[nIDEs]/i");
+  tree->Branch("simIDETDC",&simIDETDC,"simIDETDC[nIDEs]/s");
   tree->Branch("simIDEPartKin",&simIDEPartKin,"simIDEPartKin[nIDEs]/F");
   tree->Branch("simIDEEnergySum",&simIDEEnergySum,"simIDEEnergySum/F");
   
@@ -1540,7 +1546,7 @@ const art::Ptr<recob::Track> lana::PionAbsSelector::MatchRecoToTruthOrWCTrack(co
         zTrackStart = zTrackEnd;
       }
     }
-    const TVector3 trackIntersectionPoint = lsu::trackZPlane(0.,*track);
+    const TVector3 trackIntersectionPoint = lsu::trackZPlane(ZSTARTOFTPC,*track);
     float xTrack = trackXFrontTPC[iTrack];
     float yTrack = trackYFrontTPC[iTrack];
     const float deltaX = xTrack - xTrue;
@@ -1762,6 +1768,8 @@ void lana::PionAbsSelector::ResetTreeVars()
     simIDEX[iIDE] = DEFAULTNEG;
     simIDEY[iIDE] = DEFAULTNEG;
     simIDEZ[iIDE] = DEFAULTNEG;
+    simIDEChannel[iIDE] = 0;
+    simIDETDC[iIDE] = 0;
     simIDEPartKin[iIDE] = DEFAULTNEG;
   }
   simIDEEnergySum = DEFAULTNEG;
@@ -2055,7 +2063,7 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
       mcPartEndKin[nMCParts] = 1000.*(truth->EndE()-truth->Mass());
       mcPartDeltaAngle[nMCParts] = truth->Momentum().Vect().Angle(truth->EndMomentum().Vect());
 
-      const TVector3 particleFrontTPCPoint = lsu::mcPartStartZPlane(0,*truth);
+      const TVector3 particleFrontTPCPoint = lsu::mcPartStartZPlane(ZSTARTOFTPC,*truth);
       mcPartXFrontTPC[nMCParts] = particleFrontTPCPoint.X();
       mcPartYFrontTPC[nMCParts] = particleFrontTPCPoint.Y();
 
@@ -2347,8 +2355,7 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
       trueCategory = 0; // unknown
     }
 
-    const double zStartOfTPC = 0.;
-    const TVector3 particleFrontTPCPoint = lsu::mcPartStartZPlane(zStartOfTPC,*primaryParticle);
+    const TVector3 particleFrontTPCPoint = lsu::mcPartStartZPlane(ZSTARTOFTPC,*primaryParticle);
     trueXFrontTPC = particleFrontTPCPoint.X();
     trueYFrontTPC = particleFrontTPCPoint.Y();
     xWC = trueXFrontTPC;
@@ -2360,21 +2367,23 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
     size_t iClosestTrajPointToFrontTPC;
     TLorentzVector momAtFrontTPC;
     double trueTrajPointFrontTPCDistDbl;
-    const auto& closestTrajPointToFrontTPC = trajInterpAlg.pointClosestToPlane(primaryParticle->Trajectory(),zStartOfTPC,momAtFrontTPC,iClosestTrajPointToFrontTPC,trueTrajPointFrontTPCDistDbl);
+    const auto& closestTrajPointToFrontTPC = trajInterpAlg.pointClosestToPlane(primaryParticle->Trajectory(),ZSTARTOFTPC,momAtFrontTPC,iClosestTrajPointToFrontTPC,trueTrajPointFrontTPCDistDbl);
     trueTrajPointFrontTPCDist = trueTrajPointFrontTPCDistDbl;
     trueKinFrontTPC = 1000.*(momAtFrontTPC.E()-momAtFrontTPC.M()); // MeV
-    for(size_t iTP=0; iTP < primaryParticle->NumberTrajectoryPoints(); iTP++)
-    {
-      if(iClosestTrajPointToFrontTPC == iTP) std::cout << "This is TPC front point: " << std::endl;
-      std::cout << "primaryParticle TrajPoint  iTP: "<<iTP<<"z: " << primaryParticle->Vz(iTP) <<"        KE: "<< 1000.*(primaryParticle->E(iTP) - primaryParticle->Mass()) << std::endl;
-    }
+    //std::cout << "closest to front of TPC: iClosest: " << iClosestTrajPointToFrontTPC << " distance: " << trueTrajPointFrontTPCDist << " trueKinFrontTPC: " << trueKinFrontTPC << " z: " << closestTrajPointToFrontTPC.Z() << std::endl;
+    //for(size_t iTP=0; iTP < primaryParticle->NumberTrajectoryPoints(); iTP++)
+    //{
+    //  if(iClosestTrajPointToFrontTPC == iTP) std::cout << "This is TPC front point: " << std::endl;
+    //  std::cout << "primaryParticle TrajPoint  iTP: "<<iTP<<" z: " << primaryParticle->Vz(iTP) <<"        KE: "<< 1000.*(primaryParticle->E(iTP) - primaryParticle->Mass()) << std::endl;
+    //}
 
     // Get SimChannel Info
     protoana::ProtoDUNETruthUtils pdTruthUtils;
-    const auto ides = pdTruthUtils.GetIDEsFromParticleSortZ(*primaryParticle,e);
+    const auto& ideinfos = pdTruthUtils.GetIDEsFromParticleSortZ(*primaryParticle,e);
     simIDEEnergySum = 0.;
-    for(const sim::IDE & ide: ides)
-    {
+    for (const auto& ideinfo: ideinfos) {
+      const auto& [channel, tdc, ide] = ideinfo; // unsigned int, unsigned short, sim::IDE
+      std::cout << "Channel: "<< channel << " tdc: "<< tdc << " energy: " << ide.energy << " MeV\n";
       if (nIDEs >= MAXIDES - 1)
       {
           throw cet::exception("TooManyIDEs","Too many IDEs in this event, ran out of room in array");
@@ -2384,10 +2393,12 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
       simIDEX[nIDEs] = ide.x; // cm
       simIDEY[nIDEs] = ide.y;
       simIDEZ[nIDEs] = ide.z;
+      simIDEChannel[nIDEs] = channel;
+      simIDETDC[nIDEs] = tdc;
       simIDEPartKin[nIDEs] = trueKinFrontTPC - simIDEEnergySum;
-      nIDEs++;
       simIDEEnergySum += ide.energy;
-      std::cout << "primaryParticle IDE z: " << ide.z <<"        energy: "<<ide.energy<<"        part kin: " <<simIDEPartKin[nIDEs]<<std::endl;
+      //std::cout << "primaryParticle IDE z: " << ide.z <<"  energy: "<<ide.energy<<"  Esum: "<<simIDEEnergySum<<"  trueKinFront: "<<trueKinFrontTPC<<"  part kin: " <<simIDEPartKin[nIDEs]<<std::endl;
+      nIDEs++;
     } // for ide
 
   } // if primaryParticle
@@ -2446,7 +2457,7 @@ void lana::PionAbsSelector::ProcessAllTracks(const std::vector<art::Ptr<recob::T
       trackLength[iTrack] = track->Length();
     }
 
-    const TVector3 trackIntersectionPoint = lsu::trackZPlane(0.,*track);
+    const TVector3 trackIntersectionPoint = lsu::trackZPlane(ZSTARTOFTPC,*track);
     trackXFrontTPC[iTrack] = trackIntersectionPoint.X();
     trackYFrontTPC[iTrack] = trackIntersectionPoint.Y();
 
@@ -2604,7 +2615,7 @@ void lana::PionAbsSelector::ProcessAllTracks(const std::vector<art::Ptr<recob::T
           trackTrueEndZ[iTrack] = particle->EndZ();
           trackTrueEndT[iTrack] = particle->EndT();
 
-          const TVector3 particleFrontTPCPoint = lsu::mcPartStartZPlane(0,*particle);
+          const TVector3 particleFrontTPCPoint = lsu::mcPartStartZPlane(ZSTARTOFTPC,*particle);
           trackTrueXFrontTPC[iTrack] = particleFrontTPCPoint.X();
           trackTrueYFrontTPC[iTrack] = particleFrontTPCPoint.Y();
 
@@ -3001,7 +3012,7 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
       
       if(pfTrack)
       {
-        const TVector3 pfTrackFrontTPCPoint = lsu::trackZPlane(0,*pfTrack);
+        const TVector3 pfTrackFrontTPCPoint = lsu::trackZPlane(ZSTARTOFTPC,*pfTrack);
         PFBeamPrimXFrontTPC = pfTrackFrontTPCPoint.X();
         PFBeamPrimYFrontTPC = pfTrackFrontTPCPoint.Y();
         pfBeamSecondaryVertex = pfPartUtils.GetPFParticleSecondaryVertex(*pfBeamPart,e,fPFParticleTag.encode(),fPFTrackTag.encode());
@@ -3138,7 +3149,7 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
         PFBeamPrimStartTheta = showerDir.Theta();
         PFBeamPrimStartPhi = showerDir.Phi();
 
-        const TVector3 showerFrontTPCPoint = lsu::lineZPlane(0,pfBeamVertex,showerDir);
+        const TVector3 showerFrontTPCPoint = lsu::lineZPlane(ZSTARTOFTPC,pfBeamVertex,showerDir);
         PFBeamPrimXFrontTPC = showerFrontTPCPoint.X();
         PFBeamPrimYFrontTPC = showerFrontTPCPoint.Y();
 

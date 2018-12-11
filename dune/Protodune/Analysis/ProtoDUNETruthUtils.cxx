@@ -176,10 +176,10 @@ const float protoana::ProtoDUNETruthUtils::ConvertTrueTimeToPandoraTimeMicro(con
   return detclock->G4ToElecTime(trueTime);
 }
 
-std::vector<sim::IDE> protoana::ProtoDUNETruthUtils::GetIDEsFromParticle(const simb::MCParticle & part, const art::Event & evt) const{
+std::vector<std::tuple<raw::ChannelID_t,unsigned short, sim::IDE> > protoana::ProtoDUNETruthUtils::GetIDEsFromParticle(const simb::MCParticle & part, const art::Event & evt) const{
 
   art::ServiceHandle<geo::Geometry> geom;
-  std::vector<sim::IDE> result;
+  std::vector<std::tuple<raw::ChannelID_t,unsigned short, sim::IDE> > result;
   const auto& partTrackID = part.TrackId();
 
   std::vector<art::Ptr<sim::SimChannel>> simChanVec;
@@ -192,23 +192,27 @@ std::vector<sim::IDE> protoana::ProtoDUNETruthUtils::GetIDEsFromParticle(const s
     if(signalType != geo::kCollection) continue;
     for(const auto& TDCIDEs: channel->TDCIDEMap())
     {
-      // unsigned short TDC = TDCIDEs.first;
+      unsigned short TDC = TDCIDEs.first;
       const std::vector<sim::IDE>& IDEs = TDCIDEs.second;
       for(const auto& IDE: IDEs)
       {
         if(IDE.trackID == partTrackID)
         {
-          result.push_back(IDE);
+          result.push_back(std::make_tuple(channelNumber,TDC,IDE));
         }
+        //else if (-IDE.trackID == partTrackID)
+        //{
+        //  result.push_back(std::make_tuple(channelNumber,TDC,IDE));
+        //}
       }
     } // for TDCIDE
   } // for channel
   return result;
 }
 
-std::vector<sim::IDE> protoana::ProtoDUNETruthUtils::GetIDEsFromParticleSortZ(const simb::MCParticle & part, const art::Event & evt) const{
+std::vector<std::tuple<raw::ChannelID_t,unsigned short, sim::IDE> > protoana::ProtoDUNETruthUtils::GetIDEsFromParticleSortZ(const simb::MCParticle & part, const art::Event & evt) const{
   auto result = GetIDEsFromParticle(part,evt);
-  std::sort(result.begin(),result.end(),[](const auto& a, const auto& b){return a.z < b.z;});
+  std::sort(result.begin(),result.end(),[](const auto& a, const auto& b){return std::get<2>(a).z < std::get<2>(b).z;});
   return result;
 }
 
