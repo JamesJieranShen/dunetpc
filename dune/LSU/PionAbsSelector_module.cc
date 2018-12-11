@@ -358,13 +358,17 @@ private:
   Float_t trueEndMom; // primary MCParticle end momentum MeV/c
   Float_t trueEndE; // primary MCParticle end energy MeV
   Float_t trueEndKin; // primary MCParticle end kinetic energy MeV
+  Float_t trueEndMaxAngleToSec; // primary MCParticle end dir max angle to secondary start (only for +/-(pi/mu/p))
   Float_t trueSecondToEndMom;// primary MCParticle second to last point momentum MeV/c
   Float_t trueSecondToEndE;// primary MCParticle second to last point energy MeV
   Float_t trueSecondToEndKin;// primary MCParticle second to last point kinetic energy MeV
   Int_t trueSecondPDG[MAXDAUGHTER]; // secondary Pdg Code
   Float_t trueSecondKin[MAXDAUGHTER]; // secondary Kinetic Energy
+  Float_t trueSecondAngleToPrimEnd[MAXDAUGHTER]; // secondary angle to prim end
   Float_t trueXFrontTPC; // the starting trajectory projected to the TPC, x coord
   Float_t trueYFrontTPC; // the starting trajectory projected to the TPC, y coord
+  Float_t trueTrajPointFrontTPCDist; // distance from front of TPC to closest traj point on true MCPart cm
+  Float_t trueKinFrontTPC; // kinetic energy of primaryParticle at traj point closest to front of TPC MeV
 
   UInt_t nMCParts;
   bool mcPartIsBeam[MAXMCPARTS];
@@ -397,6 +401,7 @@ private:
   Float_t simIDEX[MAXIDES]; // true X position cm
   Float_t simIDEY[MAXIDES]; // true Y position cm
   Float_t simIDEZ[MAXIDES]; // true Z position cm
+  Float_t simIDEPartKin[MAXIDES]; // primary particle KE at this point MeV
   Float_t simIDEEnergySum; // sum of all simIDEEnergy
 
   UInt_t nTracks;
@@ -1103,13 +1108,17 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("trueEndMom",&trueEndMom,"trueEndMom/F");
   tree->Branch("trueEndE",&trueEndE,"trueEndE/F");
   tree->Branch("trueEndKin",&trueEndKin,"trueEndKin/F");
+  tree->Branch("trueEndMaxAngleToSec",&trueEndMaxAngleToSec,"trueEndMaxAngleToSec/F");
   tree->Branch("trueSecondToEndMom",&trueSecondToEndMom,"trueSecondToEndMom/F");
   tree->Branch("trueSecondToEndE",&trueSecondToEndE,"trueSecondToEndE/F");
   tree->Branch("trueSecondToEndKin",&trueSecondToEndKin,"trueSecondToEndKin/F");
   tree->Branch("trueSecondPDG",&trueSecondPDG,"trueSecondPDG[nSecTracks]/I");
   tree->Branch("trueSecondKin",&trueSecondKin,"trueSecondKin[nSecTracks]/F");
+  tree->Branch("trueSecondAngleToPrimEnd",&trueSecondAngleToPrimEnd,"trueSecondAngleToPrimEnd[nSecTracks]/F");
   tree->Branch("trueXFrontTPC",&trueXFrontTPC,"trueXFrontTPC/F");
   tree->Branch("trueYFrontTPC",&trueYFrontTPC,"trueYFrontTPC/F");
+  tree->Branch("trueTrajPointFrontTPCDist",&trueTrajPointFrontTPCDist,"trueTrajPointFrontTPCDist/F");
+  tree->Branch("trueKinFrontTPC",&trueKinFrontTPC,"trueKinFrontTPC/F");
 
   tree->Branch("nMCParts",&nMCParts,"nMCParts/i");
   tree->Branch("mcPartIsBeam",&mcPartIsBeam,"mcPartIsBeam[nMCParts]/O");
@@ -1142,6 +1151,7 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("simIDEX",&simIDEX,"simIDEX[nIDEs]/F");
   tree->Branch("simIDEY",&simIDEY,"simIDEY[nIDEs]/F");
   tree->Branch("simIDEZ",&simIDEZ,"simIDEZ[nIDEs]/F");
+  tree->Branch("simIDEPartKin",&simIDEPartKin,"simIDEPartKin[nIDEs]/F");
   tree->Branch("simIDEEnergySum",&simIDEEnergySum,"simIDEEnergySum/F");
   
   tree->Branch("nTracks",&nTracks,"nTracks/i");
@@ -1701,6 +1711,7 @@ void lana::PionAbsSelector::ResetTreeVars()
   trueEndMom = DEFAULTNEG;
   trueEndE = DEFAULTNEG;
   trueEndKin = DEFAULTNEG;
+  trueEndMaxAngleToSec = DEFAULTNEG;
   trueSecondToEndMom = DEFAULTNEG;
   trueSecondToEndE = DEFAULTNEG;
   trueSecondToEndKin = DEFAULTNEG;
@@ -1708,9 +1719,12 @@ void lana::PionAbsSelector::ResetTreeVars()
   {
     trueSecondPDG[iSec] = DEFAULTNEG;
     trueSecondKin[iSec] = DEFAULTNEG;
+    trueSecondAngleToPrimEnd[iSec] = DEFAULTNEG;
   }
   trueXFrontTPC = DEFAULTNEG;
   trueYFrontTPC = DEFAULTNEG;
+  trueTrajPointFrontTPCDist = DEFAULTNEG;
+  trueKinFrontTPC = DEFAULTNEG;
 
   nMCParts = 0;
   for(size_t i=0; i < MAXMCPARTS; i++)
@@ -1748,6 +1762,7 @@ void lana::PionAbsSelector::ResetTreeVars()
     simIDEX[iIDE] = DEFAULTNEG;
     simIDEY[iIDE] = DEFAULTNEG;
     simIDEZ[iIDE] = DEFAULTNEG;
+    simIDEPartKin[iIDE] = DEFAULTNEG;
   }
   simIDEEnergySum = DEFAULTNEG;
 
@@ -2156,27 +2171,35 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
       {
         if(truth->TrackId() == daughterTrackID)
         {
-          int pdgid = truth->PdgCode();
-	  TLorentzVector secMom4 = TLorentzVector(truth->Trajectory().begin()->second);
-	  float secKin = (secMom4.E()-truth->Mass())*1000.;
-	  if(nSecTracks < MAXDAUGHTER && secKin > 3.0) 
-	  {
-	    trueSecondPDG[nSecTracks] = pdgid;
-	    trueSecondKin[nSecTracks] = secKin;
-	    nSecTracks++;
-	  }
-          if(abs(pdgid) == 211)
+          const int& pdgid = truth->PdgCode();
+          const unsigned& abspdgid = abs(pdgid);
+          const TLorentzVector& secMom4 = TLorentzVector(truth->Trajectory().begin()->second);
+          const auto& secMom3 = lsu::toVector(secMom4);
+          const float& primSecAngle = ROOT::Math::VectorUtil::Angle(lsu::toVector(trueEndMomVec4),secMom3);
+          const float& secKin = (secMom4.E()-truth->Mass())*1000.;
+          if(nSecTracks < MAXDAUGHTER && secKin > 3.0) 
+          {
+            trueSecondPDG[nSecTracks] = pdgid;
+            trueSecondKin[nSecTracks] = secKin;
+            trueSecondAngleToPrimEnd[nSecTracks] = primSecAngle;
+            nSecTracks++;
+          }
+          if(abspdgid == 211 || abspdgid == 2212 || abspdgid == 13)
+          {
+            trueEndMaxAngleToSec = std::max(trueEndMaxAngleToSec,primSecAngle);
+          }
+          if(abspdgid == 211)
           {
             trueNSecondaryChPions++;
           }
-          else if(abs(pdgid) == 2212)
+          else if(abspdgid == 2212)
           {
             if(truth->Trajectory().TotalLength() > 1.)
             {
                 trueNSecondaryProtons++;
             }
           }
-          else if(abs(pdgid) == 111)
+          else if(pdgid == 111)
           {
             trueNSecondaryPiZeros++;
           }
@@ -2184,7 +2207,7 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
           {
             trueNSecondaryOppChPions++;
           }
-          else if(abs(pdgid) == 13)
+          else if(pdgid == 13)
           {
             trueNSecondaryMuons++;
           }
@@ -2324,7 +2347,8 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
       trueCategory = 0; // unknown
     }
 
-    const TVector3 particleFrontTPCPoint = lsu::mcPartStartZPlane(0,*primaryParticle);
+    const double zStartOfTPC = 0.;
+    const TVector3 particleFrontTPCPoint = lsu::mcPartStartZPlane(zStartOfTPC,*primaryParticle);
     trueXFrontTPC = particleFrontTPCPoint.X();
     trueYFrontTPC = particleFrontTPCPoint.Y();
     xWC = trueXFrontTPC;
@@ -2332,6 +2356,18 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
     pzWC = trueStartMomVec4.Z()*1000.; //in MeV/c
     pWC = trueStartMom; //in MeV/c
 
+    mctrue::TrajectoryInterpExtrapAlg trajInterpAlg;
+    size_t iClosestTrajPointToFrontTPC;
+    TLorentzVector momAtFrontTPC;
+    double trueTrajPointFrontTPCDistDbl;
+    const auto& closestTrajPointToFrontTPC = trajInterpAlg.pointClosestToPlane(primaryParticle->Trajectory(),zStartOfTPC,momAtFrontTPC,iClosestTrajPointToFrontTPC,trueTrajPointFrontTPCDistDbl);
+    trueTrajPointFrontTPCDist = trueTrajPointFrontTPCDistDbl;
+    trueKinFrontTPC = 1000.*(momAtFrontTPC.E()-momAtFrontTPC.M()); // MeV
+    for(size_t iTP=0; iTP < primaryParticle->NumberTrajectoryPoints(); iTP++)
+    {
+      if(iClosestTrajPointToFrontTPC == iTP) std::cout << "This is TPC front point: " << std::endl;
+      std::cout << "primaryParticle TrajPoint  iTP: "<<iTP<<"z: " << primaryParticle->Vz(iTP) <<"        KE: "<< 1000.*(primaryParticle->E(iTP) - primaryParticle->Mass()) << std::endl;
+    }
 
     // Get SimChannel Info
     protoana::ProtoDUNETruthUtils pdTruthUtils;
@@ -2348,8 +2384,10 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
       simIDEX[nIDEs] = ide.x; // cm
       simIDEY[nIDEs] = ide.y;
       simIDEZ[nIDEs] = ide.z;
+      simIDEPartKin[nIDEs] = trueKinFrontTPC - simIDEEnergySum;
       nIDEs++;
       simIDEEnergySum += ide.energy;
+      std::cout << "primaryParticle IDE z: " << ide.z <<"        energy: "<<ide.energy<<"        part kin: " <<simIDEPartKin[nIDEs]<<std::endl;
     } // for ide
 
   } // if primaryParticle

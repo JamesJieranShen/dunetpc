@@ -141,6 +141,15 @@ class mctrue::TrajectoryInterpExtrapAlg
                 double& distanceToClosestTrajPoint,
                 bool extrapolate=false);
 
+    /// Finds the trajectory point closest to the given z-plane
+    /**
+     */
+    const TVector3 pointClosestToPlane(
+                const simb::MCTrajectory& trajectory,
+                const double& planeZ,
+                TLorentzVector& interpolatedMomentum,
+                size_t& iClosestTrajPoint,
+                double& distanceToClosestTrajPoint);
 
   private:
 
@@ -216,6 +225,10 @@ class mctrue::TrajectoryInterpExtrapAlg
                 const TVector3& point2,
                 const TLorentzVector& momentum1,
                 const TLorentzVector& momentum2);
+
+    const int iPointClosestToPlane(
+                const simb::MCTrajectory& trajectory,
+                const double& planeZ);
     
 };
 

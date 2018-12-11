@@ -81,6 +81,42 @@ mctrue::TrajectoryInterpExtrapAlg::pointOfClosestApproach(
   }
 }
 
+const TVector3 
+mctrue::TrajectoryInterpExtrapAlg::pointClosestToPlane(
+                const simb::MCTrajectory& trajectory,
+                const double& planeZ,
+                TLorentzVector& interpolatedMomentum,
+                size_t& iClosestTrajPoint,
+                double& distanceToClosestTrajPoint)
+{
+  const size_t ntrajectory = trajectory.size();
+  if (ntrajectory == 0)
+  {
+    distanceToClosestTrajPoint = -1.;
+    iClosestTrajPoint=0;
+    return TVector3();
+  }
+  else if (ntrajectory == 1)
+  {
+    distanceToClosestTrajPoint = fabs(trajectory.Z(0)-planeZ);
+    interpolatedMomentum = trajectory.Momentum(0);
+    iClosestTrajPoint=0;
+    return trajectory.Position(0).Vect();
+  }
+  int iClosest = iPointClosestToPlane(trajectory,planeZ);
+  if (iClosest < 0)
+  {
+    distanceToClosestTrajPoint = -1.;
+    iClosestTrajPoint=0;
+    return TVector3();
+  }
+  iClosestTrajPoint = iClosest;
+  const auto& closestPoint = trajectory.Position(iClosest).Vect();
+  interpolatedMomentum = trajectory.Momentum(iClosest);
+  distanceToClosestTrajPoint = fabs(closestPoint.Z()-planeZ);
+  return closestPoint;
+}
+
 /// Find point of closest approach when closest traj point in middle of traj points
 /**
  * requires that the closest trajectory point has already been found, iClosest
@@ -426,3 +462,21 @@ mctrue::TrajectoryInterpExtrapAlg::interpolateMomentum(
     return result;
 }
 
+const int
+mctrue::TrajectoryInterpExtrapAlg::iPointClosestToPlane(
+                const simb::MCTrajectory& trajectory,
+                const double& planeZ)
+{
+  int result = -1;
+  double minDistance = 1e20;
+  for(size_t iPoint=0; iPoint < trajectory.size(); iPoint++)
+  {
+    const auto& thisDistance = fabs(trajectory.Z(iPoint)-planeZ);
+    if (thisDistance < minDistance)
+    {
+      minDistance = thisDistance;
+      result = iPoint;
+    }
+  }
+  return result;
+}
