@@ -602,7 +602,6 @@ private:
   std::vector<float> PFBeamPrimXs;
   std::vector<float> PFBeamPrimYs;
   std::vector<float> PFBeamPrimZs;
-  std::vector<bool> PFBeamPrimInFids;
   std::vector<float> PFBeamPrimKins;
   std::vector<float> PFBeamPrimKinsProton;
   float PFBeamPrimKinInteract;
@@ -1351,7 +1350,6 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("PFBeamPrimXs",&PFBeamPrimXs);
   tree->Branch("PFBeamPrimYs",&PFBeamPrimYs);
   tree->Branch("PFBeamPrimZs",&PFBeamPrimZs);
-  tree->Branch("PFBeamPrimInFids",&PFBeamPrimInFids);
   tree->Branch("PFBeamPrimKins",&PFBeamPrimKins);
   tree->Branch("PFBeamPrimKinsProton",&PFBeamPrimKinsProton);
   tree->Branch("PFBeamPrimKinInteract",&PFBeamPrimKinInteract,"PFBeamPrimKinInteract/F");
@@ -1976,7 +1974,6 @@ void lana::PionAbsSelector::ResetTreeVars()
   PFBeamPrimXs.clear();
   PFBeamPrimYs.clear();
   PFBeamPrimZs.clear();
-  PFBeamPrimInFids.clear();
   PFBeamPrimKins.clear();
   PFBeamPrimKinsProton.clear();
   PFBeamPrimKinInteract = DEFAULTNEG;
@@ -3078,22 +3075,12 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
               PFBeamPrimYs.push_back(thisPoint.Y());
               PFBeamPrimZs.push_back(thisPoint.Z());
 
-              const bool thisInFid = InPrimaryFiducial(thisPoint);
-              PFBeamPrimInFids.push_back(thisInFid);
               const double thisKin = kinWCInTPC-intE;
               PFBeamPrimKins.push_back(thisKin);
               const double thisKinProton = kinWCInTPCProton-intE;
               PFBeamPrimKinsProton.push_back(thisKinProton);
-              if(thisInFid)
-              {
-                PFBeamPrimKinInteract = thisKin;
-                PFBeamPrimKinInteractProton = thisKinProton;
-              }
-              else
-              {
-                PFBeamPrimKinInteract = DEFAULTNEG;
-                PFBeamPrimKinInteractProton = DEFAULTNEG;
-              }
+              PFBeamPrimKinInteract = thisKin;
+              PFBeamPrimKinInteractProton = thisKinProton;
               intE += pfTrackCalo->dEdx().at(cRangeIt)*pfTrackCalo->TrkPitchVec().at(cRangeIt);
             } // for cRangeIt
           } // if Plane is fCaloPlane
