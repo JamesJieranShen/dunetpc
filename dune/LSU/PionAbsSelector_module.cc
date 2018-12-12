@@ -865,6 +865,10 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       beamMom[nBeamMom] = beamEvent.GetRecoBeamMomentum(iMom);
       nBeamMom++;
       if(PRINTBEAMEVENT) std::cout << "    " << beamEvent.GetRecoBeamMomentum(iMom) << "\n";
+      if(iMom == 0)
+      {
+        pWC = beamEvent.GetRecoBeamMomentum(iMom)*1000.;
+      }
     }
     for(size_t iTrack=0; iTrack < beamEvent.GetNBeamTracks(); iTrack++)
     {
@@ -934,6 +938,16 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   }
 
   const art::Ptr<simb::MCParticle> primaryParticle = ProcessMCParticles(truePartVec,beamOrCosmic,e);
+
+  // Either got pWC from beam or from primaryParticle, so now is the time to do this
+  eWC = sqrt(pWC*pWC+MCHARGEDPION*MCHARGEDPION); // assume charged pion in MeV
+  kinWC = eWC - MCHARGEDPION; // assume charged pion in MeV
+  kinWCInTPC = kinWC - KINLOSTBEFORETPC;
+
+  // for proton
+  eWCProton = sqrt(pWC*pWC+MPROTON*MPROTON);
+  kinWCProton = eWCProton - MPROTON;
+  kinWCInTPCProton = kinWCProton - KINLOSTBEFORETPCPROTON;
 
   ProcessAllTracks(trackVec, truePartVec,tracksCaloVec,fmHitsForTracks,beamOrCosmic,e);
 
@@ -2403,15 +2417,6 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
     } // for ide
 
   } // if primaryParticle
-
-  eWC = sqrt(pWC*pWC+MCHARGEDPION*MCHARGEDPION); // assume charged pion in MeV
-  kinWC = eWC - MCHARGEDPION; // assume charged pion in MeV
-  kinWCInTPC = kinWC - KINLOSTBEFORETPC;
-
-  // for proton
-  eWCProton = sqrt(pWC*pWC+MPROTON*MPROTON);
-  kinWCProton = eWCProton - MPROTON;
-  kinWCInTPCProton = kinWCProton - KINLOSTBEFORETPCPROTON;
 
   return primaryParticle;
 
