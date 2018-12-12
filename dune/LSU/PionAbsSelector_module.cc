@@ -2274,7 +2274,7 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
     bool interactedOutsideTPC = false;
     if (trueEndZ < 0.) interactedBeforeTPC = true;
     if (trueEndZ > 695.
-        || trueEndX < 360. || trueEndX > 360.
+        || trueEndX < -360. || trueEndX > 360.
         || trueEndY < 0. || trueEndY > 608.
         ) interactedOutsideTPC = true;
 
