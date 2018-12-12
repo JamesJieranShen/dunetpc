@@ -589,6 +589,7 @@ private:
   float PFBeamPrimAngleToBeamTrk;
   float PFBeamPrimTrkLen;
   float PFBeamPrimTrkMaxKink;
+  float PFBeamPrimTrkStartEndDirAngle;
   float PFBeamPrimMaxAngleToSecTrks;
   float PFBeamPrimShwrLen;
   float PFBeamPrimShwrOpenAngle;
@@ -1351,6 +1352,7 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("PFBeamPrimAngleToBeamTrk",&PFBeamPrimAngleToBeamTrk,"PFBeamPrimAngleToBeamTrk/F");
   tree->Branch("PFBeamPrimTrkLen",&PFBeamPrimTrkLen,"PFBeamPrimTrkLen/F");
   tree->Branch("PFBeamPrimTrkMaxKink",&PFBeamPrimTrkMaxKink,"PFBeamPrimTrkMaxKink/F");
+  tree->Branch("PFBeamPrimTrkStartEndDirAngle",&PFBeamPrimTrkStartEndDirAngle,"PFBeamPrimTrkStartEndDirAngle/F");
   tree->Branch("PFBeamPrimMaxAngleToSecTrks",&PFBeamPrimMaxAngleToSecTrks,"PFBeamPrimMaxAngleToSecTrks/F");
   tree->Branch("PFBeamPrimShwrLen",&PFBeamPrimShwrLen,"PFBeamPrimShwrLen/F");
   tree->Branch("PFBeamPrimShwrOpenAngle",&PFBeamPrimShwrOpenAngle,"PFBeamPrimShwrOpenAngle/F");
@@ -1975,6 +1977,7 @@ void lana::PionAbsSelector::ResetTreeVars()
   PFBeamPrimAngleToBeamTrk = DEFAULTNEG;
   PFBeamPrimTrkLen = DEFAULTNEG;
   PFBeamPrimTrkMaxKink = DEFAULTNEG;
+  PFBeamPrimTrkStartEndDirAngle = DEFAULTNEG;
   PFBeamPrimMaxAngleToSecTrks = DEFAULTNEG;
   PFBeamPrimShwrLen = DEFAULTNEG;
   PFBeamPrimShwrOpenAngle = DEFAULTNEG;
@@ -3032,6 +3035,7 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
         {
           PFBeamPrimTrkLen = pfTrack->Length();
           pfBeamPrimTrkEndDir = pfTrack->EndDirection();
+          PFBeamPrimTrkStartEndDirAngle = ROOT::Math::VectorUtil::Angle(pfTrack->StartDirection(),pfBeamPrimTrkEndDir);
         }
 
         const auto& pfTrackTraj = pfTrack->Trajectory();
