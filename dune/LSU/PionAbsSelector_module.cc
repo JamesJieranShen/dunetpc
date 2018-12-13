@@ -3015,21 +3015,16 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
     bool primEndValid = false;
     recob::Track::Point_t pfBeamPrimStart;
     recob::Track::Point_t pfBeamPrimEnd;
-    recob::Track::Vector_t pfBeamPrimTrkStartDir;
-    recob::Track::Vector_t pfBeamPrimTrkEndDir;
+    recob::Track::Vector_t pfBeamPrimStartDir;
+    recob::Track::Vector_t pfBeamPrimEndDir;
     if(isPFParticleTracklike)
     {
       const recob::Track* pfTrack = pfPartUtils.GetPFParticleTrack(*pfBeamPart, e, fPFParticleTag.encode(),fPFTrackTag.encode());
       
       if(pfTrack)
       {
-        const TVector3 pfTrackFrontTPCPoint = lsu::trackZPlane(ZSTARTOFTPC,*pfTrack);
-        PFBeamPrimXFrontTPC = pfTrackFrontTPCPoint.X();
-        PFBeamPrimYFrontTPC = pfTrackFrontTPCPoint.Y();
         pfBeamPrimStart = pfTrack->Start();
-        PFBeamPrimStartTheta = pfTrack->Theta();
-        PFBeamPrimStartPhi = pfTrack->Phi();
-        pfBeamPrimTrkStartDir = pfTrack->StartDirection();
+        pfBeamPrimStartDir = pfTrack->StartDirection();
         primStartValid = true;
 
         if(pfTrack->NPoints() > 1)
@@ -3037,8 +3032,7 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
           primEndValid = true;
           pfBeamPrimEnd = pfTrack->End();
           PFBeamPrimTrkLen = pfTrack->Length();
-          pfBeamPrimTrkEndDir = pfTrack->EndDirection();
-          PFBeamPrimTrkStartEndDirAngle = ROOT::Math::VectorUtil::Angle(pfBeamPrimTrkStartDir,pfBeamPrimTrkEndDir);
+          pfBeamPrimEndDir = pfTrack->EndDirection();
         }
 
         std::cout << "PFBeamPrimTrk Start Pos: "
@@ -3047,23 +3041,23 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
                     << pfBeamPrimEnd.X() << ", " << pfBeamPrimEnd.Y() << ", " << pfBeamPrimEnd.Z()
                     << std::endl;
         std::cout << "PFBeamPrimTrk Start Dir: "
-                    << pfBeamPrimTrkStartDir.X() << ", " << pfBeamPrimTrkStartDir.Y() << ", " << pfBeamPrimTrkStartDir.Z()
+                    << pfBeamPrimStartDir.X() << ", " << pfBeamPrimStartDir.Y() << ", " << pfBeamPrimStartDir.Z()
                     << " End Dir: "
-                    << pfBeamPrimTrkEndDir.X() << ", " << pfBeamPrimTrkEndDir.Y() << ", " << pfBeamPrimTrkEndDir.Z()
+                    << pfBeamPrimEndDir.X() << ", " << pfBeamPrimEndDir.Y() << ", " << pfBeamPrimEndDir.Z()
                     << std::endl;
-        std::cout << "PFBeamPrimTrk Start Theta & Phi (deg): " << pfBeamPrimTrkStartDir.Theta()*180./CLHEP::pi << ", " << pfBeamPrimTrkStartDir.Phi()*180./CLHEP::pi << std::endl;
-        std::cout << "PFBeamPrimTrk End Theta & Phi (deg): " << pfBeamPrimTrkEndDir.Theta()*180./CLHEP::pi << ", " << pfBeamPrimTrkEndDir.Phi()*180./CLHEP::pi << std::endl;
+        std::cout << "PFBeamPrimTrk Start Theta & Phi (deg): " << pfBeamPrimStartDir.Theta()*180./CLHEP::pi << ", " << pfBeamPrimStartDir.Phi()*180./CLHEP::pi << std::endl;
+        std::cout << "PFBeamPrimTrk End Theta & Phi (deg): " << pfBeamPrimEndDir.Theta()*180./CLHEP::pi << ", " << pfBeamPrimEndDir.Phi()*180./CLHEP::pi << std::endl;
 
         if(primEndValid && pfBeamPrimStart.Z() > pfBeamPrimEnd.Z())
         {
             const auto tmpPoint = pfBeamPrimStart;
             pfBeamPrimStart = pfBeamPrimEnd;
             pfBeamPrimEnd = tmpPoint;
-            const auto tmpVect = pfBeamPrimTrkStartDir;
-            pfBeamPrimTrkStartDir = pfBeamPrimTrkEndDir;
-            pfBeamPrimTrkEndDir = tmpVect;
-            pfBeamPrimTrkStartDir *= -1.;
-            pfBeamPrimTrkEndDir *= -1.;
+            const auto tmpVect = pfBeamPrimStartDir;
+            pfBeamPrimStartDir = pfBeamPrimEndDir;
+            pfBeamPrimEndDir = tmpVect;
+            pfBeamPrimStartDir *= -1.;
+            pfBeamPrimEndDir *= -1.;
         }
         std::cout << "After possibly flipping:" << std::endl;
         std::cout << "PFBeamPrimTrk Start Pos: "
@@ -3072,13 +3066,12 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
                     << pfBeamPrimEnd.X() << ", " << pfBeamPrimEnd.Y() << ", " << pfBeamPrimEnd.Z()
                     << std::endl;
         std::cout << "PFBeamPrimTrk Start Dir: "
-                    << pfBeamPrimTrkStartDir.X() << ", " << pfBeamPrimTrkStartDir.Y() << ", " << pfBeamPrimTrkStartDir.Z()
+                    << pfBeamPrimStartDir.X() << ", " << pfBeamPrimStartDir.Y() << ", " << pfBeamPrimStartDir.Z()
                     << " End Dir: "
-                    << pfBeamPrimTrkEndDir.X() << ", " << pfBeamPrimTrkEndDir.Y() << ", " << pfBeamPrimTrkEndDir.Z()
+                    << pfBeamPrimEndDir.X() << ", " << pfBeamPrimEndDir.Y() << ", " << pfBeamPrimEndDir.Z()
                     << std::endl;
-        std::cout << "PFBeamPrimTrk Start Theta & Phi (deg): " << pfBeamPrimTrkStartDir.Theta()*180./CLHEP::pi << ", " << pfBeamPrimTrkStartDir.Phi()*180./CLHEP::pi << std::endl;
-        std::cout << "PFBeamPrimTrk End Theta & Phi (deg): " << pfBeamPrimTrkEndDir.Theta()*180./CLHEP::pi << ", " << pfBeamPrimTrkEndDir.Phi()*180./CLHEP::pi << std::endl;
-
+        std::cout << "PFBeamPrimTrk Start Theta & Phi (deg): " << pfBeamPrimStartDir.Theta()*180./CLHEP::pi << ", " << pfBeamPrimStartDir.Phi()*180./CLHEP::pi << std::endl;
+        std::cout << "PFBeamPrimTrk End Theta & Phi (deg): " << pfBeamPrimEndDir.Theta()*180./CLHEP::pi << ", " << pfBeamPrimEndDir.Phi()*180./CLHEP::pi << std::endl;
 
         const auto& pfTrackTraj = pfTrack->Trajectory();
         for(size_t iTP=0; iTP < pfTrackTraj.NumberTrajectoryPoints()-1; iTP++)
@@ -3224,15 +3217,8 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
       if(pfShower)
       {
         pfBeamPrimStart = lsu::toPoint(pfShower->ShowerStart());
+        pfBeamPrimStartDir = lsu::toVector(pfShower->Direction());
         primStartValid = true;
-        const TVector3 showerDir = pfShower->Direction();
-
-        PFBeamPrimStartTheta = showerDir.Theta();
-        PFBeamPrimStartPhi = showerDir.Phi();
-
-        const TVector3 showerFrontTPCPoint = lsu::lineZPlane(ZSTARTOFTPC,pfBeamPrimStart,showerDir);
-        PFBeamPrimXFrontTPC = showerFrontTPCPoint.X();
-        PFBeamPrimYFrontTPC = showerFrontTPCPoint.Y();
 
         if(pfShower->has_open_angle())
         {
@@ -3246,7 +3232,7 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
                     << pfBeamPrimStart.X() << ", " << pfBeamPrimStart.Y() << ", " << pfBeamPrimStart.Z()
                     << std::endl;
         std::cout << "PFBeamPrimShwr Start Dir: "
-                    << showerDir.X() << ", " << showerDir.Y() << ", " << showerDir.Z()
+                    << pfBeamPrimStartDir.X() << ", " << pfBeamPrimStartDir.Y() << ", " << pfBeamPrimStartDir.Z()
                     << std::endl;
         std::cout << "    Shower: "
                   << " has open angle: " << pfShower->has_open_angle()
@@ -3276,19 +3262,22 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
       PFBeamPrimStartX = pfBeamPrimStart.X();
       PFBeamPrimStartY = pfBeamPrimStart.Y();
       PFBeamPrimStartZ = pfBeamPrimStart.Z();
+      PFBeamPrimStartTheta = pfBeamPrimStartDir.Theta();
+      PFBeamPrimStartPhi = pfBeamPrimStartDir.Phi();
+      const TVector3 pfFrontTPCPoint = lsu::lineZPlane(ZSTARTOFTPC,pfBeamPrimStart,pfBeamPrimStartDir);
+      PFBeamPrimXFrontTPC = pfFrontTPCPoint.X();
+      PFBeamPrimYFrontTPC = pfFrontTPCPoint.Y();
+      const ROOT::Math::Polar3DVector dirVecBeamTrk(1.,thetaWC,phiWC);
+      PFBeamPrimAngleToBeamTrk = ROOT::Math::VectorUtil::Angle(pfBeamPrimStartDir,dirVecBeamTrk);
     }
     if (primEndValid)
     {
       PFBeamPrimEndX = pfBeamPrimEnd.X();
       PFBeamPrimEndY = pfBeamPrimEnd.Y();
       PFBeamPrimEndZ = pfBeamPrimEnd.Z();
-    }
-
-    if(primStartValid)
-    {
-      const ROOT::Math::Polar3DVector dirVecPFBeamPrim(1.,PFBeamPrimStartTheta,PFBeamPrimStartPhi);
-      const ROOT::Math::Polar3DVector dirVecBeamTrk(1.,thetaWC,phiWC);
-      PFBeamPrimAngleToBeamTrk = ROOT::Math::VectorUtil::Angle(dirVecPFBeamPrim,dirVecBeamTrk);
+      //PFBeamPrimEndTheta = pfBeamPrimEndDir.Theta();
+      //PFBeamPrimEndPhi = pfBeamPrimEndDir.Phi();
+      PFBeamPrimTrkStartEndDirAngle = ROOT::Math::VectorUtil::Angle(pfBeamPrimStartDir,pfBeamPrimEndDir);
     }
 
     const auto& pfBeamDaughterTracks = pfPartUtils.GetPFParticleDaughterTracks(*pfBeamPart,e,fPFParticleTag.encode(),fPFTrackTag.encode());
@@ -3317,11 +3306,11 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
         const auto& pfBeamDaughterTrack = pfBeamDaughterTracks.at(iSec);
         std::cout << "Daughter "<<iSec<<" track len: " << pfBeamDaughterTrack->Length() << std::endl;
         PFBeamSecTrkLen[iSec] = pfBeamDaughterTrack->Length();
-        if(PFBeamPrimEndZ > -9999.) // there was an end point (and is primary track)
+        if(primEndValid) // there was an end point (and is primary track)
         {
           PFBeamSecTrkDistToPrimEnd[iSec] = (pfBeamDaughterTrack->Start()-pfBeamPrimEnd).R();
 
-          PFBeamSecTrkAngleToPrimEnd[iSec] = ROOT::Math::VectorUtil::Angle(pfBeamPrimTrkEndDir,pfBeamDaughterTrack->StartDirection());
+          PFBeamSecTrkAngleToPrimEnd[iSec] = ROOT::Math::VectorUtil::Angle(pfBeamPrimEndDir,pfBeamDaughterTrack->StartDirection());
           PFBeamPrimMaxAngleToSecTrks = std::max(PFBeamSecTrkAngleToPrimEnd[iSec],PFBeamPrimMaxAngleToSecTrks);
         }
 
