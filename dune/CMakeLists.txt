@@ -55,8 +55,8 @@ add_subdirectory(Calib)
 add_subdirectory(CalibServices)
 add_subdirectory(CAFMaker)
 add_subdirectory(LSU)
-
 add_subdirectory(RegCVN)
+add_subdirectory(Iceberg)
 
 # Respect the order specified in lar_build, which is:
 #
