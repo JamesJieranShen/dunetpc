@@ -3074,18 +3074,17 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
         std::cout << "PFBeamPrimTrk End Theta & Phi (deg): " << pfBeamPrimEndDir.Theta()*180./CLHEP::pi << ", " << pfBeamPrimEndDir.Phi()*180./CLHEP::pi << std::endl;
 
         const auto& pfTrackTraj = pfTrack->Trajectory();
+        //std::cout << std::endl;
+        //pfTrackTraj.Dump(std::cout,7,"        ","    ");
+        //std::cout << std::endl;
         for(size_t iTP=0; iTP < pfTrackTraj.NumberTrajectoryPoints()-1; iTP++)
         {
-          float thisKink = ROOT::Math::VectorUtil::Angle(pfTrackTraj.DirectionAtPoint(iTP),pfTrackTraj.DirectionAtPoint(iTP+1));
-          //const auto& trajFlags = pfTrackTraj.FlagsAtPoint(iTP); // seems empty for pandoraTrack
-          //std::cout << "PFBeamPrimTrk: iTP:  " << iTP 
-          //          << " kink angle: " 
-          //          << thisKink*180./CLHEP::pi 
-          //          << " deg    From hit: "<< trajFlags.fromHit()
-          //          <<" Flags: ";
-          //          trajFlags.dump(std::cout,32);
-          //          std::cout << std::endl;
-          PFBeamPrimTrkMaxKink = std::max(PFBeamPrimTrkMaxKink,thisKink);
+          if(pfTrackTraj.HasValidPoint(iTP) && pfTrackTraj.HasValidPoint(iTP+1))
+          {
+            float thisKink = ROOT::Math::VectorUtil::Angle(pfTrackTraj.DirectionAtPoint(iTP),pfTrackTraj.DirectionAtPoint(iTP+1));
+            //const auto& trajFlags = pfTrackTraj.FlagsAtPoint(iTP); // seems empty for pandoraTrack
+            PFBeamPrimTrkMaxKink = std::max(PFBeamPrimTrkMaxKink,thisKink);
+          }
         } // for iTP
         //std::cout << "PFBeamPrimTrk: len: " << PFBeamPrimTrkLen
         //            << " max kink (deg): " << PFBeamPrimTrkMaxKink*180./CLHEP::pi
@@ -3118,8 +3117,11 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
               PFBeamPrimdEdxAverageLast7Hits = findAverage(dEdxEnd - 7, dEdxEnd);
             }
 
+            //std::cout  << "Calo dEdxSize: " << dEdxSize 
+            //            << " XYZ.size(): " << pfTrackCalo->XYZ().size()
+            //            << " TpIndices.size(): " << pfTrackCalo->TpIndices().size() << std::endl;
             for(size_t cRangeIt = 0; cRangeIt < pfTrackCalo->ResidualRange().size() 
-                                && cRangeIt < pfTrackCalo->dEdx().size(); cRangeIt++)
+                                && cRangeIt < dEdxSize; cRangeIt++)
             {
               PFBeamPrimResRanges.push_back(pfTrackCalo->ResidualRange().at(cRangeIt));
               PFBeamPrimdEdxs.push_back(pfTrackCalo->dEdx().at(cRangeIt));
@@ -3129,6 +3131,8 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
               PFBeamPrimXs.push_back(thisPoint.X());
               PFBeamPrimYs.push_back(thisPoint.Y());
               PFBeamPrimZs.push_back(thisPoint.Z());
+
+              //if(cRangeIt < pfTrackCalo->TpIndices().size()) std::cout << "calo i: " << cRangeIt << " TpIndex: "<< pfTrackCalo->TpIndices().at(cRangeIt) << std::endl;
 
             } // for cRangeIt
           } // if Plane is fCaloPlane
@@ -3170,6 +3174,23 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
         if(isMC) // Now MCTruth Matching
         {
           const auto& pfTrackHits = fmHitsForPFTracks.at(pfTrack->ID());
+          //std::map<size_t,size_t> nHitsPerPlane;
+          //for(size_t iHit=0; iHit < pfTrackHits.size(); iHit++)
+          //{
+          //  const auto& iPlane = pfTrackHits.at(iHit)->WireID().Plane;
+          //  if(nHitsPerPlane.count(iPlane) > 0)
+          //  {
+          //      nHitsPerPlane.at(iPlane)++;
+          //  }
+          //  else
+          //  {
+          //      nHitsPerPlane.emplace(iPlane,1);
+          //  }
+          //}
+          //for(auto& nHitsPer: nHitsPerPlane)
+          //{
+          //  std::cout << "For plane: " << nHitsPer.first << " there are " << nHitsPer.second << std::endl;
+          //}
           lsu::BackTrackerAlg btAlg;
           const auto pfTrackMCPart = btAlg.getMCParticle(pfTrackHits,e,PFBeamPrimTrueTrackIDIsNeg);
           const auto& pfTrackMCTraj = pfTrackMCPart.Trajectory();
