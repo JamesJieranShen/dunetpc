@@ -403,10 +403,23 @@ private:
   Float_t simIDEX[MAXIDES]; // true X position cm
   Float_t simIDEY[MAXIDES]; // true Y position cm
   Float_t simIDEZ[MAXIDES]; // true Z position cm
+  Float_t simIDEWireZ[MAXIDES]; // wire z position cm
   UInt_t simIDEChannel[MAXIDES]; // raw::ChannelID_t for this IDE
   Float_t simIDETDC[MAXIDES]; // TDC tick number for this IDE
   Float_t simIDEPartKin[MAXIDES]; // primary particle KE at this point MeV
   Float_t simIDEEnergySum; // sum of all simIDEEnergy
+
+  std::vector<UInt_t> zWireChannel;
+  std::vector<float> zWireWireZ;
+  
+  std::vector<float> zWireNumElectrons;
+  std::vector<float> zWireEnergy;
+  std::vector<float> zWireX;
+  std::vector<float> zWireY;
+  std::vector<float> zWireZ;
+  std::vector<float> zWireTDC;
+  std::vector<float> zWirePartKin;
+  Float_t zWireEnergySum;
 
   UInt_t nTracks;
   UInt_t nTracksInFirstZ[MAXZINT]; // the number of tracks with a space point in (0,i) cm where i is the index
@@ -646,6 +659,8 @@ private:
   TH1F* deltaAngleTPCBeamlineOnlyInFirst25cmHist;
   TH1F* deltaAngleTPCBeamlineOnlyInFlangeInFirst25cmHist;
 
+  std::map<UInt_t,std::pair<UInt_t,float>> myChannelToWireMap;
+
   art::ServiceHandle<cheat::BackTrackerService> bt;
 
   protoana::ProtoDUNEDataUtils fDataUtil;
@@ -703,8 +718,6 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
 {
   // Implementation of required member function here.
   ResetTreeVars();
-
-  art::ServiceHandle<geo::Geometry> geom;
 
   runNumber = e.run();
   subRunNumber = e.subRun();
@@ -1171,6 +1184,7 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("simIDEX",&simIDEX,"simIDEX[nIDEs]/F");
   tree->Branch("simIDEY",&simIDEY,"simIDEY[nIDEs]/F");
   tree->Branch("simIDEZ",&simIDEZ,"simIDEZ[nIDEs]/F");
+  tree->Branch("simIDEWireZ",&simIDEWireZ,"simIDEWireZ[nIDEs]/F");
   tree->Branch("simIDEChannel",&simIDEChannel,"simIDEChannel[nIDEs]/i");
   tree->Branch("simIDETDC",&simIDETDC,"simIDETDC[nIDEs]/F");
   tree->Branch("simIDEPartKin",&simIDEPartKin,"simIDEPartKin[nIDEs]/F");
@@ -1418,6 +1432,55 @@ void lana::PionAbsSelector::beginJob()
   deltaAngleTPCBeamlineOnlyInFlangeInFirst25cmHist = tfs->make<TH1F>("deltaAngleTPCBeamlineOnlyInFlangeInFirst25cm","",500,0,180);
   setHistTitles(deltaAngleTPCBeamlineOnlyInFlangeInFirst25cmHist,"#Delta #alpha TPC Track - Beamline Track","TPC-Beamline Track Pairs / Bin");
   
+  art::ServiceHandle<geo::Geometry> geom;
+  size_t iZWire = 0;
+  for(const auto& tpcid: geom->IterateTPCIDs())
+  {
+    if (tpcid.TPC != 1 && tpcid.TPC != 5 && tpcid.TPC != 9 ) continue;
+    //std::cout << "TPC: "<< tpcid << " is valid: "<<tpcid.isValid << std::endl;
+    for(const auto& planeid: geom->IteratePlaneIDs(tpcid))
+    {
+      const auto& view = geom->View(planeid);
+      if(view != geo::kZ) continue;
+      //const auto& sigType = geom->SignalType(planeid);
+      //const auto& plane = geom->Plane(planeid);
+      //std::cout << "  Plane: "<< planeid << " is valid: "<< planeid.isValid <<" sigtype: " << sigType << std::endl;
+      for(const auto & wireid: geom->IterateWireIDs(planeid))
+      {
+          const auto & wire = geom->Wire(wireid);
+          const auto & channel = geom->PlaneWireToChannel(wireid);
+          const auto & center = wire.GetCenter(); // geo::Point
+          std::cout << "    Wire: "<<wireid<<" Channel: "<<channel 
+                  << " Z: " << center.Z() 
+                  << std::endl; 
+          myChannelToWireMap.emplace(channel,std::make_pair(iZWire,center.Z()));
+          iZWire++;
+          zWireChannel.push_back(channel);
+          zWireWireZ.push_back(center.Z());
+      } // for wireid
+    } // for planeid
+  }// for tpcid
+
+  // The size is the number of wires
+  zWireNumElectrons.resize(iZWire);
+  zWireEnergy.resize(iZWire);
+  zWireX.resize(iZWire);
+  zWireY.resize(iZWire);
+  zWireZ.resize(iZWire);
+  zWireTDC.resize(iZWire);
+  zWirePartKin.resize(iZWire);
+
+  tree->Branch("zWireChannel",&zWireChannel);
+  tree->Branch("zWireWireZ",&zWireWireZ);
+
+  tree->Branch("zWireNumElectrons",&zWireNumElectrons);
+  tree->Branch("zWireEnergy",&zWireEnergy);
+  tree->Branch("zWireX",&zWireX);
+  tree->Branch("zWireY",&zWireY);
+  tree->Branch("zWireZ",&zWireZ);
+  tree->Branch("zWireTDC",&zWireTDC);
+  tree->Branch("zWirePartKin",&zWirePartKin);
+  tree->Branch("zWireEnergySum",&zWireEnergySum,"zWireEnergySum/F");
 }
 
 void lana::PionAbsSelector::beginRun(art::Run const & r)
@@ -1784,11 +1847,24 @@ void lana::PionAbsSelector::ResetTreeVars()
     simIDEX[iIDE] = DEFAULTNEG;
     simIDEY[iIDE] = DEFAULTNEG;
     simIDEZ[iIDE] = DEFAULTNEG;
+    simIDEWireZ[iIDE] = DEFAULTNEG;
     simIDEChannel[iIDE] = 0;
     simIDETDC[iIDE] = DEFAULTNEG;
     simIDEPartKin[iIDE] = DEFAULTNEG;
   }
   simIDEEnergySum = DEFAULTNEG;
+
+  for(size_t iWire=0; iWire < zWireNumElectrons.size(); iWire++)
+  {
+    zWireNumElectrons.at(iWire) = 0.;
+    zWireEnergy.at(iWire) = 0.;
+    zWireX.at(iWire) = DEFAULTNEG;
+    zWireY.at(iWire) = DEFAULTNEG;
+    zWireZ.at(iWire) = DEFAULTNEG;
+    zWireTDC.at(iWire) = DEFAULTNEG;
+    zWirePartKin.at(iWire) = DEFAULTNEG;
+  }
+  zWireEnergySum = DEFAULTNEG;
 
   nTracks = 0;
   for(size_t z=0; z < MAXZINT; z++)
@@ -2408,6 +2484,7 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
       {
           throw cet::exception("TooManyIDEs","Too many IDEs in this event, ran out of room in array");
       }
+
       simIDENumElectrons[nIDEs] = ide.numElectrons;
       simIDEEnergy[nIDEs] = ide.energy; // MeV
       simIDEX[nIDEs] = ide.x; // cm
@@ -2417,9 +2494,28 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
       simIDETDC[nIDEs] = tdc;
       simIDEPartKin[nIDEs] = trueKinFrontTPC - simIDEEnergySum;
       simIDEEnergySum += ide.energy;
+      if(myChannelToWireMap.count(channel) > 0)
+      {
+        simIDEWireZ[nIDEs] = myChannelToWireMap[channel].second;
+        const auto& iZWire = myChannelToWireMap[channel].first;
+        zWireNumElectrons.at(iZWire) = ide.numElectrons;
+        zWireEnergy.at(iZWire) = ide.energy;
+        zWireX.at(iZWire) = ide.x;
+        zWireY.at(iZWire) = ide.y;
+        zWireZ.at(iZWire) = ide.z;
+        zWireTDC.at(iZWire) = tdc;
+      }
       //std::cout << "primaryParticle IDE z: " << ide.z <<"  energy: "<<ide.energy<<"  Esum: "<<simIDEEnergySum<<"  trueKinFront: "<<trueKinFrontTPC<<"  part kin: " <<simIDEPartKin[nIDEs]<<std::endl;
       nIDEs++;
     } // for ide
+
+    // now z-wire kin energy
+    zWireEnergySum = 0.;
+    for (size_t iZWire=0; iZWire < zWireEnergy.size(); iZWire++)
+    {
+      zWirePartKin.at(iZWire) = trueKinFrontTPC - simIDEEnergySum;
+      zWireEnergySum += zWireEnergy.at(iZWire);
+    } // for iZWire
 
   } // if primaryParticle
 
