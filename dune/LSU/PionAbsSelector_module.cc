@@ -403,6 +403,8 @@ private:
   Float_t simIDEX[MAXIDES]; // true X position cm
   Float_t simIDEY[MAXIDES]; // true Y position cm
   Float_t simIDEZ[MAXIDES]; // true Z position cm
+  Float_t simIDETrajDistance[MAXIDES]; // simIDe distance from true trajectory cm
+  Float_t simIDETrajKin[MAXIDES]; // simIDE KE interpolated from trajectory MeV
   Float_t simIDEWireZ[MAXIDES]; // wire z position cm
   UInt_t simIDEChannel[MAXIDES]; // raw::ChannelID_t for this IDE
   Float_t simIDETDC[MAXIDES]; // TDC tick number for this IDE
@@ -418,6 +420,8 @@ private:
   std::vector<float> zWireY;
   std::vector<float> zWireZ;
   std::vector<float> zWireTDC;
+  std::vector<float> zWireTrajDistance;
+  std::vector<float> zWireTrajKin;
   std::vector<float> zWirePartKin;
   Float_t zWireEnergySum;
 
@@ -599,7 +603,10 @@ private:
   float PFBeamPrimEndZ;
   float PFBeamPrimStartTheta;
   float PFBeamPrimStartPhi;
+  float PFBeamPrimEndTheta;
+  float PFBeamPrimEndPhi;
   float PFBeamPrimAngleToBeamTrk;
+  float PFBeamPrimEndAngleToBeamTrk;
   float PFBeamPrimTrkLen;
   float PFBeamPrimTrkMaxKink;
   float PFBeamPrimTrkStartEndDirAngle;
@@ -1184,6 +1191,8 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("simIDEX",&simIDEX,"simIDEX[nIDEs]/F");
   tree->Branch("simIDEY",&simIDEY,"simIDEY[nIDEs]/F");
   tree->Branch("simIDEZ",&simIDEZ,"simIDEZ[nIDEs]/F");
+  tree->Branch("simIDETrajDistance",&simIDETrajDistance,"simIDETrajDistance[nIDEs]/F");
+  tree->Branch("simIDETrajKin",&simIDETrajKin,"simIDETrajKin[nIDEs]/F");
   tree->Branch("simIDEWireZ",&simIDEWireZ,"simIDEWireZ[nIDEs]/F");
   tree->Branch("simIDEChannel",&simIDEChannel,"simIDEChannel[nIDEs]/i");
   tree->Branch("simIDETDC",&simIDETDC,"simIDETDC[nIDEs]/F");
@@ -1363,7 +1372,10 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("PFBeamPrimEndZ",&PFBeamPrimEndZ,"PFBeamPrimEndZ/F");
   tree->Branch("PFBeamPrimStartTheta",&PFBeamPrimStartTheta,"PFBeamPrimStartTheta/F");
   tree->Branch("PFBeamPrimStartPhi",&PFBeamPrimStartPhi,"PFBeamPrimStartPhi/F");
+  tree->Branch("PFBeamPrimEndTheta",&PFBeamPrimEndTheta,"PFBeamPrimEndTheta/F");
+  tree->Branch("PFBeamPrimEndPhi",&PFBeamPrimEndPhi,"PFBeamPrimEndPhi/F");
   tree->Branch("PFBeamPrimAngleToBeamTrk",&PFBeamPrimAngleToBeamTrk,"PFBeamPrimAngleToBeamTrk/F");
+  tree->Branch("PFBeamPrimEndAngleToBeamTrk",&PFBeamPrimEndAngleToBeamTrk,"PFBeamPrimEndAngleToBeamTrk/F");
   tree->Branch("PFBeamPrimTrkLen",&PFBeamPrimTrkLen,"PFBeamPrimTrkLen/F");
   tree->Branch("PFBeamPrimTrkMaxKink",&PFBeamPrimTrkMaxKink,"PFBeamPrimTrkMaxKink/F");
   tree->Branch("PFBeamPrimTrkStartEndDirAngle",&PFBeamPrimTrkStartEndDirAngle,"PFBeamPrimTrkStartEndDirAngle/F");
@@ -1467,6 +1479,8 @@ void lana::PionAbsSelector::beginJob()
   zWireX.resize(iZWire);
   zWireY.resize(iZWire);
   zWireZ.resize(iZWire);
+  zWireTrajDistance.resize(iZWire);
+  zWireTrajKin.resize(iZWire);
   zWireTDC.resize(iZWire);
   zWirePartKin.resize(iZWire);
 
@@ -1478,6 +1492,8 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("zWireX",&zWireX);
   tree->Branch("zWireY",&zWireY);
   tree->Branch("zWireZ",&zWireZ);
+  tree->Branch("zWireTrajDistance",&zWireTrajDistance);
+  tree->Branch("zWireTrajKin",&zWireTrajKin);
   tree->Branch("zWireTDC",&zWireTDC);
   tree->Branch("zWirePartKin",&zWirePartKin);
   tree->Branch("zWireEnergySum",&zWireEnergySum,"zWireEnergySum/F");
@@ -1847,6 +1863,8 @@ void lana::PionAbsSelector::ResetTreeVars()
     simIDEX[iIDE] = DEFAULTNEG;
     simIDEY[iIDE] = DEFAULTNEG;
     simIDEZ[iIDE] = DEFAULTNEG;
+    simIDETrajDistance[iIDE] = DEFAULTNEG;
+    simIDETrajKin[iIDE] = DEFAULTNEG;
     simIDEWireZ[iIDE] = DEFAULTNEG;
     simIDEChannel[iIDE] = 0;
     simIDETDC[iIDE] = DEFAULTNEG;
@@ -1861,6 +1879,8 @@ void lana::PionAbsSelector::ResetTreeVars()
     zWireX.at(iWire) = DEFAULTNEG;
     zWireY.at(iWire) = DEFAULTNEG;
     zWireZ.at(iWire) = DEFAULTNEG;
+    zWireTrajDistance.at(iWire) = DEFAULTNEG;
+    zWireTrajKin.at(iWire) = DEFAULTNEG;
     zWireTDC.at(iWire) = DEFAULTNEG;
     zWirePartKin.at(iWire) = DEFAULTNEG;
   }
@@ -2050,7 +2070,10 @@ void lana::PionAbsSelector::ResetTreeVars()
   PFBeamPrimEndZ = DEFAULTNEG;
   PFBeamPrimStartTheta = DEFAULTNEG;
   PFBeamPrimStartPhi = DEFAULTNEG;
+  PFBeamPrimEndTheta = DEFAULTNEG;
+  PFBeamPrimEndPhi = DEFAULTNEG;
   PFBeamPrimAngleToBeamTrk = DEFAULTNEG;
+  PFBeamPrimEndAngleToBeamTrk = DEFAULTNEG;
   PFBeamPrimTrkLen = DEFAULTNEG;
   PFBeamPrimTrkMaxKink = DEFAULTNEG;
   PFBeamPrimTrkStartEndDirAngle = DEFAULTNEG;
@@ -2492,8 +2515,15 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
       simIDEZ[nIDEs] = ide.z;
       simIDEChannel[nIDEs] = channel;
       simIDETDC[nIDEs] = tdc;
+      simIDETrajDistance[nIDEs] = 
       simIDEPartKin[nIDEs] = trueKinFrontTPC - simIDEEnergySum;
       simIDEEnergySum += ide.energy;
+
+      TLorentzVector interpolatedMom;
+      double distToTraj;
+      trajInterpAlg.pointOfClosestApproach(primaryParticle->Trajectory(),TVector3(ide.x,ide.y,ide.z),distToTraj,interpolatedMom);
+      simIDETrajDistance[nIDEs] = distToTraj;
+      simIDETrajKin[nIDEs] = (interpolatedMom.Vect().Mag() - interpolatedMom.M())*1000.;
       if(myChannelToWireMap.count(channel) > 0)
       {
         simIDEWireZ[nIDEs] = myChannelToWireMap[channel].second;
@@ -2504,6 +2534,8 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
         zWireY.at(iZWire) = ide.y;
         zWireZ.at(iZWire) = ide.z;
         zWireTDC.at(iZWire) = tdc;
+        zWireTrajDistance.at(iZWire) = simIDETrajDistance[nIDEs];
+        zWireTrajKin.at(iZWire) = simIDETrajKin[nIDEs];
       }
       //std::cout << "primaryParticle IDE z: " << ide.z <<"  energy: "<<ide.energy<<"  Esum: "<<simIDEEnergySum<<"  trueKinFront: "<<trueKinFrontTPC<<"  part kin: " <<simIDEPartKin[nIDEs]<<std::endl;
       nIDEs++;
@@ -3170,9 +3202,6 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
         std::cout << "PFBeamPrimTrk End Theta & Phi (deg): " << pfBeamPrimEndDir.Theta()*180./CLHEP::pi << ", " << pfBeamPrimEndDir.Phi()*180./CLHEP::pi << std::endl;
 
         const auto& pfTrackTraj = pfTrack->Trajectory();
-        //std::cout << std::endl;
-        //pfTrackTraj.Dump(std::cout,7,"        ","    ");
-        //std::cout << std::endl;
         for(size_t iTP=0; iTP < pfTrackTraj.NumberTrajectoryPoints()-1; iTP++)
         {
           if(pfTrackTraj.HasValidPoint(iTP) && pfTrackTraj.HasValidPoint(iTP+1))
@@ -3182,94 +3211,12 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
             PFBeamPrimTrkMaxKink = std::max(PFBeamPrimTrkMaxKink,thisKink);
           }
         } // for iTP
-        //std::cout << "PFBeamPrimTrk: len: " << PFBeamPrimTrkLen
-        //            << " max kink (deg): " << PFBeamPrimTrkMaxKink*180./CLHEP::pi
-        //            << std::endl;
 
-        const auto& shouldBeThisTrackToo = allPFTrackVec.at(pfTrack->ID());
-        if(pfTrack->ID() != shouldBeThisTrackToo->ID() 
-            || pfTrack->NPoints() != shouldBeThisTrackToo->NPoints())
-        {
-          throw cet::exception("PionAbsSelector","track->ID() isn't the track index in the list for primary track!");
-        }
-        const auto& pfTrackCalos = fmPFCalo.at(pfTrack->ID());
-        for(const auto& pfTrackCalo:pfTrackCalos)
-        {
-          if(pfTrackCalo->PlaneID().Plane == fCaloPlane)
-          {
-            const auto& dEdxSize = pfTrackCalo->dEdx().size();
-            //const auto& dEdxBegin = pfTrackCalo->dEdx().begin();
-            const auto& dEdxEnd = pfTrackCalo->dEdx().end();
-            if (dEdxSize >= 3)
-            {
-              PFBeamPrimdEdxAverageLast3Hits = findAverage(dEdxEnd - 3, dEdxEnd);
-            }
-            if (dEdxSize >= 5)
-            {
-              PFBeamPrimdEdxAverageLast5Hits = findAverage(dEdxEnd - 5, dEdxEnd);
-            }
-            if (dEdxSize >= 7)
-            {
-              PFBeamPrimdEdxAverageLast7Hits = findAverage(dEdxEnd - 7, dEdxEnd);
-            }
-
-            //std::cout  << "Calo dEdxSize: " << dEdxSize 
-            //            << " XYZ.size(): " << pfTrackCalo->XYZ().size()
-            //            << " TpIndices.size(): " << pfTrackCalo->TpIndices().size() << std::endl;
-            for(size_t cRangeIt = 0; cRangeIt < pfTrackCalo->ResidualRange().size() 
-                                && cRangeIt < dEdxSize; cRangeIt++)
-            {
-              PFBeamPrimResRanges.push_back(pfTrackCalo->ResidualRange().at(cRangeIt));
-              PFBeamPrimdEdxs.push_back(pfTrackCalo->dEdx().at(cRangeIt));
-              PFBeamPrimPitches.push_back(pfTrackCalo->TrkPitchVec().at(cRangeIt));
-              const auto& thisPoint = pfTrackCalo->XYZ().at(cRangeIt); // PositionVector3D
-
-              PFBeamPrimXs.push_back(thisPoint.X());
-              PFBeamPrimYs.push_back(thisPoint.Y());
-              PFBeamPrimZs.push_back(thisPoint.Z());
-
-              //if(cRangeIt < pfTrackCalo->TpIndices().size()) std::cout << "calo i: " << cRangeIt << " TpIndex: "<< pfTrackCalo->TpIndices().at(cRangeIt) << std::endl;
-
-            } // for cRangeIt
-          } // if Plane is fCaloPlane
-        } // for pfTrackCalo
-        if(PFBeamPrimZs.size()>1)
-        {
-          if(PFBeamPrimZs.front() > PFBeamPrimZs.back())
-          {
-            std::reverse(PFBeamPrimXs.begin(),PFBeamPrimXs.end());
-            std::reverse(PFBeamPrimYs.begin(),PFBeamPrimYs.end());
-            std::reverse(PFBeamPrimZs.begin(),PFBeamPrimZs.end());
-            std::reverse(PFBeamPrimResRanges.begin(),PFBeamPrimResRanges.end());
-            std::reverse(PFBeamPrimdEdxs.begin(),PFBeamPrimdEdxs.end());
-            std::reverse(PFBeamPrimPitches.begin(),PFBeamPrimPitches.end());
-            std::reverse(PFBeamPrimZs.begin(),PFBeamPrimZs.end());
-            std::reverse(PFBeamPrimZs.begin(),PFBeamPrimZs.end());
-          }
-
-          double intE = 0.;
-          for(size_t iCaloHit=0; iCaloHit < PFBeamPrimdEdxs.size();iCaloHit++)
-          {
-              const double thisKin = kinWCInTPC-intE;
-              PFBeamPrimKins.push_back(thisKin);
-              const double thisKinProton = kinWCInTPCProton-intE;
-              PFBeamPrimKinsProton.push_back(thisKinProton);
-              PFBeamPrimKinInteract = thisKin;
-              PFBeamPrimKinInteractProton = thisKinProton;
-              intE += PFBeamPrimdEdxs.at(iCaloHit)*PFBeamPrimPitches.at(iCaloHit);
-              //std::cout << "Calo i: " << iCaloHit
-              //          << "    z: " << PFBeamPrimZs.at(iCaloHit) 
-              //          << "    res range: " << PFBeamPrimResRanges.at(iCaloHit)
-              //          << "    dEdx: " << PFBeamPrimdEdxs.at(iCaloHit)
-              //          << "    pitch: " << PFBeamPrimPitches.at(iCaloHit)
-              //          << "    Kin: " << PFBeamPrimKins.at(iCaloHit)
-              //          << std::endl;
-          }
-        }
+        art::ServiceHandle<geo::Geometry> geom;
+        const auto& pfTrackHits = fmHitsForPFTracks.at(pfTrack->ID());
 
         if(isMC) // Now MCTruth Matching
         {
-          const auto& pfTrackHits = fmHitsForPFTracks.at(pfTrack->ID());
           //std::map<size_t,size_t> nHitsPerPlane;
           //for(size_t iHit=0; iHit < pfTrackHits.size(); iHit++)
           //{
@@ -3326,6 +3273,145 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
           std::cout << "PFPrimaryTrack MCPart: PDG: " << pfTrackMCPart.PdgCode() <<"  Mom: "<< pfTrackMCPart.Momentum().Vect().Mag() << " isBeam: "<<PFBeamPrimTrueIsBeam<<" process: "<<pfTrackMCPart.Process() << " end process: "<<pfTrackMCPart.EndProcess()<< std::endl;
 
         } // if isMC
+
+        // For truth calo info
+        std::vector<art::Ptr<sim::SimChannel>> simChanVec;
+        if(isMC)
+        {
+          auto simChanHand = e.getValidHandle<std::vector<sim::SimChannel> >("largeant");
+          art::fill_ptr_vector(simChanVec, simChanHand);
+        } // isMC
+
+        const auto& shouldBeThisTrackToo = allPFTrackVec.at(pfTrack->ID());
+        if(pfTrack->ID() != shouldBeThisTrackToo->ID() 
+            || pfTrack->NPoints() != shouldBeThisTrackToo->NPoints())
+        {
+          throw cet::exception("PionAbsSelector","track->ID() isn't the track index in the list for primary track!");
+        }
+        const auto& pfTrackCalos = fmPFCalo.at(pfTrack->ID());
+        for(const auto& pfTrackCalo:pfTrackCalos)
+        {
+          if(pfTrackCalo->PlaneID().Plane == fCaloPlane)
+          {
+            const auto& dEdxSize = pfTrackCalo->dEdx().size();
+            //const auto& dEdxBegin = pfTrackCalo->dEdx().begin();
+            const auto& dEdxEnd = pfTrackCalo->dEdx().end();
+            if (dEdxSize >= 3)
+            {
+              PFBeamPrimdEdxAverageLast3Hits = findAverage(dEdxEnd - 3, dEdxEnd);
+            }
+            if (dEdxSize >= 5)
+            {
+              PFBeamPrimdEdxAverageLast5Hits = findAverage(dEdxEnd - 5, dEdxEnd);
+            }
+            if (dEdxSize >= 7)
+            {
+              PFBeamPrimdEdxAverageLast7Hits = findAverage(dEdxEnd - 7, dEdxEnd);
+            }
+
+            std::cout  << "Calo dEdxSize: " << dEdxSize 
+                        << " XYZ.size(): " << pfTrackCalo->XYZ().size()
+                        << " TpIndices.size(): " << pfTrackCalo->TpIndices().size() << std::endl;
+            for(size_t cRangeIt = 0; cRangeIt < pfTrackCalo->ResidualRange().size() 
+                                && cRangeIt < dEdxSize; cRangeIt++)
+            {
+              PFBeamPrimResRanges.push_back(pfTrackCalo->ResidualRange().at(cRangeIt));
+              PFBeamPrimdEdxs.push_back(pfTrackCalo->dEdx().at(cRangeIt));
+              PFBeamPrimPitches.push_back(pfTrackCalo->TrkPitchVec().at(cRangeIt));
+              const auto& thisPoint = pfTrackCalo->XYZ().at(cRangeIt); // PositionVector3D
+
+              PFBeamPrimXs.push_back(thisPoint.X());
+              PFBeamPrimYs.push_back(thisPoint.Y());
+              PFBeamPrimZs.push_back(thisPoint.Z());
+
+              if(cRangeIt < pfTrackCalo->TpIndices().size()) 
+              {
+                const size_t& tpIndex = pfTrackCalo->TpIndices().at(cRangeIt);
+                const auto& flagsAtPoint = pfTrackTraj.FlagsAtPoint(tpIndex);
+                const auto& locationAtPoint = pfTrackTraj.LocationAtPoint(tpIndex);
+                //const auto& directionAtPoint = pfTrackTraj.DirectionAtPoint(tpIndex);
+                const auto& thisHit = pfTrackHits.at(tpIndex);
+                const auto& thisHitChan = thisHit->Channel();
+                const auto& thisHitWireID = thisHit->WireID();
+                const auto& thisHitWire = geom->Wire(thisHitWireID);
+                std::cout << "calo i: " << cRangeIt 
+                            << " TpIndex: "<< tpIndex
+                            << " TrajFlags: " << flagsAtPoint
+                            << std::endl;
+                std::cout << "    calo XYZ: "
+                    << thisPoint.X() << ", " << thisPoint.Y() << ", " << thisPoint.Z()
+                    << std::endl;
+                std::cout << "    traj XYZ: "
+                    << locationAtPoint.X() << ", " << locationAtPoint.Y() << ", " << locationAtPoint.Z()
+                    << std::endl;
+                std::cout << "    Hit channel: " << thisHit->Channel() 
+                    << " wire: " << thisHitWireID
+                    << " wire Z: " << thisHitWire.GetCenter().Z()
+                    << " peak time: " << thisHit->PeakTime()
+                    << " time RMS: " << thisHit->RMS()
+                    << std::endl;
+                if(isMC)
+                {
+                  for(const auto& simChan: simChanVec)
+                  {
+                    if(simChan->Channel() == thisHitChan)
+                    {
+                      for(const auto& TDCIDEs: simChan->TDCIDEMap())
+                      {
+                        unsigned short TDC = TDCIDEs.first;
+                        const std::vector<sim::IDE>& IDEs = TDCIDEs.second;
+                        for(const auto& IDE: IDEs)
+                        {
+                          if(PFBeamPrimTrueTrackID == abs(IDE.trackID))
+                          {
+                            std::cout << "    TDC: " << int(TDC) 
+                                    << " TrackID: " << IDE.trackID
+                                    << " XYZ: " << IDE.x << ", " << IDE.y << ", " << IDE.z
+                                    << std::endl;
+                          } // if PFBeamPrimTrueTrackID == IDE.trackID
+                        } // for IDE
+                      } // for TDCIDE
+                    } // if simChan->Channel == hitChannel
+                  } // for simChan
+                } // isMC
+              } // if cRangeIt < TpIndices.size()
+            } // for cRangeIt
+          } // if Plane is fCaloPlane
+        } // for pfTrackCalo
+        if(PFBeamPrimZs.size()>1)
+        {
+          if(PFBeamPrimZs.front() > PFBeamPrimZs.back())
+          {
+            std::reverse(PFBeamPrimXs.begin(),PFBeamPrimXs.end());
+            std::reverse(PFBeamPrimYs.begin(),PFBeamPrimYs.end());
+            std::reverse(PFBeamPrimZs.begin(),PFBeamPrimZs.end());
+            std::reverse(PFBeamPrimResRanges.begin(),PFBeamPrimResRanges.end());
+            std::reverse(PFBeamPrimdEdxs.begin(),PFBeamPrimdEdxs.end());
+            std::reverse(PFBeamPrimPitches.begin(),PFBeamPrimPitches.end());
+            std::reverse(PFBeamPrimZs.begin(),PFBeamPrimZs.end());
+            std::reverse(PFBeamPrimZs.begin(),PFBeamPrimZs.end());
+          }
+
+          double intE = 0.;
+          for(size_t iCaloHit=0; iCaloHit < PFBeamPrimdEdxs.size();iCaloHit++)
+          {
+              const double thisKin = kinWCInTPC-intE;
+              PFBeamPrimKins.push_back(thisKin);
+              const double thisKinProton = kinWCInTPCProton-intE;
+              PFBeamPrimKinsProton.push_back(thisKinProton);
+              PFBeamPrimKinInteract = thisKin;
+              PFBeamPrimKinInteractProton = thisKinProton;
+              intE += PFBeamPrimdEdxs.at(iCaloHit)*PFBeamPrimPitches.at(iCaloHit);
+              //std::cout << "Calo i: " << iCaloHit
+              //          << "    z: " << PFBeamPrimZs.at(iCaloHit) 
+              //          << "    res range: " << PFBeamPrimResRanges.at(iCaloHit)
+              //          << "    dEdx: " << PFBeamPrimdEdxs.at(iCaloHit)
+              //          << "    pitch: " << PFBeamPrimPitches.at(iCaloHit)
+              //          << "    Kin: " << PFBeamPrimKins.at(iCaloHit)
+              //          << std::endl;
+          }
+        }
+
       } // if pfTrack
     } // if isPFParticleTracklike
     if(isPFParticleShowerlike)
@@ -3374,6 +3460,7 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
       } // if pfShower
     } // if isPFParticleShowerlike
 
+    const ROOT::Math::Polar3DVector dirVecBeamTrk(1.,thetaWC,phiWC);
     if (primStartValid)
     {
       PFBeamPrimStartX = pfBeamPrimStart.X();
@@ -3384,7 +3471,6 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
       const TVector3 pfFrontTPCPoint = lsu::lineZPlane(ZSTARTOFTPC,pfBeamPrimStart,pfBeamPrimStartDir);
       PFBeamPrimXFrontTPC = pfFrontTPCPoint.X();
       PFBeamPrimYFrontTPC = pfFrontTPCPoint.Y();
-      const ROOT::Math::Polar3DVector dirVecBeamTrk(1.,thetaWC,phiWC);
       PFBeamPrimAngleToBeamTrk = ROOT::Math::VectorUtil::Angle(pfBeamPrimStartDir,dirVecBeamTrk);
     }
     if (primEndValid)
@@ -3392,9 +3478,10 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
       PFBeamPrimEndX = pfBeamPrimEnd.X();
       PFBeamPrimEndY = pfBeamPrimEnd.Y();
       PFBeamPrimEndZ = pfBeamPrimEnd.Z();
-      //PFBeamPrimEndTheta = pfBeamPrimEndDir.Theta();
-      //PFBeamPrimEndPhi = pfBeamPrimEndDir.Phi();
+      PFBeamPrimEndTheta = pfBeamPrimEndDir.Theta();
+      PFBeamPrimEndPhi = pfBeamPrimEndDir.Phi();
       PFBeamPrimTrkStartEndDirAngle = ROOT::Math::VectorUtil::Angle(pfBeamPrimStartDir,pfBeamPrimEndDir);
+      PFBeamPrimEndAngleToBeamTrk = ROOT::Math::VectorUtil::Angle(pfBeamPrimEndDir,dirVecBeamTrk);
     }
 
     const auto& pfBeamDaughterTracks = pfPartUtils.GetPFParticleDaughterTracks(*pfBeamPart,e,fPFParticleTag.encode(),fPFTrackTag.encode());

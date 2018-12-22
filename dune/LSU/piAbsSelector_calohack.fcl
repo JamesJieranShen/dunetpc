@@ -1,0 +1,14 @@
+#include "lsu_analyzers.fcl"
+#include "protoDUNE_reco_3ms.fcl"
+
+process_name: PiAbsSelectorCaloHack
+
+physics.analyzers.PiAbsSelector: @local::piabsselector
+
+physics.reco: [ pmtrackcalo, pandoracalo ]
+physics.trigger_paths: [ reco ]
+physics.analysis: [ PiAbsSelector ]
+physics.end_paths: [ analysis ]
+
+physics.producers.pmtrackcalo.module_type: "CalorimetryHack"
+physics.producers.pandoracalo.module_type: "CalorimetryHack"

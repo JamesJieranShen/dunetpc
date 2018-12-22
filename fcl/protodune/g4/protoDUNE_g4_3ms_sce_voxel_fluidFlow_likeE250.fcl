@@ -1,0 +1,3 @@
+#include "protoDUNE_g4_3ms_sce_voxel_fluidFlow.fcl"
+
+services.SpaceCharge.InputFilename: "SpaceChargeProtoDUNE/dispOutput_ProtoDUNESP_withFlowNegX_E250.root"

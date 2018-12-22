@@ -29,6 +29,10 @@ art_make(
   ProtoDUNEAnaUtils
   MODULE_LIBRARIES
   DUNELSU
+  # For CalorimetryHack
+  larreco_Calorimetry
+  lardataobj_AnalysisBase
+  lardata_ArtDataHelper
   )
 install_headers()
 install_fhicl()
