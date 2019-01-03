@@ -5,7 +5,8 @@ process_name: PiAbsSelectorCaloHack
 
 physics.analyzers.PiAbsSelector: @local::piabsselector
 
-physics.reco: [ pmtrackcalo, pandoracalo ]
+#physics.reco: [ pmtrackcalo, pandoracalo ]
+physics.reco: [ pandoracalo ]
 physics.trigger_paths: [ reco ]
 physics.analysis: [ PiAbsSelector ]
 physics.end_paths: [ analysis ]

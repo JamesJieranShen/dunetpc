@@ -25,6 +25,7 @@
 //LArSoft includes
 #include "lardataobj/AnalysisBase/Calorimetry.h"
 #include "lardataobj/RecoBase/Track.h"
+#include "lardataobj/RecoBase/TrackHitMeta.h"
 #include "lardataobj/AnalysisBase/ParticleID.h"
 #include "lardataobj/RawData/TriggerData.h"
 #include "nusimdata/SimulationBase/MCTruth.h"
@@ -3109,6 +3110,7 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
     art::fill_ptr_vector(allPFTrackVec, allPFTrackHand);
   }
   art::FindManyP<recob::Hit> fmHitsForPFTracks(allPFTrackHand, e, fPFTrackTag);
+  art::FindManyP<recob::Hit, recob::TrackHitMeta> fmHitsForPFTracksMeta(allPFTrackHand, e,fPFTrackTag);
   art::FindManyP<anab::Calorimetry>  fmPFCalo(allPFTrackHand, e, fPFCaloTag);
   //auto allPFShowerHand = e.getValidHandle<std::vector<recob::Shower>>(fPFShowerTag);
   //std::vector<art::Ptr<recob::Shower>> allPFShowerVec;
@@ -3163,6 +3165,7 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
           pfBeamPrimEndDir = pfTrack->EndDirection();
         }
 
+        std::cout << "PFBeamPrimTrk ID: " << pfTrack->ID() << std::endl;
         std::cout << "PFBeamPrimTrk Start Pos: "
                     << pfBeamPrimStart.X() << ", " << pfBeamPrimStart.Y() << ", " << pfBeamPrimStart.Z()
                     << " End Pos: "
@@ -3214,6 +3217,22 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
 
         art::ServiceHandle<geo::Geometry> geom;
         const auto& pfTrackHits = fmHitsForPFTracks.at(pfTrack->ID());
+        std::map<size_t,art::Ptr<recob::Hit>> tpIndexToHitMap;
+        if(fmHitsForPFTracksMeta.isValid())
+        {
+          const auto& metaHits = fmHitsForPFTracksMeta.at(pfTrack->ID());
+          const auto& metaDatas = fmHitsForPFTracksMeta.data(pfTrack->ID());
+          for (size_t iHit=0; iHit < pfTrackHits.size(); iHit++)
+          {
+            for (size_t iMeta=0; iMeta < metaHits.size(); iMeta++)
+            {
+              if(pfTrackHits[iHit].key() == metaHits[iMeta].key())
+              {
+                tpIndexToHitMap.emplace(metaDatas[iMeta]->Index(),pfTrackHits[iHit]);
+              }
+            } // for iMeta
+          } // for iHit
+        } // if fmHitsForPFTracksMeta.isValid()
 
         if(isMC) // Now MCTruth Matching
         {
@@ -3270,7 +3289,13 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
             PFBeamPrimTrueMaxKink = std::max(PFBeamPrimTrueMaxKink,thisKink);
           } // for iTP
 
-          std::cout << "PFPrimaryTrack MCPart: PDG: " << pfTrackMCPart.PdgCode() <<"  Mom: "<< pfTrackMCPart.Momentum().Vect().Mag() << " isBeam: "<<PFBeamPrimTrueIsBeam<<" process: "<<pfTrackMCPart.Process() << " end process: "<<pfTrackMCPart.EndProcess()<< std::endl;
+          std::cout << "PFPrimaryTrack MCPart: TrackId: "<< PFBeamPrimTrueTrackID 
+                    <<" PDG: " << pfTrackMCPart.PdgCode() 
+                    <<"  Mom: "<< pfTrackMCPart.Momentum().Vect().Mag() 
+                    << " isBeam: "<<PFBeamPrimTrueIsBeam
+                    <<" process: "<<pfTrackMCPart.Process() 
+                    << " end process: "<<pfTrackMCPart.EndProcess()
+                    << std::endl;
 
         } // if isMC
 
@@ -3309,6 +3334,10 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
               PFBeamPrimdEdxAverageLast7Hits = findAverage(dEdxEnd - 7, dEdxEnd);
             }
 
+            std::cout << "N Valid Traj points:: " << pfTrackTraj.CountValidPoints() << std::endl;
+            std::cout << "pfTrackHits.size(): " << pfTrackHits.size() << std::endl;
+            std::cout << "  first Hit WireID: " << pfTrackHits.front()->WireID() << std::endl;
+            std::cout << "  last Hit WireID:  " << pfTrackHits.back()->WireID() << std::endl;
             std::cout  << "Calo dEdxSize: " << dEdxSize 
                         << " XYZ.size(): " << pfTrackCalo->XYZ().size()
                         << " TpIndices.size(): " << pfTrackCalo->TpIndices().size() << std::endl;
@@ -3330,7 +3359,11 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
                 const auto& flagsAtPoint = pfTrackTraj.FlagsAtPoint(tpIndex);
                 const auto& locationAtPoint = pfTrackTraj.LocationAtPoint(tpIndex);
                 //const auto& directionAtPoint = pfTrackTraj.DirectionAtPoint(tpIndex);
-                const auto& thisHit = pfTrackHits.at(tpIndex);
+                auto thisHit = pfTrackHits.at(tpIndex);
+                if(tpIndexToHitMap.size() > 0 && tpIndexToHitMap.count(tpIndex) > 0)
+                {
+                  thisHit = tpIndexToHitMap.at(tpIndex);
+                }
                 const auto& thisHitChan = thisHit->Channel();
                 const auto& thisHitWireID = thisHit->WireID();
                 const auto& thisHitWire = geom->Wire(thisHitWireID);
@@ -3366,6 +3399,7 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
                           {
                             std::cout << "    TDC: " << int(TDC) 
                                     << " TrackID: " << IDE.trackID
+                                    << " Energy: " << IDE.energy
                                     << " XYZ: " << IDE.x << ", " << IDE.y << ", " << IDE.z
                                     << std::endl;
                           } // if PFBeamPrimTrueTrackID == IDE.trackID
@@ -3378,10 +3412,12 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
             } // for cRangeIt
           } // if Plane is fCaloPlane
         } // for pfTrackCalo
+        std::cout << "Final Calos in Tree:\n";
         if(PFBeamPrimZs.size()>1)
         {
           if(PFBeamPrimZs.front() > PFBeamPrimZs.back())
           {
+            std::cout << "Calorimetry was backwards so reversing!\n";
             std::reverse(PFBeamPrimXs.begin(),PFBeamPrimXs.end());
             std::reverse(PFBeamPrimYs.begin(),PFBeamPrimYs.end());
             std::reverse(PFBeamPrimZs.begin(),PFBeamPrimZs.end());
@@ -3402,13 +3438,13 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
               PFBeamPrimKinInteract = thisKin;
               PFBeamPrimKinInteractProton = thisKinProton;
               intE += PFBeamPrimdEdxs.at(iCaloHit)*PFBeamPrimPitches.at(iCaloHit);
-              //std::cout << "Calo i: " << iCaloHit
-              //          << "    z: " << PFBeamPrimZs.at(iCaloHit) 
-              //          << "    res range: " << PFBeamPrimResRanges.at(iCaloHit)
-              //          << "    dEdx: " << PFBeamPrimdEdxs.at(iCaloHit)
-              //          << "    pitch: " << PFBeamPrimPitches.at(iCaloHit)
-              //          << "    Kin: " << PFBeamPrimKins.at(iCaloHit)
-              //          << std::endl;
+              std::cout << "Calo i: " << iCaloHit
+                        << "    z: " << PFBeamPrimZs.at(iCaloHit) 
+                        << "    res range: " << PFBeamPrimResRanges.at(iCaloHit)
+                        << "    dEdx: " << PFBeamPrimdEdxs.at(iCaloHit)
+                        << "    pitch: " << PFBeamPrimPitches.at(iCaloHit)
+                        << "    Kin: " << PFBeamPrimKins.at(iCaloHit)
+                        << std::endl;
           }
         }
 
