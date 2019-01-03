@@ -3,6 +3,8 @@
 
 process_name: PiAbsSelectorCaloHack
 
+services.TFileService.fileName: "PiAbsSelector.root"
+
 physics.analyzers.PiAbsSelector: @local::piabsselector
 
 #physics.reco: [ pmtrackcalo, pandoracalo ]

@@ -414,17 +414,31 @@ private:
 
   std::vector<UInt_t> zWireChannel;
   std::vector<float> zWireWireZ;
-  
-  std::vector<float> zWireNumElectrons;
-  std::vector<float> zWireEnergy;
+
+  std::vector<UInt_t> zWireNHits;
+  std::vector<float> zWireResRange;
+  std::vector<float> zWiredEdx;
+  std::vector<float> zWirePitch;
   std::vector<float> zWireX;
   std::vector<float> zWireY;
   std::vector<float> zWireZ;
-  std::vector<float> zWireTDC;
-  std::vector<float> zWireTrajDistance;
-  std::vector<float> zWireTrajKin;
   std::vector<float> zWirePartKin;
+  std::vector<float> zWirePartKinProton;
   Float_t zWireEnergySum;
+  
+  std::vector<float> zWireTrueNumElectrons;
+  std::vector<float> zWireTrueEnergy;
+  std::vector<float> zWireTrueX;
+  std::vector<float> zWireTrueY;
+  std::vector<float> zWireTrueZ;
+  std::vector<float> zWireTruedZ;
+  std::vector<float> zWireTruedR;
+  std::vector<float> zWireTrueTDC;
+  std::vector<float> zWireTrueTrajDistance;
+  std::vector<float> zWireTrueTrajPitch;
+  std::vector<float> zWireTrueTrajKin;
+  std::vector<float> zWireTruePartKin;
+  Float_t zWireTrueEnergySum;
 
   UInt_t nTracks;
   UInt_t nTracksInFirstZ[MAXZINT]; // the number of tracks with a space point in (0,i) cm where i is the index
@@ -624,6 +638,7 @@ private:
   std::vector<float> PFBeamPrimXs;
   std::vector<float> PFBeamPrimYs;
   std::vector<float> PFBeamPrimZs;
+  std::vector<Int_t> PFBeamPrimZWires;
   std::vector<float> PFBeamPrimKins;
   std::vector<float> PFBeamPrimKinsProton;
   float PFBeamPrimKinInteract;
@@ -1393,6 +1408,7 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("PFBeamPrimXs",&PFBeamPrimXs);
   tree->Branch("PFBeamPrimYs",&PFBeamPrimYs);
   tree->Branch("PFBeamPrimZs",&PFBeamPrimZs);
+  tree->Branch("PFBeamPrimZWires",&PFBeamPrimZWires);
   tree->Branch("PFBeamPrimKins",&PFBeamPrimKins);
   tree->Branch("PFBeamPrimKinsProton",&PFBeamPrimKinsProton);
   tree->Branch("PFBeamPrimKinInteract",&PFBeamPrimKinInteract,"PFBeamPrimKinInteract/F");
@@ -1475,29 +1491,56 @@ void lana::PionAbsSelector::beginJob()
   }// for tpcid
 
   // The size is the number of wires
-  zWireNumElectrons.resize(iZWire);
-  zWireEnergy.resize(iZWire);
+  zWireTrueNumElectrons.resize(iZWire);
+  zWireTrueEnergy.resize(iZWire);
+  zWireTrueX.resize(iZWire);
+  zWireTrueY.resize(iZWire);
+  zWireTrueZ.resize(iZWire);
+  zWireTruedZ.resize(iZWire);
+  zWireTruedR.resize(iZWire);
+  zWireTrueTrajDistance.resize(iZWire);
+  zWireTrueTrajPitch.resize(iZWire);
+  zWireTrueTrajKin.resize(iZWire);
+  zWireTrueTDC.resize(iZWire);
+  zWireTruePartKin.resize(iZWire);
+
+  zWireNHits.resize(iZWire);
+  zWireResRange.resize(iZWire);
+  zWiredEdx.resize(iZWire);
+  zWirePitch.resize(iZWire);
   zWireX.resize(iZWire);
   zWireY.resize(iZWire);
   zWireZ.resize(iZWire);
-  zWireTrajDistance.resize(iZWire);
-  zWireTrajKin.resize(iZWire);
-  zWireTDC.resize(iZWire);
   zWirePartKin.resize(iZWire);
+  zWirePartKinProton.resize(iZWire);
 
   tree->Branch("zWireChannel",&zWireChannel);
   tree->Branch("zWireWireZ",&zWireWireZ);
 
-  tree->Branch("zWireNumElectrons",&zWireNumElectrons);
-  tree->Branch("zWireEnergy",&zWireEnergy);
+  tree->Branch("zWireNHits",&zWireNHits);
+  tree->Branch("zWireResRange",&zWireResRange);
+  tree->Branch("zWiredEdx",&zWiredEdx);
+  tree->Branch("zWirePitch",&zWirePitch);
   tree->Branch("zWireX",&zWireX);
   tree->Branch("zWireY",&zWireY);
   tree->Branch("zWireZ",&zWireZ);
-  tree->Branch("zWireTrajDistance",&zWireTrajDistance);
-  tree->Branch("zWireTrajKin",&zWireTrajKin);
-  tree->Branch("zWireTDC",&zWireTDC);
   tree->Branch("zWirePartKin",&zWirePartKin);
-  tree->Branch("zWireEnergySum",&zWireEnergySum,"zWireEnergySum/F");
+  tree->Branch("zWirePartKinProton",&zWirePartKinProton);
+  tree->Branch("zWireTrueEnergySum",&zWireEnergySum,"zWireEnergySum/F");
+
+  tree->Branch("zWireTrueNumElectrons",&zWireTrueNumElectrons);
+  tree->Branch("zWireTrueEnergy",&zWireTrueEnergy);
+  tree->Branch("zWireTrueX",&zWireTrueX);
+  tree->Branch("zWireTrueY",&zWireTrueY);
+  tree->Branch("zWireTrueZ",&zWireTrueZ);
+  tree->Branch("zWireTruedZ",&zWireTruedZ);
+  tree->Branch("zWireTruedR",&zWireTruedR);
+  tree->Branch("zWireTrueTrajDistance",&zWireTrueTrajDistance);
+  tree->Branch("zWireTrueTrajPitch",&zWireTrueTrajPitch);
+  tree->Branch("zWireTrueTrajKin",&zWireTrueTrajKin);
+  tree->Branch("zWireTrueTDC",&zWireTrueTDC);
+  tree->Branch("zWireTruePartKin",&zWireTruePartKin);
+  tree->Branch("zWireTrueEnergySum",&zWireTrueEnergySum,"zWireTrueEnergySum/F");
 }
 
 void lana::PionAbsSelector::beginRun(art::Run const & r)
@@ -1873,19 +1916,33 @@ void lana::PionAbsSelector::ResetTreeVars()
   }
   simIDEEnergySum = DEFAULTNEG;
 
-  for(size_t iWire=0; iWire < zWireNumElectrons.size(); iWire++)
+  for(size_t iWire=0; iWire < zWireTrueNumElectrons.size(); iWire++)
   {
-    zWireNumElectrons.at(iWire) = 0.;
-    zWireEnergy.at(iWire) = 0.;
+    zWireNHits.at(iWire) = 0;
+    zWireResRange.at(iWire) = DEFAULTNEG;
+    zWiredEdx.at(iWire) = DEFAULTNEG;
+    zWirePitch.at(iWire) = DEFAULTNEG;
     zWireX.at(iWire) = DEFAULTNEG;
     zWireY.at(iWire) = DEFAULTNEG;
     zWireZ.at(iWire) = DEFAULTNEG;
-    zWireTrajDistance.at(iWire) = DEFAULTNEG;
-    zWireTrajKin.at(iWire) = DEFAULTNEG;
-    zWireTDC.at(iWire) = DEFAULTNEG;
-    zWirePartKin.at(iWire) = DEFAULTNEG;
+    zWirePartKin.at(iWire) = 0.;
+    zWirePartKinProton.at(iWire) = 0.;
+
+    zWireTrueNumElectrons.at(iWire) = 0.;
+    zWireTrueEnergy.at(iWire) = 0.;
+    zWireTrueX.at(iWire) = DEFAULTNEG;
+    zWireTrueY.at(iWire) = DEFAULTNEG;
+    zWireTrueZ.at(iWire) = DEFAULTNEG;
+    zWireTruedZ.at(iWire) = DEFAULTNEG;
+    zWireTruedR.at(iWire) = DEFAULTNEG;
+    zWireTrueTrajDistance.at(iWire) = DEFAULTNEG;
+    zWireTrueTrajPitch.at(iWire) = DEFAULTNEG;
+    zWireTrueTrajKin.at(iWire) = DEFAULTNEG;
+    zWireTrueTDC.at(iWire) = DEFAULTNEG;
+    zWireTruePartKin.at(iWire) = DEFAULTNEG;
   }
   zWireEnergySum = DEFAULTNEG;
+  zWireTrueEnergySum = DEFAULTNEG;
 
   nTracks = 0;
   for(size_t z=0; z < MAXZINT; z++)
@@ -2091,6 +2148,7 @@ void lana::PionAbsSelector::ResetTreeVars()
   PFBeamPrimXs.clear();
   PFBeamPrimYs.clear();
   PFBeamPrimZs.clear();
+  PFBeamPrimZWires.clear();
   PFBeamPrimKins.clear();
   PFBeamPrimKinsProton.clear();
   PFBeamPrimKinInteract = DEFAULTNEG;
@@ -2130,6 +2188,8 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
         const pdana::MCBeamOrCosmicAlg * const beamOrCosmic, 
         const art::Event& e) // returns primary particle candidate
 {
+  art::ServiceHandle<geo::Geometry> geom;
+
   //Get MCParticle Variables and find MCC11 primaryParticleCandidates
   std::vector<art::Ptr<simb::MCParticle> > primaryParticleCandidates;
   std::vector<size_t> primaryParticleCandidateIs;
@@ -2523,31 +2583,44 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
       TLorentzVector interpolatedMom;
       double distToTraj;
       trajInterpAlg.pointOfClosestApproach(primaryParticle->Trajectory(),TVector3(ide.x,ide.y,ide.z),distToTraj,interpolatedMom);
+      const float interpPitch = geom->WirePitch(geo::kZ)/cos(interpolatedMom.Theta());
       simIDETrajDistance[nIDEs] = distToTraj;
       simIDETrajKin[nIDEs] = (interpolatedMom.Vect().Mag() - interpolatedMom.M())*1000.;
       if(myChannelToWireMap.count(channel) > 0)
       {
         simIDEWireZ[nIDEs] = myChannelToWireMap[channel].second;
         const auto& iZWire = myChannelToWireMap[channel].first;
-        zWireNumElectrons.at(iZWire) = ide.numElectrons;
-        zWireEnergy.at(iZWire) = ide.energy;
-        zWireX.at(iZWire) = ide.x;
-        zWireY.at(iZWire) = ide.y;
-        zWireZ.at(iZWire) = ide.z;
-        zWireTDC.at(iZWire) = tdc;
-        zWireTrajDistance.at(iZWire) = simIDETrajDistance[nIDEs];
-        zWireTrajKin.at(iZWire) = simIDETrajKin[nIDEs];
+        zWireTrueNumElectrons.at(iZWire) = ide.numElectrons;
+        zWireTrueEnergy.at(iZWire) = ide.energy;
+        zWireTrueX.at(iZWire) = ide.x;
+        zWireTrueY.at(iZWire) = ide.y;
+        zWireTrueZ.at(iZWire) = ide.z;
+        zWireTrueTDC.at(iZWire) = tdc;
+        zWireTrueTrajDistance.at(iZWire) = simIDETrajDistance[nIDEs];
+        zWireTrueTrajKin.at(iZWire) = simIDETrajKin[nIDEs];
+        zWireTrueTrajPitch.at(iZWire) = interpPitch;
       }
       //std::cout << "primaryParticle IDE z: " << ide.z <<"  energy: "<<ide.energy<<"  Esum: "<<simIDEEnergySum<<"  trueKinFront: "<<trueKinFrontTPC<<"  part kin: " <<simIDEPartKin[nIDEs]<<std::endl;
       nIDEs++;
     } // for ide
 
     // now z-wire kin energy
-    zWireEnergySum = 0.;
-    for (size_t iZWire=0; iZWire < zWireEnergy.size(); iZWire++)
+    zWireTrueEnergySum = 0.;
+    for (size_t iZWire=0; iZWire < zWireTrueEnergy.size(); iZWire++)
     {
-      zWirePartKin.at(iZWire) = trueKinFrontTPC - simIDEEnergySum;
-      zWireEnergySum += zWireEnergy.at(iZWire);
+      zWireTruePartKin.at(iZWire) = trueKinFrontTPC - simIDEEnergySum;
+      if(zWireTrueEnergy.at(iZWire) >= 0.)
+      {
+        zWireTrueEnergySum += zWireTrueEnergy.at(iZWire);
+      }
+      if(iZWire > 0 && iZWire < (zWireTrueZ.size() -1) && zWireTrueZ.at(iZWire) > -1000. && zWireTrueZ.at(iZWire-1) > -1000.  && zWireTrueZ.at(iZWire+1) > -1000.)
+      {
+        const recob::Track::Point_t thisPoint(zWireTrueX.at(iZWire),zWireTrueY.at(iZWire),zWireTrueZ.at(iZWire));
+        const recob::Track::Point_t prevPoint(zWireTrueX.at(iZWire-1),zWireTrueY.at(iZWire-1),zWireTrueZ.at(iZWire-1));
+        const recob::Track::Point_t nextPoint(zWireTrueX.at(iZWire+1),zWireTrueY.at(iZWire+1),zWireTrueZ.at(iZWire+1));
+        zWireTruedR.at(iZWire) = ((nextPoint-thisPoint).R()+(thisPoint-prevPoint).R())*0.5;
+        zWireTruedZ.at(iZWire) = (fabs(nextPoint.Z()-thisPoint.Z())+fabs(thisPoint.Z()-prevPoint.Z()))*0.5;
+      }
     } // for iZWire
 
   } // if primaryParticle
@@ -3352,6 +3425,7 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
               PFBeamPrimXs.push_back(thisPoint.X());
               PFBeamPrimYs.push_back(thisPoint.Y());
               PFBeamPrimZs.push_back(thisPoint.Z());
+              int iZWire = DEFAULTNEG;
 
               if(cRangeIt < pfTrackCalo->TpIndices().size()) 
               {
@@ -3383,6 +3457,17 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
                     << " peak time: " << thisHit->PeakTime()
                     << " time RMS: " << thisHit->RMS()
                     << std::endl;
+                if(myChannelToWireMap.count(thisHitChan) > 0)
+                {
+                  iZWire = myChannelToWireMap[thisHitChan].first;
+                  zWireNHits.at(iZWire)++;
+                  zWireResRange.at(iZWire) = pfTrackCalo->ResidualRange().at(cRangeIt);
+                  zWiredEdx.at(iZWire) = pfTrackCalo->dEdx().at(cRangeIt);
+                  zWirePitch.at(iZWire) = pfTrackCalo->TrkPitchVec().at(cRangeIt);
+                  zWireX.at(iZWire) = thisPoint.X();
+                  zWireY.at(iZWire) = thisPoint.Y();
+                  zWireZ.at(iZWire) = thisPoint.Z();
+                }
                 if(isMC)
                 {
                   for(const auto& simChan: simChanVec)
@@ -3409,6 +3494,7 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
                   } // for simChan
                 } // isMC
               } // if cRangeIt < TpIndices.size()
+              PFBeamPrimZWires.push_back(iZWire);
             } // for cRangeIt
           } // if Plane is fCaloPlane
         } // for pfTrackCalo
@@ -3424,8 +3510,7 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
             std::reverse(PFBeamPrimResRanges.begin(),PFBeamPrimResRanges.end());
             std::reverse(PFBeamPrimdEdxs.begin(),PFBeamPrimdEdxs.end());
             std::reverse(PFBeamPrimPitches.begin(),PFBeamPrimPitches.end());
-            std::reverse(PFBeamPrimZs.begin(),PFBeamPrimZs.end());
-            std::reverse(PFBeamPrimZs.begin(),PFBeamPrimZs.end());
+            std::reverse(PFBeamPrimZWires.begin(),PFBeamPrimZWires.end());
           }
 
           double intE = 0.;
@@ -3439,6 +3524,7 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
               PFBeamPrimKinInteractProton = thisKinProton;
               intE += PFBeamPrimdEdxs.at(iCaloHit)*PFBeamPrimPitches.at(iCaloHit);
               std::cout << "Calo i: " << iCaloHit
+                        << "    iZWire: " << PFBeamPrimZWires.at(iCaloHit) 
                         << "    z: " << PFBeamPrimZs.at(iCaloHit) 
                         << "    res range: " << PFBeamPrimResRanges.at(iCaloHit)
                         << "    dEdx: " << PFBeamPrimdEdxs.at(iCaloHit)
@@ -3447,7 +3533,17 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
                         << std::endl;
           }
         }
-
+        // now z-wire kin energy
+        zWireEnergySum = 0.;
+        for (size_t iZWire=0; iZWire < zWiredEdx.size(); iZWire++)
+        {
+          zWirePartKin.at(iZWire) = kinWCInTPC - zWireEnergySum;
+          zWirePartKinProton.at(iZWire) = kinWCInTPCProton - zWireEnergySum;
+          if(zWiredEdx.at(iZWire) >= 0.)
+          {
+            zWireEnergySum += zWiredEdx.at(iZWire) * zWirePitch.at(iZWire);
+          }
+        } // for iZWire
       } // if pfTrack
     } // if isPFParticleTracklike
     if(isPFParticleShowerlike)
