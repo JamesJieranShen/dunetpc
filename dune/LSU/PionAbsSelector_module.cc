@@ -2613,13 +2613,15 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
       {
         zWireTrueEnergySum += zWireTrueEnergy.at(iZWire);
       }
-      if(iZWire > 0 && iZWire < (zWireTrueZ.size() -1) && zWireTrueZ.at(iZWire) > -1000. && zWireTrueZ.at(iZWire-1) > -1000.  && zWireTrueZ.at(iZWire+1) > -1000.)
+      if(iZWire < (zWireTrueZ.size() -1) && zWireTrueZ.at(iZWire) > -1000. && zWireTrueZ.at(iZWire+1) > -1000.)
       {
         const recob::Track::Point_t thisPoint(zWireTrueX.at(iZWire),zWireTrueY.at(iZWire),zWireTrueZ.at(iZWire));
-        const recob::Track::Point_t prevPoint(zWireTrueX.at(iZWire-1),zWireTrueY.at(iZWire-1),zWireTrueZ.at(iZWire-1));
         const recob::Track::Point_t nextPoint(zWireTrueX.at(iZWire+1),zWireTrueY.at(iZWire+1),zWireTrueZ.at(iZWire+1));
-        zWireTruedR.at(iZWire) = ((nextPoint-thisPoint).R()+(thisPoint-prevPoint).R())*0.5;
-        zWireTruedZ.at(iZWire) = (fabs(nextPoint.Z()-thisPoint.Z())+fabs(thisPoint.Z()-prevPoint.Z()))*0.5;
+        const auto& dZ = nextPoint.Z()-thisPoint.Z();
+        zWireTruedZ.at(iZWire) = dZ;
+        auto&& dR = (nextPoint-thisPoint).R();
+        if(dZ < 0.) dR *= -1.;
+        zWireTruedR.at(iZWire) = dR;
       }
     } // for iZWire
 
@@ -3430,8 +3432,6 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
               if(cRangeIt < pfTrackCalo->TpIndices().size()) 
               {
                 const size_t& tpIndex = pfTrackCalo->TpIndices().at(cRangeIt);
-                const auto& flagsAtPoint = pfTrackTraj.FlagsAtPoint(tpIndex);
-                const auto& locationAtPoint = pfTrackTraj.LocationAtPoint(tpIndex);
                 //const auto& directionAtPoint = pfTrackTraj.DirectionAtPoint(tpIndex);
                 auto thisHit = pfTrackHits.at(tpIndex);
                 if(tpIndexToHitMap.size() > 0 && tpIndexToHitMap.count(tpIndex) > 0)
@@ -3439,24 +3439,24 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
                   thisHit = tpIndexToHitMap.at(tpIndex);
                 }
                 const auto& thisHitChan = thisHit->Channel();
-                const auto& thisHitWireID = thisHit->WireID();
-                const auto& thisHitWire = geom->Wire(thisHitWireID);
-                std::cout << "calo i: " << cRangeIt 
-                            << " TpIndex: "<< tpIndex
-                            << " TrajFlags: " << flagsAtPoint
-                            << std::endl;
-                std::cout << "    calo XYZ: "
-                    << thisPoint.X() << ", " << thisPoint.Y() << ", " << thisPoint.Z()
-                    << std::endl;
-                std::cout << "    traj XYZ: "
-                    << locationAtPoint.X() << ", " << locationAtPoint.Y() << ", " << locationAtPoint.Z()
-                    << std::endl;
-                std::cout << "    Hit channel: " << thisHit->Channel() 
-                    << " wire: " << thisHitWireID
-                    << " wire Z: " << thisHitWire.GetCenter().Z()
-                    << " peak time: " << thisHit->PeakTime()
-                    << " time RMS: " << thisHit->RMS()
-                    << std::endl;
+                //const auto& thisHitWireID = thisHit->WireID();
+                //const auto& thisHitWire = geom->Wire(thisHitWireID);
+                //const auto& locationAtPoint = pfTrackTraj.LocationAtPoint(tpIndex);
+                //std::cout << "calo i: " << cRangeIt 
+                //            << " TpIndex: "<< tpIndex
+                //            << std::endl;
+                //std::cout << "    calo XYZ: "
+                //    << thisPoint.X() << ", " << thisPoint.Y() << ", " << thisPoint.Z()
+                //    << std::endl;
+                //std::cout << "    traj XYZ: "
+                //    << locationAtPoint.X() << ", " << locationAtPoint.Y() << ", " << locationAtPoint.Z()
+                //    << std::endl;
+                //std::cout << "    Hit channel: " << thisHit->Channel() 
+                //    << " wire: " << thisHitWireID
+                //    << " wire Z: " << thisHitWire.GetCenter().Z()
+                //    << " peak time: " << thisHit->PeakTime()
+                //    << " time RMS: " << thisHit->RMS()
+                //    << std::endl;
                 if(myChannelToWireMap.count(thisHitChan) > 0)
                 {
                   iZWire = myChannelToWireMap[thisHitChan].first;
@@ -3468,7 +3468,7 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
                   zWireY.at(iZWire) = thisPoint.Y();
                   zWireZ.at(iZWire) = thisPoint.Z();
                 }
-                if(isMC)
+                if(isMC && false)
                 {
                   for(const auto& simChan: simChanVec)
                   {
@@ -3498,7 +3498,7 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
             } // for cRangeIt
           } // if Plane is fCaloPlane
         } // for pfTrackCalo
-        std::cout << "Final Calos in Tree:\n";
+        //std::cout << "Final Calos in Tree:\n";
         if(PFBeamPrimZs.size()>1)
         {
           if(PFBeamPrimZs.front() > PFBeamPrimZs.back())
@@ -3523,14 +3523,14 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
               PFBeamPrimKinInteract = thisKin;
               PFBeamPrimKinInteractProton = thisKinProton;
               intE += PFBeamPrimdEdxs.at(iCaloHit)*PFBeamPrimPitches.at(iCaloHit);
-              std::cout << "Calo i: " << iCaloHit
-                        << "    iZWire: " << PFBeamPrimZWires.at(iCaloHit) 
-                        << "    z: " << PFBeamPrimZs.at(iCaloHit) 
-                        << "    res range: " << PFBeamPrimResRanges.at(iCaloHit)
-                        << "    dEdx: " << PFBeamPrimdEdxs.at(iCaloHit)
-                        << "    pitch: " << PFBeamPrimPitches.at(iCaloHit)
-                        << "    Kin: " << PFBeamPrimKins.at(iCaloHit)
-                        << std::endl;
+              //std::cout << "Calo i: " << iCaloHit
+              //          << "    iZWire: " << PFBeamPrimZWires.at(iCaloHit) 
+              //          << "    z: " << PFBeamPrimZs.at(iCaloHit) 
+              //          << "    res range: " << PFBeamPrimResRanges.at(iCaloHit)
+              //          << "    dEdx: " << PFBeamPrimdEdxs.at(iCaloHit)
+              //          << "    pitch: " << PFBeamPrimPitches.at(iCaloHit)
+              //          << "    Kin: " << PFBeamPrimKins.at(iCaloHit)
+              //          << std::endl;
           }
         }
         // now z-wire kin energy
