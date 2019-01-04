@@ -1925,11 +1925,11 @@ void lana::PionAbsSelector::ResetTreeVars()
     zWireX.at(iWire) = DEFAULTNEG;
     zWireY.at(iWire) = DEFAULTNEG;
     zWireZ.at(iWire) = DEFAULTNEG;
-    zWirePartKin.at(iWire) = 0.;
-    zWirePartKinProton.at(iWire) = 0.;
+    zWirePartKin.at(iWire) = DEFAULTNEG;
+    zWirePartKinProton.at(iWire) = DEFAULTNEG;
 
     zWireTrueNumElectrons.at(iWire) = 0.;
-    zWireTrueEnergy.at(iWire) = 0.;
+    zWireTrueEnergy.at(iWire) = DEFAULTNEG;
     zWireTrueX.at(iWire) = DEFAULTNEG;
     zWireTrueY.at(iWire) = DEFAULTNEG;
     zWireTrueZ.at(iWire) = DEFAULTNEG;
@@ -2606,14 +2606,19 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
 
     // now z-wire kin energy
     zWireTrueEnergySum = 0.;
-    for (size_t iZWire=0; iZWire < zWireTrueEnergy.size(); iZWire++)
+    long lastWire = -1;
+    for (long iZWire=0; iZWire < (long) zWireTrueEnergy.size(); iZWire++)
     {
-      zWireTruePartKin.at(iZWire) = trueKinFrontTPC - simIDEEnergySum;
+      if(zWireTrueEnergy.at(iZWire) >= 0.) lastWire = iZWire;
+    }
+    for (long iZWire=0; iZWire <= lastWire; iZWire++)
+    {
+      zWireTruePartKin.at(iZWire) = trueKinFrontTPC - zWireTrueEnergySum;
       if(zWireTrueEnergy.at(iZWire) >= 0.)
       {
         zWireTrueEnergySum += zWireTrueEnergy.at(iZWire);
       }
-      if(iZWire < (zWireTrueZ.size() -1) && zWireTrueZ.at(iZWire) > -1000. && zWireTrueZ.at(iZWire+1) > -1000.)
+      if(iZWire < ((long) zWireTrueZ.size() -1) && zWireTrueZ.at(iZWire) > -1000. && zWireTrueZ.at(iZWire+1) > -1000.)
       {
         const recob::Track::Point_t thisPoint(zWireTrueX.at(iZWire),zWireTrueY.at(iZWire),zWireTrueZ.at(iZWire));
         const recob::Track::Point_t nextPoint(zWireTrueX.at(iZWire+1),zWireTrueY.at(iZWire+1),zWireTrueZ.at(iZWire+1));
@@ -3535,7 +3540,12 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
         }
         // now z-wire kin energy
         zWireEnergySum = 0.;
-        for (size_t iZWire=0; iZWire < zWiredEdx.size(); iZWire++)
+        int lastZWire = -1;
+        for (long iZWire=0; iZWire < (long) zWiredEdx.size(); iZWire++)
+        {
+          if(zWiredEdx.at(iZWire) >= 0.) lastZWire = iZWire;
+        }
+        for (long iZWire=0; iZWire <= lastZWire; iZWire++)
         {
           zWirePartKin.at(iZWire) = kinWCInTPC - zWireEnergySum;
           zWirePartKinProton.at(iZWire) = kinWCInTPCProton - zWireEnergySum;
