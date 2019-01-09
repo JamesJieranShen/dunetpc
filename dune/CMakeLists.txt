@@ -11,7 +11,7 @@ add_subdirectory(Utilities)
 add_subdirectory(Simulation)
 add_subdirectory(LArG4)
 add_subdirectory(PhotonPropagation)
-add_subdirectory(OpticalDetector)  
+add_subdirectory(OpticalDetector)
 add_subdirectory(DetSim)
 add_subdirectory(DetectorVariations)
 add_subdirectory(EventGenerator)
@@ -57,6 +57,8 @@ add_subdirectory(CAFMaker)
 add_subdirectory(LSU)
 add_subdirectory(RegCVN)
 add_subdirectory(Iceberg)
+add_subdirectory(DUNEWireCell)
+
 
 # Respect the order specified in lar_build, which is:
 #
@@ -89,7 +91,7 @@ add_subdirectory(Iceberg)
 #     "larreco_EventFinder",
 #     "larsim_TriggerAlgo",
 #     "larana_OpticalDetector",
-#     "larreco_Calorimetry", 
+#     "larreco_Calorimetry",
 #     "larreco_ShowerFinder",
 #     "lareventdisplay_EventDisplay",
 #     "larana_ParticleIdentification",
