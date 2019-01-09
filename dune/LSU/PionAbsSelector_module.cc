@@ -1526,7 +1526,7 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("zWireZ",&zWireZ);
   tree->Branch("zWirePartKin",&zWirePartKin);
   tree->Branch("zWirePartKinProton",&zWirePartKinProton);
-  tree->Branch("zWireTrueEnergySum",&zWireEnergySum,"zWireEnergySum/F");
+  tree->Branch("zWireEnergySum",&zWireEnergySum,"zWireEnergySum/F");
 
   tree->Branch("zWireTrueNumElectrons",&zWireTrueNumElectrons);
   tree->Branch("zWireTrueEnergy",&zWireTrueEnergy);
