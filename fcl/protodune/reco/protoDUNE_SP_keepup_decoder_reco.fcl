@@ -32,6 +32,7 @@ services:
     TimeTracker:       {}
     MemoryTracker:     {}
     RandomNumberGenerator: {} 
+    DetectorPropertiesService: @local::protodunesp_detproperties
     @table::protodune_rawdecoding_services
     FileCatalogMetadata:  @local::art_file_catalog_data
                           @table::protodune_reco_services
@@ -274,3 +275,5 @@ physics.producers.pandoracalipid.TrackModuleLabel:              "pandoraTrack"
 #Optical detector configuration
 physics.producers.ophit.InputModule:                        "opdigi"
 physics.producers.opflash.InputModule:                      "ophit"
+
+services.DetectorPropertiesService: @local::protodunesp_detproperties
