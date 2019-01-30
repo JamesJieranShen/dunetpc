@@ -1082,9 +1082,10 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("pWC",&pWC,"pWC/F");
   tree->Branch("eWC",&eWC,"eWC/F");
   tree->Branch("kinWC",&kinWC,"kinWC/F");
-  //tree->Branch("kinWCInTPC",&kinWCInTPC,"kinWCInTPC/F");
-  //tree->Branch("eWCProton",&eWCProton,"eWCProton/F");
-  //tree->Branch("kinWCProton",&kinWCProton,"kinWCProton/F");
+  tree->Branch("kinWCInTPC",&kinWCInTPC,"kinWCInTPC/F");
+  tree->Branch("eWCProton",&eWCProton,"eWCProton/F");
+  tree->Branch("kinWCProton",&kinWCProton,"kinWCProton/F");
+  tree->Branch("kinWCInTPCProton",&kinWCInTPCProton,"kinWCInTPCProton/F");
   //tree->Branch("yKinkWC",&yKinkWC,"yKinkWC/F");
   //tree->Branch("nHitsWC",&nHitsWC,"nHitsWC/i");
   //tree->Branch("xWC4Hit",&xWC4Hit,"xWC4Hit/F");
