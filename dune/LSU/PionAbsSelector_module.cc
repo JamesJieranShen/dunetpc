@@ -73,7 +73,7 @@ const auto MAXBEAMTRACKS = 300;
 const auto MAXBEAMMOMS = 300;
 const auto MAXIDES = 20000;
 const auto MAXPFSECTRKS = 25;
-const auto MAXPFSECSHWRS = 25;
+//const auto MAXPFSECSHWRS = 25;
 const auto MAXZINT = 95;
 const auto MAXLINT = 20;
 const auto NTOFCHANS = 4;
@@ -1815,7 +1815,7 @@ void lana::PionAbsSelector::ResetTreeVars()
   triggerBits = 0;
   for(size_t k=0; k < 6; k++)
   {
-    nGoodFEMBs[6] = DEFAULTNEG;
+    nGoodFEMBs[k] = DEFAULTNEG;
   }
 
   CKov0Status = DEFAULTNEG;
@@ -2547,7 +2547,8 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
     size_t iClosestTrajPointToFrontTPC;
     TLorentzVector momAtFrontTPC;
     double trueTrajPointFrontTPCDistDbl;
-    const auto& closestTrajPointToFrontTPC = trajInterpAlg.pointClosestToPlane(primaryParticle->Trajectory(),ZSTARTOFTPC,momAtFrontTPC,iClosestTrajPointToFrontTPC,trueTrajPointFrontTPCDistDbl);
+    //const auto& closestTrajPointToFrontTPC = trajInterpAlg.pointClosestToPlane(primaryParticle->Trajectory(),ZSTARTOFTPC,momAtFrontTPC,iClosestTrajPointToFrontTPC,trueTrajPointFrontTPCDistDbl);
+    trajInterpAlg.pointClosestToPlane(primaryParticle->Trajectory(),ZSTARTOFTPC,momAtFrontTPC,iClosestTrajPointToFrontTPC,trueTrajPointFrontTPCDistDbl);
     trueTrajPointFrontTPCDist = trueTrajPointFrontTPCDistDbl;
     trueKinFrontTPC = 1000.*(momAtFrontTPC.E()-momAtFrontTPC.M()); // MeV
     //std::cout << "closest to front of TPC: iClosest: " << iClosestTrajPointToFrontTPC << " distance: " << trueTrajPointFrontTPCDist << " trueKinFrontTPC: " << trueKinFrontTPC << " z: " << closestTrajPointToFrontTPC.Z() << std::endl;
