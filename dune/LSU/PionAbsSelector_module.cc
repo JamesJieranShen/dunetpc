@@ -2260,26 +2260,32 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
   } // for true (mcPart)
 
   // Debugging printing of primaryParticleCandidates
-  for(const size_t & iMCPart: primaryParticleCandidateIs)
+  for(size_t iTruth=0; iTruth < primaryParticleCandidateIs.size(); iTruth++)
   {
+    const auto & iMCPart = primaryParticleCandidateIs[iTruth];
+    const auto & mcPart = primaryParticleCandidates[iTruth];
+    const auto &  trueSecondToEndMomVec4 = lsu::toVector4(std::prev(std::prev(mcPart->Trajectory().end()))->second);
+    const auto & trueSecondToEndMom = trueSecondToEndMomVec4.R()*1000.; // in MeV/c
     std::cout << "PrimaryParticle Candidate for: "<< eventNumber <<"\n"
-              << "  iMCPart:   " << iMCPart << "\n"
-              << "  TrackID:   " << mcPartTrackID[iMCPart] << "\n"
-              //<< "  IsPrimary: " << mcPartIsPrimary[iMCPart] << "\n"
-              << "  PDG:       " << mcPartPDG[iMCPart] << "\n"
-              << "  StartX:    " << mcPartStartX[iMCPart] << "\n"
-              << "  StartY:    " << mcPartStartY[iMCPart] << "\n"
-              << "  StartZ:    " << mcPartStartZ[iMCPart] << "\n"
-              << "  StartT:    " << mcPartStartT[iMCPart] << "\n"
-              << "  EndX:      " << mcPartEndX[iMCPart] << "\n"
-              << "  EndY:      " << mcPartEndY[iMCPart] << "\n"
-              << "  EndZ:      " << mcPartEndZ[iMCPart] << "\n"
-              << "  StartMom:  " << mcPartStartMom[iMCPart] << "\n"
-              //<< "  EndMom:    " << mcPartEndMom[iMCPart] << "\n"
+              << "  iMCPart:     " << iMCPart << "\n"
+              << "  TrackID:     " << mcPartTrackID[iMCPart] << "\n"
+              //<< "  IsPrimary:   " << mcPartIsPrimary[iMCPart] << "\n"
+              << "  PDG:         " << mcPartPDG[iMCPart] << "\n"
+              << "  Process:     " << mcPart->Process() << "\n"
+              << "  EndProcess:  " << mcPart->EndProcess() << "\n"
+              << "  StartX:      " << mcPartStartX[iMCPart] << "\n"
+              << "  StartY:      " << mcPartStartY[iMCPart] << "\n"
+              << "  StartZ:      " << mcPartStartZ[iMCPart] << "\n"
+              << "  StartT:      " << mcPartStartT[iMCPart] << "\n"
+              << "  EndX:        " << mcPartEndX[iMCPart] << "\n"
+              << "  EndY:        " << mcPartEndY[iMCPart] << "\n"
+              << "  EndZ:        " << mcPartEndZ[iMCPart] << "\n"
+              << "  StartMom:    " << mcPartStartMom[iMCPart] << "\n"
+              << "  2ndToEndMom: " << trueSecondToEndMom << "\n"
               << "  StartTheta:  " << mcPartStartTheta[iMCPart]*180/CLHEP::pi << " deg\n"
-              << "  StartPhi:  " << mcPartStartPhi[iMCPart]*180/CLHEP::pi << " deg\n"
-              << "  XFrontTPC: " << mcPartXFrontTPC[iMCPart] << "\n"
-              << "  YFrontTPC: " << mcPartYFrontTPC[iMCPart] << "\n"
+              << "  StartPhi:    " << mcPartStartPhi[iMCPart]*180/CLHEP::pi << " deg\n"
+              << "  XFrontTPC:   " << mcPartXFrontTPC[iMCPart] << "\n"
+              << "  YFrontTPC:   " << mcPartYFrontTPC[iMCPart] << "\n"
               ;
     if(nBeamTracks >= MAXBEAMTRACKS)
     {
@@ -2441,6 +2447,8 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
 	   {trueEndProcess = 15;}
 	if(endProcessStr == "annihil") // positron
 	   {trueEndProcess = 16;}
+	if(endProcessStr == "FastScintillation") // just ionizes?
+	   {trueEndProcess = 17;}
     mf::LogInfo("PrimaryParticle") <<"process: "<<processStr <<", endProcess: "<< endProcessStr
                         <<", trueEndProcess: "<<trueEndProcess
                         <<", nDaughters: "<< trueNDaughters
@@ -2520,7 +2528,7 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
     {
       trueCategory = 10; // decay-in-flight
     }
-    else if (trueEndProcess == 14) // stopping
+    else if (trueEndProcess == 14 || trueEndProcess == 17) // stopping
     {
       if (trueNSecondaryMuons == 1)
       {
@@ -2535,6 +2543,8 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
     {
       trueCategory = 0; // unknown
     }
+
+    //std::cout << "trueEndProcess: " << trueEndProcess << " trueCategory: " << trueCategory << std::endl;
 
     const TVector3 particleFrontTPCPoint = lsu::mcPartStartZPlane(ZSTARTOFTPC,*primaryParticle);
     trueXFrontTPC = particleFrontTPCPoint.X();
