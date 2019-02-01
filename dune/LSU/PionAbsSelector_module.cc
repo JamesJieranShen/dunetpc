@@ -418,6 +418,7 @@ private:
   std::vector<UInt_t> zWireNHits;
   std::vector<float> zWireResRange;
   std::vector<float> zWiredEdx;
+  std::vector<float> zWiredQdx;
   std::vector<float> zWirePitch;
   std::vector<float> zWireX;
   std::vector<float> zWireY;
@@ -634,6 +635,7 @@ private:
 
   std::vector<float> PFBeamPrimResRanges;
   std::vector<float> PFBeamPrimdEdxs;
+  std::vector<float> PFBeamPrimdQdxs;
   std::vector<float> PFBeamPrimPitches;
   std::vector<float> PFBeamPrimXs;
   std::vector<float> PFBeamPrimYs;
@@ -1405,6 +1407,7 @@ void lana::PionAbsSelector::beginJob()
 
   tree->Branch("PFBeamPrimResRanges",&PFBeamPrimResRanges);
   tree->Branch("PFBeamPrimdEdxs",&PFBeamPrimdEdxs);
+  tree->Branch("PFBeamPrimdQdxs",&PFBeamPrimdQdxs);
   tree->Branch("PFBeamPrimPitches",&PFBeamPrimPitches);
   tree->Branch("PFBeamPrimXs",&PFBeamPrimXs);
   tree->Branch("PFBeamPrimYs",&PFBeamPrimYs);
@@ -1508,6 +1511,7 @@ void lana::PionAbsSelector::beginJob()
   zWireNHits.resize(iZWire);
   zWireResRange.resize(iZWire);
   zWiredEdx.resize(iZWire);
+  zWiredQdx.resize(iZWire);
   zWirePitch.resize(iZWire);
   zWireX.resize(iZWire);
   zWireY.resize(iZWire);
@@ -1521,6 +1525,7 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("zWireNHits",&zWireNHits);
   tree->Branch("zWireResRange",&zWireResRange);
   tree->Branch("zWiredEdx",&zWiredEdx);
+  tree->Branch("zWiredQdx",&zWiredQdx);
   tree->Branch("zWirePitch",&zWirePitch);
   tree->Branch("zWireX",&zWireX);
   tree->Branch("zWireY",&zWireY);
@@ -1922,6 +1927,7 @@ void lana::PionAbsSelector::ResetTreeVars()
     zWireNHits.at(iWire) = 0;
     zWireResRange.at(iWire) = DEFAULTNEG;
     zWiredEdx.at(iWire) = DEFAULTNEG;
+    zWiredQdx.at(iWire) = DEFAULTNEG;
     zWirePitch.at(iWire) = DEFAULTNEG;
     zWireX.at(iWire) = DEFAULTNEG;
     zWireY.at(iWire) = DEFAULTNEG;
@@ -2145,6 +2151,7 @@ void lana::PionAbsSelector::ResetTreeVars()
 
   PFBeamPrimResRanges.clear();
   PFBeamPrimdEdxs.clear();
+  PFBeamPrimdQdxs.clear();
   PFBeamPrimPitches.clear();
   PFBeamPrimXs.clear();
   PFBeamPrimYs.clear();
@@ -3438,6 +3445,7 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
             {
               PFBeamPrimResRanges.push_back(pfTrackCalo->ResidualRange().at(cRangeIt));
               PFBeamPrimdEdxs.push_back(pfTrackCalo->dEdx().at(cRangeIt));
+              PFBeamPrimdQdxs.push_back(pfTrackCalo->dQdx().at(cRangeIt));
               PFBeamPrimPitches.push_back(pfTrackCalo->TrkPitchVec().at(cRangeIt));
               const auto& thisPoint = pfTrackCalo->XYZ().at(cRangeIt); // PositionVector3D
 
@@ -3480,6 +3488,7 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
                   zWireNHits.at(iZWire)++;
                   zWireResRange.at(iZWire) = pfTrackCalo->ResidualRange().at(cRangeIt);
                   zWiredEdx.at(iZWire) = pfTrackCalo->dEdx().at(cRangeIt);
+                  zWiredQdx.at(iZWire) = pfTrackCalo->dQdx().at(cRangeIt);
                   zWirePitch.at(iZWire) = pfTrackCalo->TrkPitchVec().at(cRangeIt);
                   zWireX.at(iZWire) = thisPoint.X();
                   zWireY.at(iZWire) = thisPoint.Y();
@@ -3526,6 +3535,7 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
             std::reverse(PFBeamPrimZs.begin(),PFBeamPrimZs.end());
             std::reverse(PFBeamPrimResRanges.begin(),PFBeamPrimResRanges.end());
             std::reverse(PFBeamPrimdEdxs.begin(),PFBeamPrimdEdxs.end());
+            std::reverse(PFBeamPrimdQdxs.begin(),PFBeamPrimdQdxs.end());
             std::reverse(PFBeamPrimPitches.begin(),PFBeamPrimPitches.end());
             std::reverse(PFBeamPrimZWires.begin(),PFBeamPrimZWires.end());
           }
