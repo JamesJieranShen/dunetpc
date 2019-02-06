@@ -44,6 +44,7 @@
 #include "larpandora/LArPandoraInterface/LArPandoraHelper.h"
 #include "dunetpc/dune/DuneObj/ProtoDUNEBeamEvent.h"
 #include "larsim/MCCheater/BackTrackerService.h"
+#include "larreco/RecoAlg/TrackMomentumCalculator.h"
 
 //ROOT includes
 #include "TH1F.h"
@@ -78,6 +79,7 @@ const auto MAXZINT = 95;
 const auto MAXLINT = 20;
 const auto NTOFCHANS = 4;
 
+const auto MMUON = 105.6583745; // MeV/c^2
 const auto MCHARGEDPION = 139.57018; // MeV/c^2
 const auto MPROTON = 938.2720813; // MeV/c^2
 const auto KINLOSTBEFORETPC = 0.0; //MeV; from LArIAT pion total cross section group
@@ -629,6 +631,10 @@ private:
   float PFBeamPrimMaxAngleToSecTrks;
   float PFBeamPrimShwrLen;
   float PFBeamPrimShwrOpenAngle;
+  float PFBeamPrimCSDAMomMu;
+  float PFBeamPrimCSDAMomProton;
+  float PFBeamPrimCSDAKinMu;
+  float PFBeamPrimCSDAKinProton;
   float PFBeamPrimdEdxAverageLast3Hits;
   float PFBeamPrimdEdxAverageLast5Hits;
   float PFBeamPrimdEdxAverageLast7Hits;
@@ -1401,6 +1407,10 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("PFBeamPrimMaxAngleToSecTrks",&PFBeamPrimMaxAngleToSecTrks,"PFBeamPrimMaxAngleToSecTrks/F");
   tree->Branch("PFBeamPrimShwrLen",&PFBeamPrimShwrLen,"PFBeamPrimShwrLen/F");
   tree->Branch("PFBeamPrimShwrOpenAngle",&PFBeamPrimShwrOpenAngle,"PFBeamPrimShwrOpenAngle/F");
+  tree->Branch("PFBeamPrimCSDAMomMu",&PFBeamPrimCSDAMomMu,"PFBeamPrimCSDAMomMu/F");
+  tree->Branch("PFBeamPrimCSDAMomProton",&PFBeamPrimCSDAMomProton,"PFBeamPrimCSDAMomProton/F");
+  tree->Branch("PFBeamPrimCSDAKinMu",&PFBeamPrimCSDAKinMu,"PFBeamPrimCSDAKinMu/F");
+  tree->Branch("PFBeamPrimCSDAKinProton",&PFBeamPrimCSDAKinProton,"PFBeamPrimCSDAKinProton/F");
   tree->Branch("PFBeamPrimdEdxAverageLast3Hits",&PFBeamPrimdEdxAverageLast3Hits,"PFBeamPrimdEdxAverageLast3Hits/F");
   tree->Branch("PFBeamPrimdEdxAverageLast5Hits",&PFBeamPrimdEdxAverageLast5Hits,"PFBeamPrimdEdxAverageLast5Hits/F");
   tree->Branch("PFBeamPrimdEdxAverageLast7Hits",&PFBeamPrimdEdxAverageLast7Hits,"PFBeamPrimdEdxAverageLast7Hits/F");
@@ -2145,6 +2155,10 @@ void lana::PionAbsSelector::ResetTreeVars()
   PFBeamPrimMaxAngleToSecTrks = DEFAULTNEG;
   PFBeamPrimShwrLen = DEFAULTNEG;
   PFBeamPrimShwrOpenAngle = DEFAULTNEG;
+  PFBeamPrimCSDAMomMu = DEFAULTNEG;
+  PFBeamPrimCSDAMomProton = DEFAULTNEG;
+  PFBeamPrimCSDAKinMu = DEFAULTNEG;
+  PFBeamPrimCSDAKinProton = DEFAULTNEG;
   PFBeamPrimdEdxAverageLast3Hits = DEFAULTNEG;
   PFBeamPrimdEdxAverageLast5Hits = DEFAULTNEG;
   PFBeamPrimdEdxAverageLast7Hits = DEFAULTNEG;
@@ -3219,6 +3233,8 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
   //}
   //art::FindManyP<recob::Hit> fmHitsForPFShowers(allPFShowerHand, e, fPFShowerTag);
 
+  trkf::TrackMomentumCalculator trackMomCalc;
+
   PFNBeamSlices = pfFromBeamSlice.size();
   std::cout << "Number of primary beam PFParticles: " << PFNBeamSlices << std::endl;
   for(size_t iPF=0; iPF < PFNBeamSlices; iPF++)
@@ -3260,8 +3276,12 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
         {
           primEndValid = true;
           pfBeamPrimEnd = pfTrack->End();
-          PFBeamPrimTrkLen = pfTrack->Length();
           pfBeamPrimEndDir = pfTrack->EndDirection();
+          PFBeamPrimTrkLen = pfTrack->Length();
+          PFBeamPrimCSDAMomMu = trackMomCalc.GetTrackMomentum(PFBeamPrimTrkLen,13) * 1000; // MeV/c
+          PFBeamPrimCSDAMomProton = trackMomCalc.GetTrackMomentum(PFBeamPrimTrkLen,2212) * 1000; // MeV/c
+          PFBeamPrimCSDAKinMu = sqrt(pow(PFBeamPrimCSDAMomMu,2)+pow(MMUON,2))-MMUON; // MeV
+          PFBeamPrimCSDAKinProton = sqrt(pow(PFBeamPrimCSDAMomProton,2)+pow(MPROTON,2))-MPROTON; // MeV
         }
 
         std::cout << "PFBeamPrimTrk ID: " << pfTrack->ID() << std::endl;
