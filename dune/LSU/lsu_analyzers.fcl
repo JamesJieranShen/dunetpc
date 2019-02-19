@@ -1,20 +1,18 @@
 #include "ProtoDUNEDataUtils.fcl"
+#include "ProtoDUNEBeamlineUtils.fcl"
 
 BEGIN_PROLOG
 
 lsu_analyzer:
 { 
   module_type:                "LSUAnalyzer"
+  BeamlineUtils:              @local::standard_protodunebeamlineutils
+  NominalBeamMomentum:        7.0
 }
 
 gdbtest_analyzer:
 { 
   module_type:                "GDBTest"
-}
-
-lsu_analyzer:
-{ 
-  module_type:                "LSUAnalyzer"
 }
 
 lsu_beam_analyzer:

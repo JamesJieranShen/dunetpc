@@ -39,3 +39,7 @@ physics:
 }
 
 ### Here, we overwrite ALL module Labels with the ones defined above.
+
+# change this to the nominal beam momentum of the data
+# to get the correct beamline particle identification
+physics.analyzers.lsuanalyzer.NominalBeamMomentum: 7.0

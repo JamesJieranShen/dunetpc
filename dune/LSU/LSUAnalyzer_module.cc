@@ -26,6 +26,11 @@
 #include "art/Framework/Services/Optional/TFileService.h"
 #include "larsim/MCCheater/BackTrackerService.h"
 
+#include "dunetpc/dune/DuneObj/ProtoDUNEBeamEvent.h"
+#include "dunetpc/dune/Protodune/Analysis/ProtoDUNEBeamlineUtils.h"
+#include "dunetpc/dune/Protodune/Analysis/ProtoDUNEDataUtils.h"
+#include "dunetpc/dune/Protodune/Analysis/ProtoDUNEPFParticleUtils.h"
+
 #include "TH1F.h"
 #include "TH2F.h"
 #include "TGraph.h"
@@ -56,6 +61,9 @@ private:
 
   // Declare member data here.
 
+  protoana::ProtoDUNEBeamlineUtils fBeamlineUtils;
+  double fNominalBeamMomentum;
+
   TH1F* fmcparticlePDG;
   TH1F* fmcparticleNparticles;
   TH2F* ftrackdEdxVResRange;
@@ -67,9 +75,11 @@ private:
 
 LSUAnalyzer::LSUAnalyzer(fhicl::ParameterSet const & p)
   :
-  EDAnalyzer(p)  // ,
- // More initializers here.
-{}
+  EDAnalyzer(p),
+  fBeamlineUtils(p.get<fhicl::ParameterSet>("BeamlineUtils"))
+{
+  fNominalBeamMomentum = p.get<double>("NominalBeamMomentum");
+}
 
 void LSUAnalyzer::analyze(art::Event const & e)
 {
@@ -81,9 +91,19 @@ void LSUAnalyzer::analyze(art::Event const & e)
   // * MC truth information
   art::Handle< std::vector<simb::MCParticle> > mcparticleListHandle;
   std::vector<art::Ptr<simb::MCParticle> > mcparticleList;
-  if (e.getByLabel("largeant",mcparticleListHandle))
+  if ((!e.isRealData()) && e.getByLabel("largeant",mcparticleListHandle))
   {
     art::fill_ptr_vector(mcparticleList, mcparticleListHandle);
+  }
+
+  std::vector<art::Ptr<beam::ProtoDUNEBeamEvent>> beamVec;
+  if(e.isRealData())
+  {
+    auto beamHand = e.getValidHandle<std::vector<beam::ProtoDUNEBeamEvent>>("beamevent");
+    if(beamHand.isValid())
+    {
+      art::fill_ptr_vector(beamVec, beamHand);
+    }
   }
 
   // reco track information
@@ -119,6 +139,96 @@ void LSUAnalyzer::analyze(art::Event const & e)
               << std::endl;
     fmcparticlePDG->Fill(mcparticle->PdgCode());
   } // for iParticle
+
+
+  // Beamline info
+  const bool PRINTBEAMEVENT=true;
+  float TOF=-9999999; // ns
+  short CKov0Status=-20;
+  short CKov1Status=-20;
+  bool oneBeamTrackAndMom=false;
+  float beamMom=-9999999.; // GeV/c
+  float beamTrackXFrontTPC=-9999999.; // cm
+  float beamTrackYFrontTPC=-9999999.; // cm
+  float beamTrackTheta=-9999999.; // rad
+  float beamTrackPhi=-9999999.; // rad
+  bool beamIsElectron;
+  bool beamIsMuon;
+  bool beamIsPion;
+  bool beamIsKaon;
+  bool beamIsProton;
+  bool beamIsDeuteron;
+  for(size_t iBeamEvent=0; iBeamEvent < beamVec.size(); iBeamEvent++)
+  {
+    beam::ProtoDUNEBeamEvent beamEvent = *(beamVec.at(iBeamEvent));
+    TOF = beamEvent.GetTOF(); // ns
+    CKov0Status = beamEvent.GetCKov0Status(); // if 1 then a fast particle
+    CKov1Status = beamEvent.GetCKov1Status(); // if 1 then a fast particle
+    if(PRINTBEAMEVENT)
+    {
+      std::cout << "LSUAnalyzer BeamEvent " << iBeamEvent << ": \n";
+      std::cout << "  CTB Timestamp: " << beamEvent.GetCTBTimestamp() << "\n";
+      std::cout << "  BI Trigger: " << beamEvent.GetBITrigger() << "\n";
+      std::cout << "  Active Trigger: " << beamEvent.GetActiveTrigger() << "\n";
+      std::cout << "  Is Trigger Matched: " << beamEvent.CheckIsMatched() << "\n";
+      std::cout << "  TOF: " << TOF << "\n";
+      std::cout << "  CKov0Status: " << CKov0Status << "\n";
+      std::cout << "  CKov1Status: " << CKov1Status << "\n";
+      //std::cout << "  CKov0Time: " << beamEvent.GetCKov0Time() << "\n";
+      //std::cout << "  CKov1Time: " << beamEvent.GetCKov1Time() << "\n";
+      std::cout << "  CKov0Pressure: " << beamEvent.GetCKov0Pressure() << "\n";
+      std::cout << "  CKov1Pressure: " << beamEvent.GetCKov1Pressure() << "\n";
+    }
+
+    oneBeamTrackAndMom = beamEvent.GetNBeamTracks() == 1 && beamEvent.GetNRecoBeamMomenta() == 1;
+    if (oneBeamTrackAndMom)
+    {
+      beamMom = beamEvent.GetRecoBeamMomentum(0); // GeV/c
+
+      const recob::Track & track =  beamEvent.GetBeamTrack(0);
+      beamTrackXFrontTPC = track.End().X();
+      beamTrackYFrontTPC = track.End().Y();
+      beamTrackTheta = track.EndDirection().Theta();
+      beamTrackPhi = track.EndDirection().Phi();
+      if(PRINTBEAMEVENT)
+      {
+        std::cout << "  Beam Momentum: "<< beamMom <<" GeV/c\n";
+        std::cout << "  Beam Track: \n";
+        std::cout << "    N Points:  " << track.NumberTrajectoryPoints() << "\n";
+        std::cout << "    Start Pos: " << track.Vertex().X()
+                                  << "  " << track.Vertex().Y()
+                                  << "  " << track.Vertex().Z() << "\n";
+        std::cout << "    End Pos:   " << beamTrackXFrontTPC
+                                  << "  " << beamTrackYFrontTPC
+                                  << "  " << track.End().Z() << "\n";
+        std::cout << "    Start Theta: " << track.VertexDirection().Theta()*180/CLHEP::pi << " deg\n";
+        std::cout << "    Start Phi:   " << track.VertexDirection().Phi()*180/CLHEP::pi << " deg\n";
+        std::cout << "    End Theta:   " << beamTrackTheta*180/CLHEP::pi << " deg\n";
+        std::cout << "    End Phi:     " << beamTrackPhi*180/CLHEP::pi << " deg\n";
+      }
+    }
+    else if (PRINTBEAMEVENT)
+    {
+      std::cout << "  N beam tracks: " << beamEvent.GetNBeamTracks() << " N beam momenta: " << beamEvent.GetNRecoBeamMomenta() << "\n";
+    }
+    const auto& beamPIDs = fBeamlineUtils.GetPIDCandidates(beamEvent,fNominalBeamMomentum);
+    beamIsElectron = beamPIDs.electron;
+    beamIsMuon = beamPIDs.muon;
+    beamIsPion = beamPIDs.pion;
+    beamIsKaon = beamPIDs.kaon;
+    beamIsProton = beamPIDs.proton;
+    beamIsDeuteron = beamPIDs.deuteron; // not implemented I don't think
+    if (PRINTBEAMEVENT)
+    {
+      std::cout << "  Official CERN PID: \n" 
+                << "    beamIsElectron " << beamIsElectron << "\n"
+                << "    beamIsMuon     " << beamIsMuon << "\n"
+                << "    beamIsPion     " << beamIsPion << "\n"
+                << "    beamIsKaon     " << beamIsKaon << "\n"
+                << "    beamIsProton   " << beamIsProton << "\n"
+                << "    beamIsDeuteron " << beamIsDeuteron << "\n";
+    }
+  } // for iBeamEvent
 
   std::cout << "Number of tracks: " << trackList.size() << std::endl;
   for (size_t iTrack=0; iTrack < trackList.size(); iTrack++)
@@ -230,8 +340,37 @@ void LSUAnalyzer::analyze(art::Event const & e)
 
   } // for iTrack
 
+  // Just testing use of a graph
+
   ftestGraph->SetPoint(fiTestGraph,nParticles,trackList.size());
   fiTestGraph++;
+
+  // Now for Pandora particle-flow (PF) Stuff
+  protoana::ProtoDUNEPFParticleUtils pfPartUtils;
+  const std::vector<const recob::PFParticle*> pfFromBeamSlice = pfPartUtils.GetPFParticlesFromBeamSlice(e,"pandora");
+  std::cout << "Number of primary beam PFParticles (number of beam slices): " << pfFromBeamSlice.size() << std::endl;
+  for(size_t iPF=0; iPF < pfFromBeamSlice.size(); iPF++)
+  {
+    const recob::PFParticle* pfBeamPart = pfFromBeamSlice.at(iPF);
+    const auto& PFBeamPrimPDG = pfBeamPart->PdgCode();
+    const auto& PFBeamPrimNDaughters = pfBeamPart->NumDaughters();
+    std::cout << "Beam Primary PFParticle: "<< iPF 
+                << " Reco PDG: " << PFBeamPrimPDG
+                << " Number of daughter PFParticles: " << PFBeamPrimNDaughters
+                << std::endl;
+    const recob::Track* pfTrack = pfPartUtils.GetPFParticleTrack(*pfBeamPart, e, "pandora","pandoraTrack");
+    if(pfTrack)
+    {
+      std::cout << "Beam Primary PFParticle is reconstructed as a track\n";
+      // Now you can analyze this Pandora track just like you did the pmtrack earlier
+    } // if pfTrack
+    const recob::Shower* pfShower = pfPartUtils.GetPFParticleShower(*pfBeamPart, e, "pandora","pandoraShower");
+    if(pfShower)
+    {
+      // Now you can analyze this shower. This is a reco electron or photon, check out recob::Shower on larsoft doxygen to see how to do it
+      std::cout << "Beam Primary PFParticle is reconstructed as a shower\n";
+    } // if pfShower
+  } // for iPF
 
 } // analyze function
 
