@@ -39,6 +39,7 @@
 #include "dunetpc/dune/LSU/GenVectorHelper.h"
 #include "dunetpc/dune/LSU/BackTrackerAlg.h"
 #include "dunetpc/dune/Protodune/Analysis/ProtoDUNEDataUtils.h"
+#include "dunetpc/dune/Protodune/Analysis/ProtoDUNEBeamlineUtils.h"
 #include "dunetpc/dune/Protodune/Analysis/ProtoDUNEPFParticleUtils.h"
 #include "dunetpc/dune/Protodune/Analysis/ProtoDUNETruthUtils.h"
 #include "larpandora/LArPandoraInterface/LArPandoraHelper.h"
@@ -327,6 +328,49 @@ private:
   Float_t CKov1Time;
   Float_t CKov0Pressure;
   Float_t CKov1Pressure;
+
+  bool BIElectron0p3GeV;
+  bool BIMuon0p3GeV;
+  bool BIPion0p3GeV;
+  bool BIKaon0p3GeV;
+  bool BIProton0p3GeV;
+  bool BIDeuteron0p3GeV;
+  bool BIElectron0p5GeV;
+  bool BIMuon0p5GeV;
+  bool BIPion0p5GeV;
+  bool BIKaon0p5GeV;
+  bool BIProton0p5GeV;
+  bool BIDeuteron0p5GeV;
+  bool BIElectron1GeV;
+  bool BIMuon1GeV;
+  bool BIPion1GeV;
+  bool BIKaon1GeV;
+  bool BIProton1GeV;
+  bool BIDeuteron1GeV;
+  bool BIElectron2GeV;
+  bool BIMuon2GeV;
+  bool BIPion2GeV;
+  bool BIKaon2GeV;
+  bool BIProton2GeV;
+  bool BIDeuteron2GeV;
+  bool BIElectron3GeV;
+  bool BIMuon3GeV;
+  bool BIPion3GeV;
+  bool BIKaon3GeV;
+  bool BIProton3GeV;
+  bool BIDeuteron3GeV;
+  bool BIElectron6GeV;
+  bool BIMuon6GeV;
+  bool BIPion6GeV;
+  bool BIKaon6GeV;
+  bool BIProton6GeV;
+  bool BIDeuteron6GeV;
+  bool BIElectron7GeV;
+  bool BIMuon7GeV;
+  bool BIPion7GeV;
+  bool BIKaon7GeV;
+  bool BIProton7GeV;
+  bool BIDeuteron7GeV;
 
   bool triggerIsBeam;
   UInt_t triggerBits;
@@ -695,6 +739,7 @@ private:
   art::ServiceHandle<cheat::BackTrackerService> bt;
 
   protoana::ProtoDUNEDataUtils fDataUtil;
+  protoana::ProtoDUNEBeamlineUtils fBeamlineUtils;
  
   //Internal functions
   const art::Ptr<recob::Track> MatchRecoToTruthOrWCTrack(const std::vector<art::Ptr<recob::Track>>& tracks, bool isData); 
@@ -739,7 +784,8 @@ lana::PionAbsSelector::PionAbsSelector(fhicl::ParameterSet const & p)
   :
   EDAnalyzer(p),
   infilename("NoInFilenameFound"),
-  fDataUtil(p.get<fhicl::ParameterSet>("DataUtil"))
+  fDataUtil(p.get<fhicl::ParameterSet>("DataUtil")),
+  fBeamlineUtils(p.get<fhicl::ParameterSet>("BeamlineUtils"))
  // More initializers here.
 {
   this->reconfigure(p);
@@ -960,6 +1006,58 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
         std::cout << "    End Theta:   " << track.EndDirection().Phi()*180/CLHEP::pi << " deg\n";
       }
     }
+
+    // CERN official beam PID
+    const auto& beamPIDs0p3GeV = fBeamlineUtils.GetPIDCandidates(beamEvent,0.3);
+    const auto& beamPIDs0p5GeV = fBeamlineUtils.GetPIDCandidates(beamEvent,0.5);
+    const auto& beamPIDs1GeV = fBeamlineUtils.GetPIDCandidates(beamEvent,1);
+    const auto& beamPIDs2GeV = fBeamlineUtils.GetPIDCandidates(beamEvent,2);
+    const auto& beamPIDs3GeV = fBeamlineUtils.GetPIDCandidates(beamEvent,3);
+    const auto& beamPIDs6GeV = fBeamlineUtils.GetPIDCandidates(beamEvent,6);
+    const auto& beamPIDs7GeV = fBeamlineUtils.GetPIDCandidates(beamEvent,7);
+
+    BIElectron0p3GeV = beamPIDs0p3GeV.electron;
+    BIMuon0p3GeV = beamPIDs0p3GeV.muon;
+    BIPion0p3GeV = beamPIDs0p3GeV.pion;
+    BIKaon0p3GeV = beamPIDs0p3GeV.kaon;
+    BIProton0p3GeV = beamPIDs0p3GeV.proton;
+    BIDeuteron0p3GeV = beamPIDs0p3GeV.deuteron;
+    BIElectron0p5GeV = beamPIDs0p5GeV.electron;
+    BIMuon0p5GeV = beamPIDs0p5GeV.muon;
+    BIPion0p5GeV = beamPIDs0p5GeV.pion;
+    BIKaon0p5GeV = beamPIDs0p5GeV.kaon;
+    BIProton0p5GeV = beamPIDs0p5GeV.proton;
+    BIDeuteron0p5GeV = beamPIDs0p5GeV.deuteron;
+    BIElectron1GeV = beamPIDs1GeV.electron;
+    BIMuon1GeV = beamPIDs1GeV.muon;
+    BIPion1GeV = beamPIDs1GeV.pion;
+    BIKaon1GeV = beamPIDs1GeV.kaon;
+    BIProton1GeV = beamPIDs1GeV.proton;
+    BIDeuteron1GeV = beamPIDs1GeV.deuteron;
+    BIElectron2GeV = beamPIDs2GeV.electron;
+    BIMuon2GeV = beamPIDs2GeV.muon;
+    BIPion2GeV = beamPIDs2GeV.pion;
+    BIKaon2GeV = beamPIDs2GeV.kaon;
+    BIProton2GeV = beamPIDs2GeV.proton;
+    BIDeuteron2GeV = beamPIDs2GeV.deuteron;
+    BIElectron3GeV = beamPIDs3GeV.electron;
+    BIMuon3GeV = beamPIDs3GeV.muon;
+    BIPion3GeV = beamPIDs3GeV.pion;
+    BIKaon3GeV = beamPIDs3GeV.kaon;
+    BIProton3GeV = beamPIDs3GeV.proton;
+    BIDeuteron3GeV = beamPIDs3GeV.deuteron;
+    BIElectron6GeV = beamPIDs6GeV.electron;
+    BIMuon6GeV = beamPIDs6GeV.muon;
+    BIPion6GeV = beamPIDs6GeV.pion;
+    BIKaon6GeV = beamPIDs6GeV.kaon;
+    BIProton6GeV = beamPIDs6GeV.proton;
+    BIDeuteron6GeV = beamPIDs6GeV.deuteron;
+    BIElectron7GeV = beamPIDs7GeV.electron;
+    BIMuon7GeV = beamPIDs7GeV.muon;
+    BIPion7GeV = beamPIDs7GeV.pion;
+    BIKaon7GeV = beamPIDs7GeV.kaon;
+    BIProton7GeV = beamPIDs7GeV.proton;
+    BIDeuteron7GeV = beamPIDs7GeV.deuteron;
   }
 
   // Get Trigger info
@@ -1137,6 +1235,48 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("beamTrackKinProton",&beamTrackKinProton,"beamTrackKinProton[nBeamTracks]/F");
   tree->Branch("beamTrackTruePDG",&beamTrackTruePDG,"beamTrackTruePDG[nBeamTracks]/F");
 
+  tree->Branch("BIElectron0p3GeV",BIElectron0p3GeV,"BIElectron0p3GeV/O");
+  tree->Branch("BIMuon0p3GeV",BIMuon0p3GeV,"BIMuon0p3GeV/O");
+  tree->Branch("BIPion0p3GeV",BIPion0p3GeV,"BIPion0p3GeV/O");
+  tree->Branch("BIKaon0p3GeV",BIKaon0p3GeV,"BIKaon0p3GeV/O");
+  tree->Branch("BIProton0p3GeV",BIProton0p3GeV,"BIProton0p3GeV/O");
+  tree->Branch("BIDeuteron0p3GeV",BIDeuteron0p3GeV,"BIDeuteron0p3GeV/O");
+  tree->Branch("BIElectron0p5GeV",BIElectron0p5GeV,"BIElectron0p5GeV/O");
+  tree->Branch("BIMuon0p5GeV",BIMuon0p5GeV,"BIMuon0p5GeV/O");
+  tree->Branch("BIPion0p5GeV",BIPion0p5GeV,"BIPion0p5GeV/O");
+  tree->Branch("BIKaon0p5GeV",BIKaon0p5GeV,"BIKaon0p5GeV/O");
+  tree->Branch("BIProton0p5GeV",BIProton0p5GeV,"BIProton0p5GeV/O");
+  tree->Branch("BIDeuteron0p5GeV",BIDeuteron0p5GeV,"BIDeuteron0p5GeV/O");
+  tree->Branch("BIElectron1GeV",BIElectron1GeV,"BIElectron1GeV/O");
+  tree->Branch("BIMuon1GeV",BIMuon1GeV,"BIMuon1GeV/O");
+  tree->Branch("BIPion1GeV",BIPion1GeV,"BIPion1GeV/O");
+  tree->Branch("BIKaon1GeV",BIKaon1GeV,"BIKaon1GeV/O");
+  tree->Branch("BIProton1GeV",BIProton1GeV,"BIProton1GeV/O");
+  tree->Branch("BIDeuteron1GeV",BIDeuteron1GeV,"BIDeuteron1GeV/O");
+  tree->Branch("BIElectron2GeV",BIElectron2GeV,"BIElectron2GeV/O");
+  tree->Branch("BIMuon2GeV",BIMuon2GeV,"BIMuon2GeV/O");
+  tree->Branch("BIPion2GeV",BIPion2GeV,"BIPion2GeV/O");
+  tree->Branch("BIKaon2GeV",BIKaon2GeV,"BIKaon2GeV/O");
+  tree->Branch("BIProton2GeV",BIProton2GeV,"BIProton2GeV/O");
+  tree->Branch("BIDeuteron2GeV",BIDeuteron2GeV,"BIDeuteron2GeV/O");
+  tree->Branch("BIElectron3GeV",BIElectron3GeV,"BIElectron3GeV/O");
+  tree->Branch("BIMuon3GeV",BIMuon3GeV,"BIMuon3GeV/O");
+  tree->Branch("BIPion3GeV",BIPion3GeV,"BIPion3GeV/O");
+  tree->Branch("BIKaon3GeV",BIKaon3GeV,"BIKaon3GeV/O");
+  tree->Branch("BIProton3GeV",BIProton3GeV,"BIProton3GeV/O");
+  tree->Branch("BIDeuteron3GeV",BIDeuteron3GeV,"BIDeuteron3GeV/O");
+  tree->Branch("BIElectron6GeV",BIElectron6GeV,"BIElectron6GeV/O");
+  tree->Branch("BIMuon6GeV",BIMuon6GeV,"BIMuon6GeV/O");
+  tree->Branch("BIPion6GeV",BIPion6GeV,"BIPion6GeV/O");
+  tree->Branch("BIKaon6GeV",BIKaon6GeV,"BIKaon6GeV/O");
+  tree->Branch("BIProton6GeV",BIProton6GeV,"BIProton6GeV/O");
+  tree->Branch("BIDeuteron6GeV",BIDeuteron6GeV,"BIDeuteron6GeV/O");
+  tree->Branch("BIElectron7GeV",BIElectron7GeV,"BIElectron7GeV/O");
+  tree->Branch("BIMuon7GeV",BIMuon7GeV,"BIMuon7GeV/O");
+  tree->Branch("BIPion7GeV",BIPion7GeV,"BIPion7GeV/O");
+  tree->Branch("BIKaon7GeV",BIKaon7GeV,"BIKaon7GeV/O");
+  tree->Branch("BIProton7GeV",BIProton7GeV,"BIProton7GeV/O");
+  tree->Branch("BIDeuteron7GeV",BIDeuteron7GeV,"BIDeuteron7GeV/O");
 
   tree->Branch("triggerIsBeam",&triggerIsBeam,"triggerIsBeam/O");
   tree->Branch("triggerBits",&triggerBits,"triggerBits/i");
@@ -1826,6 +1966,49 @@ void lana::PionAbsSelector::ResetTreeVars()
     TOFusTrigsByChan[iTOF] = 0;
     TOFdsTrigsByChan[iTOF] = 0;
   }
+
+  BIElectron0p3GeV = false;
+  BIMuon0p3GeV = false;
+  BIPion0p3GeV = false;
+  BIKaon0p3GeV = false;
+  BIProton0p3GeV = false;
+  BIDeuteron0p3GeV = false;
+  BIElectron0p5GeV = false;
+  BIMuon0p5GeV = false;
+  BIPion0p5GeV = false;
+  BIKaon0p5GeV = false;
+  BIProton0p5GeV = false;
+  BIDeuteron0p5GeV = false;
+  BIElectron1GeV = false;
+  BIMuon1GeV = false;
+  BIPion1GeV = false;
+  BIKaon1GeV = false;
+  BIProton1GeV = false;
+  BIDeuteron1GeV = false;
+  BIElectron2GeV = false;
+  BIMuon2GeV = false;
+  BIPion2GeV = false;
+  BIKaon2GeV = false;
+  BIProton2GeV = false;
+  BIDeuteron2GeV = false;
+  BIElectron3GeV = false;
+  BIMuon3GeV = false;
+  BIPion3GeV = false;
+  BIKaon3GeV = false;
+  BIProton3GeV = false;
+  BIDeuteron3GeV = false;
+  BIElectron6GeV = false;
+  BIMuon6GeV = false;
+  BIPion6GeV = false;
+  BIKaon6GeV = false;
+  BIProton6GeV = false;
+  BIDeuteron6GeV = false;
+  BIElectron7GeV = false;
+  BIMuon7GeV = false;
+  BIPion7GeV = false;
+  BIKaon7GeV = false;
+  BIProton7GeV = false;
+  BIDeuteron7GeV = false;
 
   triggerIsBeam = false;
   triggerBits = 0;

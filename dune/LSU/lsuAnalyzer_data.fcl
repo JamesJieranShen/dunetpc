@@ -1,0 +1,31 @@
+#include "ProtoDUNEFembFilter.fcl"
+#include "ProtoDUNEUnstableHVFilter.fcl"
+#include "BeamEvent.fcl"
+#include "lsuAnalyzer.fcl"
+
+process_name: LSUAnaData
+
+services.FileCatalogMetadata:       @local::art_file_catalog_data
+services.IFBeam:                    {}
+services.PdspChannelMapService:     @local::pdspchannelmap
+services.ChannelStatusService:      @local::pdsp_channel_status
+
+# only look at events with good high voltage and all beam-side channels working
+physics.filters: {
+    unstablehvfilter: @local::HVfilter
+    fembfilter: @local::pdsp_fembfilter_beamside
+}
+physics.producers.beamevent: @local::proto_beamevent # redo the beamline reco (bug fixes and updates)
+physics.reco: [ unstablehvfilter, fembfilter, beamevent ]
+physics.trigger_paths: [ reco ]
+
+#####################################
+### Change the stuff below if you want
+
+services.TFileService.fileName: "LSU_hist.root"
+source.maxEvents: 10
+
+# change this to the nominal beam momentum of the data
+# to get the correct beamline particle identification
+physics.analyzers.lsuanalyzer.NominalBeamMomentum: 7.0
+

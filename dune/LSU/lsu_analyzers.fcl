@@ -64,6 +64,7 @@ piabsselector:
   FlangeCenterZ:                  0.
   FlangeRadiusCut:                50.
   DataUtil:                       @local::standard_protodunedatautils
+  BeamlineUtils:                  @local::standard_protodunebeamlineutils
 }
 
 beammatchinganalyzer: 

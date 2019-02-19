@@ -79,6 +79,7 @@ LSUAnalyzer::LSUAnalyzer(fhicl::ParameterSet const & p)
   fBeamlineUtils(p.get<fhicl::ParameterSet>("BeamlineUtils"))
 {
   fNominalBeamMomentum = p.get<double>("NominalBeamMomentum");
+  std::cout << "LSUAnalyzer using NominalBeamMomentum: " << fNominalBeamMomentum << " GeV/c\n";
 }
 
 void LSUAnalyzer::analyze(art::Event const & e)
@@ -253,7 +254,7 @@ void LSUAnalyzer::analyze(art::Event const & e)
             // These are the reconstructed residual range and dE/dx
             float calo_residualRange = calo->ResidualRange().at(iRange);
             float calo_dEdx = calo->dEdx().at(iRange);
-            std::cout << "Reco dE/dx:  " << calo_dEdx << " MeV/cm, residual range: " <<calo_residualRange<<" cm"<< std::endl;
+            //std::cout << "Reco dE/dx:  " << calo_dEdx << " MeV/cm, residual range: " <<calo_residualRange<<" cm"<< std::endl;
             ftrackdEdxVResRange->Fill(calo_residualRange,calo_dEdx);
           }
         } // if plane == fCaloPlane
