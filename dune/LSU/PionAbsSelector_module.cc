@@ -1008,26 +1008,26 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     }
 
     // CERN official beam PID
-    const auto& beamPIDs0p3GeV = fBeamlineUtils.GetPIDCandidates(beamEvent,0.3);
-    const auto& beamPIDs0p5GeV = fBeamlineUtils.GetPIDCandidates(beamEvent,0.5);
+    //const auto& beamPIDs0p3GeV = fBeamlineUtils.GetPIDCandidates(beamEvent,0.3);
+    //const auto& beamPIDs0p5GeV = fBeamlineUtils.GetPIDCandidates(beamEvent,0.5);
     const auto& beamPIDs1GeV = fBeamlineUtils.GetPIDCandidates(beamEvent,1);
     const auto& beamPIDs2GeV = fBeamlineUtils.GetPIDCandidates(beamEvent,2);
     const auto& beamPIDs3GeV = fBeamlineUtils.GetPIDCandidates(beamEvent,3);
     const auto& beamPIDs6GeV = fBeamlineUtils.GetPIDCandidates(beamEvent,6);
     const auto& beamPIDs7GeV = fBeamlineUtils.GetPIDCandidates(beamEvent,7);
 
-    BIElectron0p3GeV = beamPIDs0p3GeV.electron;
-    BIMuon0p3GeV = beamPIDs0p3GeV.muon;
-    BIPion0p3GeV = beamPIDs0p3GeV.pion;
-    BIKaon0p3GeV = beamPIDs0p3GeV.kaon;
-    BIProton0p3GeV = beamPIDs0p3GeV.proton;
-    BIDeuteron0p3GeV = beamPIDs0p3GeV.deuteron;
-    BIElectron0p5GeV = beamPIDs0p5GeV.electron;
-    BIMuon0p5GeV = beamPIDs0p5GeV.muon;
-    BIPion0p5GeV = beamPIDs0p5GeV.pion;
-    BIKaon0p5GeV = beamPIDs0p5GeV.kaon;
-    BIProton0p5GeV = beamPIDs0p5GeV.proton;
-    BIDeuteron0p5GeV = beamPIDs0p5GeV.deuteron;
+    //BIElectron0p3GeV = beamPIDs0p3GeV.electron;
+    //BIMuon0p3GeV = beamPIDs0p3GeV.muon;
+    //BIPion0p3GeV = beamPIDs0p3GeV.pion;
+    //BIKaon0p3GeV = beamPIDs0p3GeV.kaon;
+    //BIProton0p3GeV = beamPIDs0p3GeV.proton;
+    //BIDeuteron0p3GeV = beamPIDs0p3GeV.deuteron;
+    //BIElectron0p5GeV = beamPIDs0p5GeV.electron;
+    //BIMuon0p5GeV = beamPIDs0p5GeV.muon;
+    //BIPion0p5GeV = beamPIDs0p5GeV.pion;
+    //BIKaon0p5GeV = beamPIDs0p5GeV.kaon;
+    //BIProton0p5GeV = beamPIDs0p5GeV.proton;
+    //BIDeuteron0p5GeV = beamPIDs0p5GeV.deuteron;
     BIElectron1GeV = beamPIDs1GeV.electron;
     BIMuon1GeV = beamPIDs1GeV.muon;
     BIPion1GeV = beamPIDs1GeV.pion;
@@ -1058,6 +1058,46 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     BIKaon7GeV = beamPIDs7GeV.kaon;
     BIProton7GeV = beamPIDs7GeV.proton;
     BIDeuteron7GeV = beamPIDs7GeV.deuteron;
+
+    if(PRINTBEAMEVENT)
+    {
+      std::cout << "CERN BIG PID: e  mu pi k  p  d  \n"
+                << "1 GeV:        " << beamPIDs1GeV.electron
+                            << "  " << beamPIDs1GeV.muon
+                            << "  " << beamPIDs1GeV.pion
+                            << "  " << beamPIDs1GeV.kaon
+                            << "  " << beamPIDs1GeV.proton
+                            << "  " << beamPIDs1GeV.deuteron
+                                    << "\n"
+                << "2 GeV:        " << beamPIDs2GeV.electron
+                            << "  " << beamPIDs2GeV.muon
+                            << "  " << beamPIDs2GeV.pion
+                            << "  " << beamPIDs2GeV.kaon
+                            << "  " << beamPIDs2GeV.proton
+                            << "  " << beamPIDs2GeV.deuteron
+                                    << "\n"
+                << "3 GeV:        " << beamPIDs3GeV.electron
+                            << "  " << beamPIDs3GeV.muon
+                            << "  " << beamPIDs3GeV.pion
+                            << "  " << beamPIDs3GeV.kaon
+                            << "  " << beamPIDs3GeV.proton
+                            << "  " << beamPIDs3GeV.deuteron
+                                    << "\n"
+                << "6 GeV:        " << beamPIDs6GeV.electron
+                            << "  " << beamPIDs6GeV.muon
+                            << "  " << beamPIDs6GeV.pion
+                            << "  " << beamPIDs6GeV.kaon
+                            << "  " << beamPIDs6GeV.proton
+                            << "  " << beamPIDs6GeV.deuteron
+                                    << "\n"
+                << "7 GeV:        " << beamPIDs7GeV.electron
+                            << "  " << beamPIDs7GeV.muon
+                            << "  " << beamPIDs7GeV.pion
+                            << "  " << beamPIDs7GeV.kaon
+                            << "  " << beamPIDs7GeV.proton
+                            << "  " << beamPIDs7GeV.deuteron
+                                    << "\n";
+    }
   }
 
   // Get Trigger info
