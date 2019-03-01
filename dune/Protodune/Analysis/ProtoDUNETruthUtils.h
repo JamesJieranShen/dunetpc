@@ -10,6 +10,8 @@
 
 
 #include "lardataobj/RecoBase/Track.h"
+#include "larcore/Geometry/Geometry.h"
+#include "larcorealg/Geometry/GeometryCore.h"
 #include "nusimdata/SimulationBase/MCParticle.h"
 #include "nusimdata/SimulationBase/MCTruth.h"
 #include "lardataobj/Simulation/SimChannel.h"
@@ -64,6 +66,17 @@ namespace protoana {
      * over the IDEs on that channel. The ide energy and numElectrons are sums over the IDEs.
      */
     std::vector<std::tuple<raw::ChannelID_t,float, sim::IDE> > GetTotalChannelEnergyFromParticle(const simb::MCParticle & part, const art::Event & evt, const bool includeNegativeTrackID) const;
+    // Get interaction process key.
+    int GetProcessKey(std::string process);
+
+    // Get the MC truth deposited energy
+    double GetDepEnergyMC(const art::Event &evt, geo::GeometryCore const * fGeom, int trackid, int whichview) const;
+
+    // Get first trajectory point in TPC active volume
+    int GetFirstTrajectoryPointInTPCActiveVolume(const simb::MCParticle& mcpart, double tpcactiveXlow, double tpcactiveXhigh, double tpcactiveYlow, double tpcactiveYhigh, double tpcactiveZlow, double tpcactiveZhigh);
+    
+    // Get MC Particle length in TPC active volume
+    double GetMCParticleLengthInTPCActiveVolume(const simb::MCParticle& mcpart, double tpcactiveXlow, double tpcactiveXhigh, double tpcactiveYlow, double tpcactiveYhigh, double tpcactiveZlow, double tpcactiveZhigh);
 
   private:
 
