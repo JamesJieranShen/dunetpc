@@ -22,3 +22,6 @@ physics.producers.pmtrackcalo.module_type: "CalorimetryHack"
 physics.producers.pandoracalo.module_type: "CalorimetryHack"
 
 physics.analyzers.PiAbsSelector.BeamlineUtils.UseCERNCalibSelection: true
+physics.analyzers.PiAbsSelector.BeamlineUtilsOld.UseCERNCalibSelection: false
+physics.analyzers.PiAbsSelector.BeamEventTag: "beamevent::PiAbsSelectorRedoBeam"
+physics.analyzers.PiAbsSelector.BeamEventTagOld: "beamevent::DecoderandReco"

@@ -230,6 +230,7 @@ private:
   art::InputTag fTrackLabel; //The name of the module that produced recob::Track objects
   art::InputTag fCaloLabel; //The name of the module that produced anab::Calorimetry objects
   art::InputTag fBeamEventTag;
+  art::InputTag fBeamEventTagOld;
   art::InputTag fRawTriggerTag;
   //art::InputTag fVertexLabel; //The name of the module that produced recob::Vertex objects
   art::InputTag fLikelihoodPIDTag;
@@ -371,6 +372,65 @@ private:
   bool BIKaon7GeV;
   bool BIProton7GeV;
   bool BIDeuteron7GeV;
+
+  UInt_t nBeamTracksOld;
+  UInt_t nBeamMomOld;
+  Float_t beamMomOld[MAXBEAMMOMS];
+  Float_t beamTrackXFrontTPCOld[MAXBEAMTRACKS];
+  Float_t beamTrackYFrontTPCOld[MAXBEAMTRACKS];
+  Float_t beamTrackThetaOld[MAXBEAMTRACKS];
+  Float_t beamTrackPhiOld[MAXBEAMTRACKS];
+
+  UInt_t nBeamEventsOld;
+  Int_t BITriggerOld;
+  bool BITriggerMatchedOld;
+  UInt_t BIActiveTriggerOld;
+  Float_t TOFOld;
+  Int_t CKov0StatusOld;
+  Int_t CKov1StatusOld;
+
+  bool BIElectron0p3GeVOld;
+  bool BIMuon0p3GeVOld;
+  bool BIPion0p3GeVOld;
+  bool BIKaon0p3GeVOld;
+  bool BIProton0p3GeVOld;
+  bool BIDeuteron0p3GeVOld;
+  bool BIElectron0p5GeVOld;
+  bool BIMuon0p5GeVOld;
+  bool BIPion0p5GeVOld;
+  bool BIKaon0p5GeVOld;
+  bool BIProton0p5GeVOld;
+  bool BIDeuteron0p5GeVOld;
+  bool BIElectron1GeVOld;
+  bool BIMuon1GeVOld;
+  bool BIPion1GeVOld;
+  bool BIKaon1GeVOld;
+  bool BIProton1GeVOld;
+  bool BIDeuteron1GeVOld;
+  bool BIElectron2GeVOld;
+  bool BIMuon2GeVOld;
+  bool BIPion2GeVOld;
+  bool BIKaon2GeVOld;
+  bool BIProton2GeVOld;
+  bool BIDeuteron2GeVOld;
+  bool BIElectron3GeVOld;
+  bool BIMuon3GeVOld;
+  bool BIPion3GeVOld;
+  bool BIKaon3GeVOld;
+  bool BIProton3GeVOld;
+  bool BIDeuteron3GeVOld;
+  bool BIElectron6GeVOld;
+  bool BIMuon6GeVOld;
+  bool BIPion6GeVOld;
+  bool BIKaon6GeVOld;
+  bool BIProton6GeVOld;
+  bool BIDeuteron6GeVOld;
+  bool BIElectron7GeVOld;
+  bool BIMuon7GeVOld;
+  bool BIPion7GeVOld;
+  bool BIKaon7GeVOld;
+  bool BIProton7GeVOld;
+  bool BIDeuteron7GeVOld;
 
   bool triggerIsBeam;
   UInt_t triggerBits;
@@ -740,6 +800,7 @@ private:
 
   protoana::ProtoDUNEDataUtils fDataUtil;
   protoana::ProtoDUNEBeamlineUtils fBeamlineUtils;
+  protoana::ProtoDUNEBeamlineUtils fBeamlineUtilsOld;
  
   //Internal functions
   const art::Ptr<recob::Track> MatchRecoToTruthOrWCTrack(const std::vector<art::Ptr<recob::Track>>& tracks, bool isData); 
@@ -785,7 +846,8 @@ lana::PionAbsSelector::PionAbsSelector(fhicl::ParameterSet const & p)
   EDAnalyzer(p),
   infilename("NoInFilenameFound"),
   fDataUtil(p.get<fhicl::ParameterSet>("DataUtil")),
-  fBeamlineUtils(p.get<fhicl::ParameterSet>("BeamlineUtils"))
+  fBeamlineUtils(p.get<fhicl::ParameterSet>("BeamlineUtils")),
+  fBeamlineUtilsOld(p.get<fhicl::ParameterSet>("BeamlineUtilsOld"))
  // More initializers here.
 {
   this->reconfigure(p);
@@ -833,9 +895,29 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   if(e.isRealData())
   {
     auto beamHand = e.getValidHandle<std::vector<beam::ProtoDUNEBeamEvent>>(fBeamEventTag);
+    const auto prov = beamHand.provenance();
+    const auto& provTag = prov->inputTag();
+    std::cout << "BeamEvent provenance inputTag: '" << provTag.encode() << "'\n";
+    //prov->write(std::cout);
+    //std::cout << "\nBeamEvent provenance done\n";
     if(beamHand.isValid())
     {
       art::fill_ptr_vector(beamVec, beamHand);
+    }
+  }
+
+  std::vector<art::Ptr<beam::ProtoDUNEBeamEvent>> beamVecOld;
+  if(e.isRealData())
+  {
+    auto beamHandOld = e.getValidHandle<std::vector<beam::ProtoDUNEBeamEvent>>(fBeamEventTagOld);
+    const auto prov = beamHandOld.provenance();
+    const auto& provTag = prov->inputTag();
+    std::cout << "BeamEvent Old provenance inputTag: '" << provTag.encode() << "'\n";
+    //prov->write(std::cout);
+    //std::cout << "\nBeamEvent Old provenance done\n";
+    if(beamHandOld.isValid())
+    {
+      art::fill_ptr_vector(beamVecOld, beamHandOld);
     }
   }
 
@@ -1100,6 +1182,166 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     }
   }
 
+
+  nBeamEventsOld = beamVecOld.size();
+  nBeamTracksOld = 0;
+  nBeamMomOld = 0;
+  for(size_t iBeamEvent=0; iBeamEvent < beamVecOld.size(); iBeamEvent++)
+  {
+    beam::ProtoDUNEBeamEvent beamEvent = *(beamVecOld.at(iBeamEvent));
+    if(PRINTBEAMEVENT)
+    {
+      std::cout << "PiAbsSel BeamEvent (OLD)" << iBeamEvent << ": \n";
+      std::cout << "  CTB Timestamp: " << beamEvent.GetCTBTimestamp() << "\n";
+      std::cout << "  BI Trigger: " << beamEvent.GetBITrigger() << "\n";
+      std::cout << "  Active Trigger: " << beamEvent.GetActiveTrigger() << "\n";
+      std::cout << "  Is Trigger Matched: " << beamEvent.CheckIsMatched() << "\n";
+      std::cout << "  TOF: " << beamEvent.GetTOF() << "\n";
+      std::cout << "  CKov0Status: " << beamEvent.GetCKov0Status() << "\n";
+      std::cout << "  CKov1Status: " << beamEvent.GetCKov1Status() << "\n";
+      std::cout << "  CKov0Time: " << beamEvent.GetCKov0Time() << "\n";
+      std::cout << "  CKov1Time: " << beamEvent.GetCKov1Time() << "\n";
+      std::cout << "  CKov0Pressure: " << beamEvent.GetCKov0Pressure() << "\n";
+      std::cout << "  CKov1Pressure: " << beamEvent.GetCKov1Pressure() << "\n";
+      std::cout << "  Beam Momenta:\n";
+    }
+
+    BITriggerOld = beamEvent.GetBITrigger();
+    BITriggerMatchedOld = beamEvent.CheckIsMatched();
+    BIActiveTriggerOld = beamEvent.GetActiveTrigger();
+    TOFOld = beamEvent.GetTOF();
+    CKov0StatusOld = beamEvent.GetCKov0Status();
+    CKov1StatusOld = beamEvent.GetCKov1Status();
+
+    for(size_t iMom=0; iMom < beamEvent.GetNRecoBeamMomenta(); iMom++)
+    {
+      beamMomOld[nBeamMomOld] = beamEvent.GetRecoBeamMomentum(iMom);
+      nBeamMomOld++;
+      if(PRINTBEAMEVENT) std::cout << "    " << beamEvent.GetRecoBeamMomentum(iMom) << "\n";
+    }
+    for(size_t iTrack=0; iTrack < beamEvent.GetNBeamTracks(); iTrack++)
+    {
+      const recob::Track & track =  beamEvent.GetBeamTrack(iTrack);
+      if(nBeamTracks >= MAXBEAMTRACKS)
+      {
+        throw cet::exception("TooManyOldBeamTracks","Too many old beam tracks in this event, ran out of room in array");
+      }
+      beamTrackXFrontTPCOld[nBeamTracksOld] = track.End().X();
+      beamTrackYFrontTPCOld[nBeamTracksOld] = track.End().Y();
+      beamTrackThetaOld[nBeamTracksOld] = track.EndDirection().Theta();
+      beamTrackPhiOld[nBeamTracksOld] = track.EndDirection().Phi();
+      nBeamTracksOld++;
+
+      if(PRINTBEAMEVENT)
+      {
+        std::cout << "  Old Beam Track: "<< iTrack <<"\n";
+        std::cout << "    N Points:  " << track.NumberTrajectoryPoints() << "\n";
+        std::cout << "    Start Pos: " << track.Vertex().X()
+                                  << "  " << track.Vertex().Y()
+                                  << "  " << track.Vertex().Z() << "\n";
+        std::cout << "    End Pos:   " << track.End().X()
+                                  << "  " << track.End().Y()
+                                  << "  " << track.End().Z() << "\n";
+        std::cout << "    Start Theta: " << track.VertexDirection().Theta()*180/CLHEP::pi << " deg\n";
+        std::cout << "    Start Phi:   " << track.VertexDirection().Phi()*180/CLHEP::pi << " deg\n";
+        std::cout << "    End Theta:   " << track.EndDirection().Theta()*180/CLHEP::pi << " deg\n";
+        std::cout << "    End Theta:   " << track.EndDirection().Phi()*180/CLHEP::pi << " deg\n";
+      }
+    }
+
+    // CERN official beam PID
+    //const auto& beamPIDs0p3GeV = fBeamlineUtilsOld.GetPIDCandidates(beamEvent,0.3);
+    //const auto& beamPIDs0p5GeV = fBeamlineUtilsOld.GetPIDCandidates(beamEvent,0.5);
+    const auto& beamPIDs1GeV = fBeamlineUtilsOld.GetPIDCandidates(beamEvent,1);
+    const auto& beamPIDs2GeV = fBeamlineUtilsOld.GetPIDCandidates(beamEvent,2);
+    const auto& beamPIDs3GeV = fBeamlineUtilsOld.GetPIDCandidates(beamEvent,3);
+    const auto& beamPIDs6GeV = fBeamlineUtilsOld.GetPIDCandidates(beamEvent,6);
+    const auto& beamPIDs7GeV = fBeamlineUtilsOld.GetPIDCandidates(beamEvent,7);
+
+    //BIElectron0p3GeVOld = beamPIDs0p3GeV.electron;
+    //BIMuon0p3GeVOld = beamPIDs0p3GeV.muon;
+    //BIPion0p3GeVOld = beamPIDs0p3GeV.pion;
+    //BIKaon0p3GeVOld = beamPIDs0p3GeV.kaon;
+    //BIProton0p3GeVOld = beamPIDs0p3GeV.proton;
+    //BIDeuteron0p3GeVOld = beamPIDs0p3GeV.deuteron;
+    //BIElectron0p5GeVOld = beamPIDs0p5GeV.electron;
+    //BIMuon0p5GeVOld = beamPIDs0p5GeV.muon;
+    //BIPion0p5GeVOld = beamPIDs0p5GeV.pion;
+    //BIKaon0p5GeVOld = beamPIDs0p5GeV.kaon;
+    //BIProton0p5GeVOld = beamPIDs0p5GeV.proton;
+    //BIDeuteron0p5GeVOld = beamPIDs0p5GeV.deuteron;
+    BIElectron1GeVOld = beamPIDs1GeV.electron;
+    BIMuon1GeVOld = beamPIDs1GeV.muon;
+    BIPion1GeVOld = beamPIDs1GeV.pion;
+    BIKaon1GeVOld = beamPIDs1GeV.kaon;
+    BIProton1GeVOld = beamPIDs1GeV.proton;
+    BIDeuteron1GeVOld = beamPIDs1GeV.deuteron;
+    BIElectron2GeVOld = beamPIDs2GeV.electron;
+    BIMuon2GeVOld = beamPIDs2GeV.muon;
+    BIPion2GeVOld = beamPIDs2GeV.pion;
+    BIKaon2GeVOld = beamPIDs2GeV.kaon;
+    BIProton2GeVOld = beamPIDs2GeV.proton;
+    BIDeuteron2GeVOld = beamPIDs2GeV.deuteron;
+    BIElectron3GeVOld = beamPIDs3GeV.electron;
+    BIMuon3GeVOld = beamPIDs3GeV.muon;
+    BIPion3GeVOld = beamPIDs3GeV.pion;
+    BIKaon3GeVOld = beamPIDs3GeV.kaon;
+    BIProton3GeVOld = beamPIDs3GeV.proton;
+    BIDeuteron3GeVOld = beamPIDs3GeV.deuteron;
+    BIElectron6GeVOld = beamPIDs6GeV.electron;
+    BIMuon6GeVOld = beamPIDs6GeV.muon;
+    BIPion6GeVOld = beamPIDs6GeV.pion;
+    BIKaon6GeVOld = beamPIDs6GeV.kaon;
+    BIProton6GeVOld = beamPIDs6GeV.proton;
+    BIDeuteron6GeVOld = beamPIDs6GeV.deuteron;
+    BIElectron7GeVOld = beamPIDs7GeV.electron;
+    BIMuon7GeVOld = beamPIDs7GeV.muon;
+    BIPion7GeVOld = beamPIDs7GeV.pion;
+    BIKaon7GeVOld = beamPIDs7GeV.kaon;
+    BIProton7GeVOld = beamPIDs7GeV.proton;
+    BIDeuteron7GeVOld = beamPIDs7GeV.deuteron;
+
+    if(PRINTBEAMEVENT)
+    {
+      std::cout << "My   old PID: e  mu pi k  p  d  \n"
+                << "1 GeV:        " << beamPIDs1GeV.electron
+                            << "  " << beamPIDs1GeV.muon
+                            << "  " << beamPIDs1GeV.pion
+                            << "  " << beamPIDs1GeV.kaon
+                            << "  " << beamPIDs1GeV.proton
+                            << "  " << beamPIDs1GeV.deuteron
+                                    << "\n"
+                << "2 GeV:        " << beamPIDs2GeV.electron
+                            << "  " << beamPIDs2GeV.muon
+                            << "  " << beamPIDs2GeV.pion
+                            << "  " << beamPIDs2GeV.kaon
+                            << "  " << beamPIDs2GeV.proton
+                            << "  " << beamPIDs2GeV.deuteron
+                                    << "\n"
+                << "3 GeV:        " << beamPIDs3GeV.electron
+                            << "  " << beamPIDs3GeV.muon
+                            << "  " << beamPIDs3GeV.pion
+                            << "  " << beamPIDs3GeV.kaon
+                            << "  " << beamPIDs3GeV.proton
+                            << "  " << beamPIDs3GeV.deuteron
+                                    << "\n"
+                << "6 GeV:        " << beamPIDs6GeV.electron
+                            << "  " << beamPIDs6GeV.muon
+                            << "  " << beamPIDs6GeV.pion
+                            << "  " << beamPIDs6GeV.kaon
+                            << "  " << beamPIDs6GeV.proton
+                            << "  " << beamPIDs6GeV.deuteron
+                                    << "\n"
+                << "7 GeV:        " << beamPIDs7GeV.electron
+                            << "  " << beamPIDs7GeV.muon
+                            << "  " << beamPIDs7GeV.pion
+                            << "  " << beamPIDs7GeV.kaon
+                            << "  " << beamPIDs7GeV.proton
+                            << "  " << beamPIDs7GeV.deuteron
+                                    << "\n";
+    }
+  }
+
   // Get Trigger info
   if (triggerHandle.isValid() && triggerHandle->size() > 0)
   {
@@ -1317,6 +1559,67 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("BIKaon7GeV",&BIKaon7GeV,"BIKaon7GeV/O");
   tree->Branch("BIProton7GeV",&BIProton7GeV,"BIProton7GeV/O");
   tree->Branch("BIDeuteron7GeV",&BIDeuteron7GeV,"BIDeuteron7GeV/O");
+
+  tree->Branch("nBeamEventsOld",&nBeamEventsOld,"nBeamEventsOld/i");
+  tree->Branch("BITriggerOld",&BITriggerOld,"BITriggerOld/I");
+  tree->Branch("BITriggerMatchedOld",&BITriggerMatchedOld,"BITriggerMatchedOld/O");
+  tree->Branch("BIActiveTriggerOld",&BIActiveTriggerOld,"BIActiveTriggerOld/i");
+  tree->Branch("TOFOld",&TOFOld,"TOFOld/F");
+
+  tree->Branch("CKov0StatusOld",&CKov0StatusOld,"CKov0StatusOld/I");
+  tree->Branch("CKov1StatusOld",&CKov1StatusOld,"CKov1StatusOld/I");
+
+  tree->Branch("nBeamMomOld",&nBeamMomOld,"nBeamMomOld/i");
+  tree->Branch("beamMomOld",&beamMomOld,"beamMomOld[nBeamMomOld]/F");
+
+  tree->Branch("nBeamTracksOld",&nBeamTracksOld,"nBeamTracksOld/i");
+  tree->Branch("beamTrackXFrontTPCOld",&beamTrackXFrontTPCOld,"beamTrackXFrontTPCOld[nBeamTracksOld]/F");
+  tree->Branch("beamTrackYFrontTPCOld",&beamTrackYFrontTPCOld,"beamTrackYFrontTPCOld[nBeamTracksOld]/F");
+  tree->Branch("beamTrackThetaOld",&beamTrackThetaOld,"beamTrackThetaOld[nBeamTracksOld]/F");
+  tree->Branch("beamTrackPhiOld",&beamTrackPhiOld,"beamTrackPhiOld[nBeamTracksOld]/F");
+
+  tree->Branch("BIElectron0p3GeVOld",&BIElectron0p3GeVOld,"BIElectron0p3GeVOld/O");
+  tree->Branch("BIMuon0p3GeVOld",&BIMuon0p3GeVOld,"BIMuon0p3GeVOld/O");
+  tree->Branch("BIPion0p3GeVOld",&BIPion0p3GeVOld,"BIPion0p3GeVOld/O");
+  tree->Branch("BIKaon0p3GeVOld",&BIKaon0p3GeVOld,"BIKaon0p3GeVOld/O");
+  tree->Branch("BIProton0p3GeVOld",&BIProton0p3GeVOld,"BIProton0p3GeVOld/O");
+  tree->Branch("BIDeuteron0p3GeVOld",&BIDeuteron0p3GeVOld,"BIDeuteron0p3GeVOld/O");
+  tree->Branch("BIElectron0p5GeVOld",&BIElectron0p5GeVOld,"BIElectron0p5GeVOld/O");
+  tree->Branch("BIMuon0p5GeVOld",&BIMuon0p5GeVOld,"BIMuon0p5GeVOld/O");
+  tree->Branch("BIPion0p5GeVOld",&BIPion0p5GeVOld,"BIPion0p5GeVOld/O");
+  tree->Branch("BIKaon0p5GeVOld",&BIKaon0p5GeVOld,"BIKaon0p5GeVOld/O");
+  tree->Branch("BIProton0p5GeVOld",&BIProton0p5GeVOld,"BIProton0p5GeVOld/O");
+  tree->Branch("BIDeuteron0p5GeVOld",&BIDeuteron0p5GeVOld,"BIDeuteron0p5GeVOld/O");
+  tree->Branch("BIElectron1GeVOld",&BIElectron1GeVOld,"BIElectron1GeVOld/O");
+  tree->Branch("BIMuon1GeVOld",&BIMuon1GeVOld,"BIMuon1GeVOld/O");
+  tree->Branch("BIPion1GeVOld",&BIPion1GeVOld,"BIPion1GeVOld/O");
+  tree->Branch("BIKaon1GeVOld",&BIKaon1GeVOld,"BIKaon1GeVOld/O");
+  tree->Branch("BIProton1GeVOld",&BIProton1GeVOld,"BIProton1GeVOld/O");
+  tree->Branch("BIDeuteron1GeVOld",&BIDeuteron1GeVOld,"BIDeuteron1GeVOld/O");
+  tree->Branch("BIElectron2GeVOld",&BIElectron2GeVOld,"BIElectron2GeVOld/O");
+  tree->Branch("BIMuon2GeVOld",&BIMuon2GeVOld,"BIMuon2GeVOld/O");
+  tree->Branch("BIPion2GeVOld",&BIPion2GeVOld,"BIPion2GeVOld/O");
+  tree->Branch("BIKaon2GeVOld",&BIKaon2GeVOld,"BIKaon2GeVOld/O");
+  tree->Branch("BIProton2GeVOld",&BIProton2GeVOld,"BIProton2GeVOld/O");
+  tree->Branch("BIDeuteron2GeVOld",&BIDeuteron2GeVOld,"BIDeuteron2GeVOld/O");
+  tree->Branch("BIElectron3GeVOld",&BIElectron3GeVOld,"BIElectron3GeVOld/O");
+  tree->Branch("BIMuon3GeVOld",&BIMuon3GeVOld,"BIMuon3GeVOld/O");
+  tree->Branch("BIPion3GeVOld",&BIPion3GeVOld,"BIPion3GeVOld/O");
+  tree->Branch("BIKaon3GeVOld",&BIKaon3GeVOld,"BIKaon3GeVOld/O");
+  tree->Branch("BIProton3GeVOld",&BIProton3GeVOld,"BIProton3GeVOld/O");
+  tree->Branch("BIDeuteron3GeVOld",&BIDeuteron3GeVOld,"BIDeuteron3GeVOld/O");
+  tree->Branch("BIElectron6GeVOld",&BIElectron6GeVOld,"BIElectron6GeVOld/O");
+  tree->Branch("BIMuon6GeVOld",&BIMuon6GeVOld,"BIMuon6GeVOld/O");
+  tree->Branch("BIPion6GeVOld",&BIPion6GeVOld,"BIPion6GeVOld/O");
+  tree->Branch("BIKaon6GeVOld",&BIKaon6GeVOld,"BIKaon6GeVOld/O");
+  tree->Branch("BIProton6GeVOld",&BIProton6GeVOld,"BIProton6GeVOld/O");
+  tree->Branch("BIDeuteron6GeVOld",&BIDeuteron6GeVOld,"BIDeuteron6GeVOld/O");
+  tree->Branch("BIElectron7GeVOld",&BIElectron7GeVOld,"BIElectron7GeVOld/O");
+  tree->Branch("BIMuon7GeVOld",&BIMuon7GeVOld,"BIMuon7GeVOld/O");
+  tree->Branch("BIPion7GeVOld",&BIPion7GeVOld,"BIPion7GeVOld/O");
+  tree->Branch("BIKaon7GeVOld",&BIKaon7GeVOld,"BIKaon7GeVOld/O");
+  tree->Branch("BIProton7GeVOld",&BIProton7GeVOld,"BIProton7GeVOld/O");
+  tree->Branch("BIDeuteron7GeVOld",&BIDeuteron7GeVOld,"BIDeuteron7GeVOld/O");
 
   tree->Branch("triggerIsBeam",&triggerIsBeam,"triggerIsBeam/O");
   tree->Branch("triggerBits",&triggerBits,"triggerBits/i");
@@ -1774,6 +2077,7 @@ void lana::PionAbsSelector::reconfigure(fhicl::ParameterSet const & p)
   fTrackLabel = p.get<art::InputTag>("TrackLabel");
   fCaloLabel = p.get<art::InputTag>("CaloLabel");
   fBeamEventTag = p.get<art::InputTag>("BeamEventTag");
+  fBeamEventTagOld = p.get<art::InputTag>("BeamEventTagOld");
   fRawTriggerTag = p.get<art::InputTag>("RawTriggerTag");
   //fVertexLabel = p.get<art::InputTag>("VertexLabel");
   fLikelihoodPIDTag = p.get<art::InputTag>("LikelihoodPIDTag");
@@ -2049,6 +2353,72 @@ void lana::PionAbsSelector::ResetTreeVars()
   BIKaon7GeV = false;
   BIProton7GeV = false;
   BIDeuteron7GeV = false;
+
+  nBeamTracksOld = 0;
+  for(size_t iTrack=0; iTrack < MAXBEAMTRACKS; iTrack++)
+  {
+    beamTrackXFrontTPCOld[iTrack] = DEFAULTNEG;
+    beamTrackYFrontTPCOld[iTrack] = DEFAULTNEG;
+    beamTrackThetaOld[iTrack] = DEFAULTNEG;
+    beamTrackPhiOld[iTrack] = DEFAULTNEG;
+  }
+
+  nBeamMomOld = 0;
+  for(size_t iTrack=0; iTrack < MAXBEAMMOMS; iTrack++)
+  {
+    beamMomOld[iTrack] = DEFAULTNEG;
+  }
+
+  nBeamEventsOld = 0;
+  BITriggerOld = DEFAULTNEG;
+  BITriggerMatchedOld = false;
+  BIActiveTriggerOld = 0;
+  TOFOld = DEFAULTNEG;
+  CKov0StatusOld = DEFAULTNEG;
+  CKov1StatusOld = DEFAULTNEG;
+
+  BIElectron0p3GeVOld = false;
+  BIMuon0p3GeVOld = false;
+  BIPion0p3GeVOld = false;
+  BIKaon0p3GeVOld = false;
+  BIProton0p3GeVOld = false;
+  BIDeuteron0p3GeVOld = false;
+  BIElectron0p5GeVOld = false;
+  BIMuon0p5GeVOld = false;
+  BIPion0p5GeVOld = false;
+  BIKaon0p5GeVOld = false;
+  BIProton0p5GeVOld = false;
+  BIDeuteron0p5GeVOld = false;
+  BIElectron1GeVOld = false;
+  BIMuon1GeVOld = false;
+  BIPion1GeVOld = false;
+  BIKaon1GeVOld = false;
+  BIProton1GeVOld = false;
+  BIDeuteron1GeVOld = false;
+  BIElectron2GeVOld = false;
+  BIMuon2GeVOld = false;
+  BIPion2GeVOld = false;
+  BIKaon2GeVOld = false;
+  BIProton2GeVOld = false;
+  BIDeuteron2GeVOld = false;
+  BIElectron3GeVOld = false;
+  BIMuon3GeVOld = false;
+  BIPion3GeVOld = false;
+  BIKaon3GeVOld = false;
+  BIProton3GeVOld = false;
+  BIDeuteron3GeVOld = false;
+  BIElectron6GeVOld = false;
+  BIMuon6GeVOld = false;
+  BIPion6GeVOld = false;
+  BIKaon6GeVOld = false;
+  BIProton6GeVOld = false;
+  BIDeuteron6GeVOld = false;
+  BIElectron7GeVOld = false;
+  BIMuon7GeVOld = false;
+  BIPion7GeVOld = false;
+  BIKaon7GeVOld = false;
+  BIProton7GeVOld = false;
+  BIDeuteron7GeVOld = false;
 
   triggerIsBeam = false;
   triggerBits = 0;
