@@ -9,3 +9,5 @@ services.IFBeam:  {}
 physics.producers.beamevent: @local::proto_beamevent
 physics.reco: [ beamevent ]
 physics.trigger_paths: [ reco ]
+
+physics.analyzers.PiAbsSelector.BeamlineUtils.UseCERNCalibSelection: true
