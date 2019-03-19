@@ -223,6 +223,8 @@ private:
   // Declare member data here.
 
   //parameters read from fcl file
+  bool fDoPMAAnalysis;
+  bool fDoPandoraAnalysis;
   art::InputTag fTruePartLabel; //The name of the module that produced simb::MCParticle objects
   art::InputTag fBeamTruthTag; //The name of the module that produced beam simb::MCTruth objects
   art::InputTag fCosmicTruthTag; //The name of the module that produced cosmic simb::MCTruth objects
@@ -1374,76 +1376,82 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
   kinWCProton = eWCProton - MPROTON;
   kinWCInTPCProton = kinWCProton - KINLOSTBEFORETPCPROTON;
 
-  ProcessAllTracks(trackVec, truePartVec,tracksCaloVec,fmHitsForTracks,beamOrCosmic,e);
-
-  ProcessPrimaryTrack(trackVec,primaryParticle,tracksCaloVec,motherDaughterWalker,e);
-
-  if (isMC && nTracksInFirstZ[2] >= 1 && nTracksInFirstZ[14] < 4 && nTracksLengthLt[5] < 3
-            && iBestMatch >= 0 && nMatchedTracks == 1
-            && primTrkEndX > 5.4 && primTrkEndX < 42.9
-            && primTrkEndY > -15. && primTrkEndX < 15.
-            && primTrkEndY > 5. && primTrkEndX < 85.
-      )
+  if(fDoPMAAnalysis)
   {
-    mf::LogInfo("PiAbsRecoAccuracy") << std::fixed << std::setprecision(1) 
-            << "N_pi+/-: " << trueNSecondaryChPions
-            << " N_pi0: " << trueNSecondaryPiZeros
-            << " N_p: " << trueNSecondaryProtons
-            << " N Secondary Tracks: " << nSecTrk
-            << std::setprecision(2)
-            << " Min Proton/Pion LHR: " << nSecLLRProtonToPionMin;
-  }
+    ProcessAllTracks(trackVec, truePartVec,tracksCaloVec,fmHitsForTracks,beamOrCosmic,e);
 
-  ProcessPFParticles(e,beamOrCosmic);
+    ProcessPrimaryTrack(trackVec,primaryParticle,tracksCaloVec,motherDaughterWalker,e);
+
+    if (isMC && nTracksInFirstZ[2] >= 1 && nTracksInFirstZ[14] < 4 && nTracksLengthLt[5] < 3
+              && iBestMatch >= 0 && nMatchedTracks == 1
+              && primTrkEndX > 5.4 && primTrkEndX < 42.9
+              && primTrkEndY > -15. && primTrkEndX < 15.
+              && primTrkEndY > 5. && primTrkEndX < 85.
+        )
+    {
+      mf::LogInfo("PiAbsRecoAccuracy") << std::fixed << std::setprecision(1) 
+              << "N_pi+/-: " << trueNSecondaryChPions
+              << " N_pi0: " << trueNSecondaryPiZeros
+              << " N_p: " << trueNSecondaryProtons
+              << " N Secondary Tracks: " << nSecTrk
+              << std::setprecision(2)
+              << " Min Proton/Pion LHR: " << nSecLLRProtonToPionMin;
+    }
+  } // if fDoPMAAnalysis
+
+  if (fDoPandoraAnalysis) ProcessPFParticles(e,beamOrCosmic);
   
   tree->Fill();
 
-  const float flangeRadiusCutSquared = pow(fFlangeRadiusCut,2);
-  for (size_t iTrack=0; iTrack < nTracks; iTrack++)
+  if (fDoPMAAnalysis)
   {
-    for (size_t iBeamTrack=0; iBeamTrack < nBeamTracks; iBeamTrack++)
+    const float flangeRadiusCutSquared = pow(fFlangeRadiusCut,2);
+    for (size_t iTrack=0; iTrack < nTracks; iTrack++)
     {
-      const float dx = trackXFrontTPC[iTrack] - beamTrackXFrontTPC[iBeamTrack];
-      const float dy = trackYFrontTPC[iTrack] - beamTrackYFrontTPC[iBeamTrack];
-      TVector3 trackDir;
-      TVector3 beamTrackDir;
-      trackDir.SetMagThetaPhi(1.,trackStartTheta[iTrack],trackStartPhi[iTrack]);
-      beamTrackDir.SetMagThetaPhi(1.,beamTrackTheta[iTrack],beamTrackPhi[iTrack]);
-      const float dAngle = trackDir.Angle(beamTrackDir)*180./CLHEP::pi;
-      deltaXYTPCBeamlineHist->Fill(dx,dy);
-      deltaAngleTPCBeamlineHist->Fill(dAngle);
-      const float r2FlangeBeamTrack = pow(beamTrackXFrontTPC[iBeamTrack]-fFlangeCenterX,2)
-                                    +pow(beamTrackYFrontTPC[iBeamTrack]-fFlangeCenterY,2);
-      const float r2FlangeTrack = pow(trackXFrontTPC[iTrack]-fFlangeCenterX,2)
-                                   +pow(trackYFrontTPC[iTrack]-fFlangeCenterY,2);
-      const bool beamTrackInFlange = r2FlangeBeamTrack < flangeRadiusCutSquared;
-      const bool trackInFlange = r2FlangeTrack < flangeRadiusCutSquared;
-      const bool trackInFirst25cm = std::min(trackStartZ[iTrack],trackEndZ[iTrack]) < 25.;
-      //std::cout << "iTrack: " << iTrack << " iMCPart: " << iMCPart
-      //          << " trackInFirst25cm " << trackInFirst25cm
-      //          << " trackInFlange " << trackInFlange
-      //          << " beamTrackInFlange " << beamTrackInFlange
-      //          << " r2FlangeBeamTrack " << r2FlangeBeamTrack
-      //          << " r2FlangeTrack " << r2FlangeTrack
-      //          << " trackMinZ " << std::min(trackStartZ[iTrack],trackEndZ[iTrack])
-      //          << std::endl;
-      if (beamTrackInFlange && trackInFlange)
+      for (size_t iBeamTrack=0; iBeamTrack < nBeamTracks; iBeamTrack++)
       {
-        deltaXYTPCBeamlineOnlyInFlangeHist->Fill(dx,dy);
-        deltaAngleTPCBeamlineOnlyInFlangeHist->Fill(dAngle);
+        const float dx = trackXFrontTPC[iTrack] - beamTrackXFrontTPC[iBeamTrack];
+        const float dy = trackYFrontTPC[iTrack] - beamTrackYFrontTPC[iBeamTrack];
+        TVector3 trackDir;
+        TVector3 beamTrackDir;
+        trackDir.SetMagThetaPhi(1.,trackStartTheta[iTrack],trackStartPhi[iTrack]);
+        beamTrackDir.SetMagThetaPhi(1.,beamTrackTheta[iTrack],beamTrackPhi[iTrack]);
+        const float dAngle = trackDir.Angle(beamTrackDir)*180./CLHEP::pi;
+        deltaXYTPCBeamlineHist->Fill(dx,dy);
+        deltaAngleTPCBeamlineHist->Fill(dAngle);
+        const float r2FlangeBeamTrack = pow(beamTrackXFrontTPC[iBeamTrack]-fFlangeCenterX,2)
+                                      +pow(beamTrackYFrontTPC[iBeamTrack]-fFlangeCenterY,2);
+        const float r2FlangeTrack = pow(trackXFrontTPC[iTrack]-fFlangeCenterX,2)
+                                     +pow(trackYFrontTPC[iTrack]-fFlangeCenterY,2);
+        const bool beamTrackInFlange = r2FlangeBeamTrack < flangeRadiusCutSquared;
+        const bool trackInFlange = r2FlangeTrack < flangeRadiusCutSquared;
+        const bool trackInFirst25cm = std::min(trackStartZ[iTrack],trackEndZ[iTrack]) < 25.;
+        //std::cout << "iTrack: " << iTrack << " iMCPart: " << iMCPart
+        //          << " trackInFirst25cm " << trackInFirst25cm
+        //          << " trackInFlange " << trackInFlange
+        //          << " beamTrackInFlange " << beamTrackInFlange
+        //          << " r2FlangeBeamTrack " << r2FlangeBeamTrack
+        //          << " r2FlangeTrack " << r2FlangeTrack
+        //          << " trackMinZ " << std::min(trackStartZ[iTrack],trackEndZ[iTrack])
+        //          << std::endl;
+        if (beamTrackInFlange && trackInFlange)
+        {
+          deltaXYTPCBeamlineOnlyInFlangeHist->Fill(dx,dy);
+          deltaAngleTPCBeamlineOnlyInFlangeHist->Fill(dAngle);
+          if (trackInFirst25cm)
+          {
+            deltaXYTPCBeamlineOnlyInFlangeInFirst25cmHist->Fill(dx,dy);
+            deltaAngleTPCBeamlineOnlyInFlangeInFirst25cmHist->Fill(dAngle);
+          }
+        }
         if (trackInFirst25cm)
         {
-          deltaXYTPCBeamlineOnlyInFlangeInFirst25cmHist->Fill(dx,dy);
-          deltaAngleTPCBeamlineOnlyInFlangeInFirst25cmHist->Fill(dAngle);
+          deltaXYTPCBeamlineOnlyInFirst25cmHist->Fill(dx,dy);
+          deltaAngleTPCBeamlineOnlyInFirst25cmHist->Fill(dAngle);
         }
-      }
-      if (trackInFirst25cm)
-      {
-        deltaXYTPCBeamlineOnlyInFirst25cmHist->Fill(dx,dy);
-        deltaAngleTPCBeamlineOnlyInFirst25cmHist->Fill(dAngle);
-      }
-    } // for iMCPart
-  } // for iTrack
+      } // for iMCPart
+    } // for iTrack
+  } // if fDoPMAAnalysis
 
   if(beamOrCosmic) delete beamOrCosmic;
 
@@ -2070,6 +2078,8 @@ void lana::PionAbsSelector::endSubRun(art::SubRun const & sr)
 void lana::PionAbsSelector::reconfigure(fhicl::ParameterSet const & p)
 {
   // Implementation of optional member function here.
+  fDoPMAAnalysis = p.get<bool>("DoPMAAnalysis");
+  fDoPandoraAnalysis = p.get<bool>("DoPandoraAnalysis");
   fTruePartLabel = p.get<art::InputTag>("TruePartLabel");
   fBeamTruthTag = p.get<art::InputTag>("BeamTruthTag");
   fCosmicTruthTag = p.get<art::InputTag>("CosmicTruthTag");

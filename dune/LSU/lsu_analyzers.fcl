@@ -26,6 +26,8 @@ lsu_beam_analyzer:
 piabsselector: 
 {
   module_type:                    "PionAbsSelector"
+  DoPMAAnalysis:                  false
+  DoPandoraAnalysis:              true
   BeamTruthTag:                   "generator"
   CosmicTruthTag:                 "cosmicgenerator"
   TruePartLabel:                  "largeant"
