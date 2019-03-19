@@ -71,6 +71,7 @@ const auto MAXTOFS = 10;
 const auto MAXTRACKS = 1000;
 const auto MAXDAUGHTER = 25;
 const auto MAXMCPARTS = 10000;
+const auto MAXTRUETRAJPOINTS = 1000;
 const auto MAXBEAMTRACKS = 300;
 const auto MAXBEAMMOMS = 300;
 const auto MAXIDES = 20000;
@@ -480,6 +481,20 @@ private:
   Float_t trueYFrontTPC; // the starting trajectory projected to the TPC, y coord
   Float_t trueTrajPointFrontTPCDist; // distance from front of TPC to closest traj point on true MCPart cm
   Float_t trueKinFrontTPC; // kinetic energy of primaryParticle at traj point closest to front of TPC MeV
+
+  UInt_t trueTrajNPoints;
+  Float_t trueTrajPointX[MAXTRUETRAJPOINTS];
+  Float_t trueTrajPointY[MAXTRUETRAJPOINTS];
+  Float_t trueTrajPointZ[MAXTRUETRAJPOINTS];
+  Float_t trueTrajPointT[MAXTRUETRAJPOINTS];
+  Float_t trueTrajPointPx[MAXTRUETRAJPOINTS];
+  Float_t trueTrajPointPy[MAXTRUETRAJPOINTS];
+  Float_t trueTrajPointPz[MAXTRUETRAJPOINTS];
+  Float_t trueTrajPointE[MAXTRUETRAJPOINTS];
+  Float_t trueTrajPointMom[MAXTRUETRAJPOINTS];
+  Float_t trueTrajPointKin[MAXTRUETRAJPOINTS];
+  UChar_t trueTrajPointProc[MAXTRUETRAJPOINTS]; // 0 unknown, 1 hadElastic 2-7 inelastic depend on hadron
+  Float_t trueTrajPointKinkAngle[MAXTRUETRAJPOINTS]; // angle between this point mom and last point mom
 
   UInt_t nMCParts;
   bool mcPartIsBeam[MAXMCPARTS];
@@ -1676,6 +1691,20 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("trueTrajPointFrontTPCDist",&trueTrajPointFrontTPCDist,"trueTrajPointFrontTPCDist/F");
   tree->Branch("trueKinFrontTPC",&trueKinFrontTPC,"trueKinFrontTPC/F");
 
+  tree->Branch("trueTrajNPoints",&trueTrajNPoints,"trueTrajNPoints/i");
+  tree->Branch("trueTrajPointX",&trueTrajPointX,"trueTrajPointX[trueTrajNPoints]/F");
+  tree->Branch("trueTrajPointY",&trueTrajPointY,"trueTrajPointY[trueTrajNPoints]/F");
+  tree->Branch("trueTrajPointZ",&trueTrajPointZ,"trueTrajPointZ[trueTrajNPoints]/F");
+  tree->Branch("trueTrajPointT",&trueTrajPointT,"trueTrajPointT[trueTrajNPoints]/F");
+  tree->Branch("trueTrajPointPx",&trueTrajPointPx,"trueTrajPointPx[trueTrajNPoints]/F");
+  tree->Branch("trueTrajPointPy",&trueTrajPointPy,"trueTrajPointPy[trueTrajNPoints]/F");
+  tree->Branch("trueTrajPointPz",&trueTrajPointPz,"trueTrajPointPz[trueTrajNPoints]/F");
+  tree->Branch("trueTrajPointE",&trueTrajPointE,"trueTrajPointE[trueTrajNPoints]/F");
+  tree->Branch("trueTrajPointMom",&trueTrajPointMom,"trueTrajPointMom[trueTrajNPoints]/F");
+  tree->Branch("trueTrajPointKin",&trueTrajPointKin,"trueTrajPointKin[trueTrajNPoints]/F");
+  tree->Branch("trueTrajPointProc",&trueTrajPointProc,"trueTrajPointProc[trueTrajNPoints]/b");
+  tree->Branch("trueTrajPointKinkAngle",&trueTrajPointKinkAngle,"trueTrajPointKinkAngle[trueTrajNPoints]/F");
+
   tree->Branch("nMCParts",&nMCParts,"nMCParts/i");
   tree->Branch("mcPartIsBeam",&mcPartIsBeam,"mcPartIsBeam[nMCParts]/O");
   tree->Branch("mcPartIsPrimary",&mcPartIsPrimary,"mcPartIsPrimary[nMCParts]/O");
@@ -2490,6 +2519,23 @@ void lana::PionAbsSelector::ResetTreeVars()
   trueTrajPointFrontTPCDist = DEFAULTNEG;
   trueKinFrontTPC = DEFAULTNEG;
 
+  trueTrajNPoints = 0;
+  for(size_t i=0; i < MAXTRUETRAJPOINTS; i++)
+  {
+    trueTrajPointX[i] = DEFAULTNEG;
+    trueTrajPointY[i] = DEFAULTNEG;
+    trueTrajPointZ[i] = DEFAULTNEG;
+    trueTrajPointT[i] = DEFAULTNEG;
+    trueTrajPointPx[i] = DEFAULTNEG;
+    trueTrajPointPy[i] = DEFAULTNEG;
+    trueTrajPointPz[i] = DEFAULTNEG;
+    trueTrajPointE[i] = DEFAULTNEG;
+    trueTrajPointMom[i] = DEFAULTNEG;
+    trueTrajPointKin[i] = DEFAULTNEG;
+    trueTrajPointProc[i] = 0;
+    trueTrajPointKinkAngle[i] = DEFAULTNEG;
+  }
+
   nMCParts = 0;
   for(size_t i=0; i < MAXMCPARTS; i++)
   {
@@ -3192,6 +3238,44 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
     //  if(iClosestTrajPointToFrontTPC == iTP) std::cout << "This is TPC front point: " << std::endl;
     //  std::cout << "primaryParticle TrajPoint  iTP: "<<iTP<<" z: " << primaryParticle->Vz(iTP) <<"        KE: "<< 1000.*(primaryParticle->E(iTP) - primaryParticle->Mass()) << std::endl;
     //}
+
+    // Store all trajectory info
+    const auto& trajectory = primaryParticle->Trajectory();
+    const auto& trajProcMap = trajectory.TrajectoryProcesses(); // I think tells you if elastic interactions happened
+    trueTrajNPoints = 0;
+    for (size_t iTP=0; iTP < trajectory.size(); iTP++)
+    {
+      if (trajectory.Z(iTP) > 800. || iTP >= MAXTRUETRAJPOINTS) break;
+      trueTrajPointX[iTP] = trajectory.X(iTP);
+      trueTrajPointY[iTP] = trajectory.Y(iTP);
+      trueTrajPointZ[iTP] = trajectory.Z(iTP);
+      trueTrajPointT[iTP] = trajectory.T(iTP);
+      const auto& trajMom = trajectory.Momentum(iTP);
+      trueTrajPointPx[iTP] = trajMom.Px();
+      trueTrajPointPy[iTP] = trajMom.Py();
+      trueTrajPointPz[iTP] = trajMom.Pz();
+      trueTrajPointE[iTP] = trajMom.E();
+      trueTrajPointMom[iTP] = trajMom.Vect().Mag();
+      trueTrajPointKin[iTP] = trajMom.E()-trajMom.M();
+      unsigned char procCode = 0;
+      for (const auto& iPtAndCode: trajProcMap)
+      {
+        if(iPtAndCode.first == iTP)
+        {
+          procCode = iPtAndCode.second;
+          break;
+        } // if iPt == iTP
+      } // for iPtAndCode
+      trueTrajPointProc[iTP] = procCode;
+      if(iTP > 0 && iTP < trajectory.size()-1)
+      {
+        trueTrajPointKinkAngle[iTP] = trajectory.Momentum(iTP-1).Angle(trajMom.Vect());
+      }
+      //std::cout << "Trajectory Point " << iTP << " Position: " << trajectory.X(iTP) << "  " << trajectory.Y(iTP) <<"  "<< trajectory.Z(iTP) 
+      //          << "  KE: " << trajMom.E() - trajMom.M() << " GeV Kink: " << trueTrajPointKinkAngle[iTP] 
+      //          << " process: "<<(unsigned) procCode  << " \""<< trajectory.KeyToProcess(procCode) << "\"\n";
+      trueTrajNPoints++;
+    } // for iTP
 
     // Get SimChannel Info
     protoana::ProtoDUNETruthUtils pdTruthUtils;
