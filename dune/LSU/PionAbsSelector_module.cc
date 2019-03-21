@@ -972,7 +972,7 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     //art::Ptr<beam::ProtoDUNEBeamEvent> beamEvent = beamVec.at(iBeamEvent);
     if(PRINTBEAMEVENT)
     {
-      std::cout << "PiAbsSel BeamEvent " << iBeamEvent << ": \n";
+      std::cout << "PiAbsSel BeamEvent " << iBeamEvent << " for "<< e.id() << ": \n";
       std::cout << "  CTB Timestamp: " << beamEvent.GetCTBTimestamp() << "\n";
       std::cout << "  BI Trigger: " << beamEvent.GetBITrigger() << "\n";
       std::cout << "  Active Trigger: " << beamEvent.GetActiveTrigger() << "\n";
@@ -1208,7 +1208,7 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
     beam::ProtoDUNEBeamEvent beamEvent = *(beamVecOld.at(iBeamEvent));
     if(PRINTBEAMEVENT)
     {
-      std::cout << "PiAbsSel BeamEvent (OLD)" << iBeamEvent << ": \n";
+      std::cout << "PiAbsSel BeamEvent (OLD)" << iBeamEvent << " for " << e.id() << ": \n";
       std::cout << "  CTB Timestamp: " << beamEvent.GetCTBTimestamp() << "\n";
       std::cout << "  BI Trigger: " << beamEvent.GetBITrigger() << "\n";
       std::cout << "  Active Trigger: " << beamEvent.GetActiveTrigger() << "\n";
