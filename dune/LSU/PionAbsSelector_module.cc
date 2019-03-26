@@ -734,6 +734,8 @@ private:
   float PFBeamPrimBeamCosmicScore;
   float PFBeamPrimXFrontTPC;
   float PFBeamPrimYFrontTPC;
+  float PFBeamPrimXFrontTPCTrackEnd;
+  float PFBeamPrimYFrontTPCTrackEnd;
   float PFBeamPrimStartX;
   float PFBeamPrimStartY;
   float PFBeamPrimStartZ;
@@ -1909,6 +1911,8 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("PFBeamPrimBeamCosmicScore",&PFBeamPrimBeamCosmicScore,"PFBeamPrimBeamCosmicScore/F");
   tree->Branch("PFBeamPrimXFrontTPC",&PFBeamPrimXFrontTPC,"PFBeamPrimXFrontTPC/F");
   tree->Branch("PFBeamPrimYFrontTPC",&PFBeamPrimYFrontTPC,"PFBeamPrimYFrontTPC/F");
+  tree->Branch("PFBeamPrimXFrontTPCTrackEnd",&PFBeamPrimXFrontTPCTrackEnd,"PFBeamPrimXFrontTPCTrackEnd/F");
+  tree->Branch("PFBeamPrimYFrontTPCTrackEnd",&PFBeamPrimYFrontTPCTrackEnd,"PFBeamPrimYFrontTPCTrackEnd/F");
   tree->Branch("PFBeamPrimStartX",&PFBeamPrimStartX,"PFBeamPrimStartX/F");
   tree->Branch("PFBeamPrimStartY",&PFBeamPrimStartY,"PFBeamPrimStartY/F");
   tree->Branch("PFBeamPrimStartZ",&PFBeamPrimStartZ,"PFBeamPrimStartZ/F");
@@ -2786,6 +2790,8 @@ void lana::PionAbsSelector::ResetTreeVars()
   PFBeamPrimBeamCosmicScore = DEFAULTNEG;
   PFBeamPrimXFrontTPC = DEFAULTNEG;
   PFBeamPrimYFrontTPC = DEFAULTNEG;
+  PFBeamPrimXFrontTPCTrackEnd = DEFAULTNEG;
+  PFBeamPrimYFrontTPCTrackEnd = DEFAULTNEG;
   PFBeamPrimStartX = DEFAULTNEG;
   PFBeamPrimStartY = DEFAULTNEG;
   PFBeamPrimStartZ = DEFAULTNEG;
@@ -4351,6 +4357,9 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
       PFBeamPrimEndZ = pfBeamPrimEnd.Z();
       PFBeamPrimEndTheta = pfBeamPrimEndDir.Theta();
       PFBeamPrimEndPhi = pfBeamPrimEndDir.Phi();
+      const TVector3 pfFrontTPCPointTrackEnd = lsu::lineZPlane(ZSTARTOFTPC,pfBeamPrimEnd,pfBeamPrimEndDir);
+      PFBeamPrimXFrontTPCTrackEnd = pfFrontTPCPointTrackEnd.X();
+      PFBeamPrimYFrontTPCTrackEnd = pfFrontTPCPointTrackEnd.Y();
       PFBeamPrimTrkStartEndDirAngle = ROOT::Math::VectorUtil::Angle(pfBeamPrimStartDir,pfBeamPrimEndDir);
       PFBeamPrimEndAngleToBeamTrk = ROOT::Math::VectorUtil::Angle(pfBeamPrimEndDir,dirVecBeamTrk);
     }
