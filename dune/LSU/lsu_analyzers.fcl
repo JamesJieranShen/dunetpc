@@ -45,6 +45,7 @@ piabsselector:
   PFTrackTag:                     "pandoraTrack"
   PFShowerTag:                    "pandoraShower"
   PFCaloTag:                      "pandoracalo"
+  PandoraHitTag:                  "linecluster"
   CaloPlane:                      2
   FiducialPrimaryXMin:            30.
   FiducialPrimaryXMax:            330.
