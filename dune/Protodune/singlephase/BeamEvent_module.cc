@@ -733,6 +733,7 @@ void proto::BeamEvent::SetBeamEvent(){
 ////////////////////////
 // Producer Method (reads in the event and derives values)
 void proto::BeamEvent::produce(art::Event & e){
+  std::cout << "BeamEvent Justin: started produce " << e.id() << std::endl;
   //Reset 
   acqTime = 0;
   acqStampMBPL = 0;
@@ -1041,13 +1042,16 @@ void proto::BeamEvent::produce(art::Event & e){
 
   std::unique_ptr<std::vector<beam::ProtoDUNEBeamEvent> > beamData(new std::vector<beam::ProtoDUNEBeamEvent>);
   beamData->push_back(beam::ProtoDUNEBeamEvent(*beamevt));
+  std::cout << "BeamEvent Justin: about to put vector of BeamEvent in event " << e.id() << std::endl;
   e.put(std::move(beamData));
+  std::cout << "BeamEvent Justin: just put vector of BeamEvent in event " << e.id() << std::endl;
   delete beamevt;
   delete beamspill;
  
   // Write out the to tree
   if( fSaveOutTree )fOutTree->Fill();
  
+  std::cout << "BeamEvent Justin: end of produce " << e.id() << std::endl;
 }
 // END BeamEvent::produce
 ////////////////////////

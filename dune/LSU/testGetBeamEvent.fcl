@@ -1,0 +1,60 @@
+#include "services_dune.fcl"
+#include "BeamEvent.fcl"
+
+process_name: TestRedoBeamEvent
+
+services:
+{
+  TFileService: { fileName: "TestGetBeamEvent.root" }
+  RandomNumberGenerator: {} #ART native random number generator
+  FileCatalogMetadata:  @local::art_file_catalog_data
+  @table::protodune_services
+  #PdspChannelMapService:        @local::pdspchannelmap
+  #ChannelStatusService:         @local::pdsp_channel_status
+  TimeTracker:      {}
+  MemoryTracker:    {}
+  IFBeam:  {}
+}
+
+source:
+{
+  module_type: RootInput
+
+  # Number of events to analyze; "-1" means all of the events in the input
+  # file. You can override this value with the "-n" option on the command line. 
+  maxEvents:  -1 
+}
+
+# This is empty, because we're not writing any art::Events to an output file. 
+outputs: {}
+
+physics:
+{
+  producers:
+  {
+    beamevent: @local::proto_beamevent
+  }
+
+  analyzers:
+  {
+    TestGetBeamEvent:
+    {
+        module_type:                    "TestGetBeamEvent"
+        BeamEventTag:                   "beamevent"
+        BeamEventTagOld:                "beamevent"
+    }
+  }
+
+  analysis: [ TestGetBeamEvent ]
+
+  reco: [ beamevent ]
+
+  trigger_paths: [reco]
+
+  end_paths: [ analysis ]
+}
+
+######################################################
+
+physics.analyzers.TestGetBeamEvent.BeamEventTag:    "beamevent::TestRedoBeamEvent" # this reco
+physics.analyzers.TestGetBeamEvent.BeamEventTagOld: "beamevent::DecoderandReco" # original reco

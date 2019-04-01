@@ -108,4 +108,10 @@ beammatchinganalyzer:
   FlangeRadiusCut:                30.
 }
 
+testgetbeamevent: {
+  module_type:                    "TestGetBeamEvent"
+  BeamEventTag:                   "beamevent"
+  BeamEventTagOld:                "beamevent"
+}
+
 END_PROLOG
