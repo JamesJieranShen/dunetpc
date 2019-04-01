@@ -70,7 +70,6 @@ void lana::TestGetBeamEvent::analyze(art::Event const & e)
       std::cout << "TestGetBeamEvent: BeamEvent provenance inputTag: '" << provTag.encode() << "'\n";
       //prov->write(std::cout);
       //std::cout << "\nBeamEvent provenance done\n";
-      fIsFirstEvent = false;
     }
     //if(beamHand.isValid())
     //{
@@ -89,7 +88,6 @@ void lana::TestGetBeamEvent::analyze(art::Event const & e)
       std::cout << "TestGetBeamEvent: BeamEvent Old provenance inputTag: '" << provTag.encode() << "'\n";
       //prov->write(std::cout);
       //std::cout << "\nBeamEvent Old provenance done\n";
-      fIsFirstEvent = false;
     }
     //if(beamHandOld.isValid())
     //{
@@ -97,6 +95,7 @@ void lana::TestGetBeamEvent::analyze(art::Event const & e)
     //}
   }
 
+  if(fIsFirstEvent) fIsFirstEvent = false;
 } // analyze function
 
 void lana::TestGetBeamEvent::reconfigure(fhicl::ParameterSet const & p)
