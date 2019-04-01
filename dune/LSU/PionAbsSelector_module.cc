@@ -1067,7 +1067,8 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       const recob::Track & track =  beamEvent.GetBeamTrack(iTrack);
       if(nBeamTracks >= MAXBEAMTRACKS)
       {
-        throw cet::exception("TooManyBeamTracks","Too many beam tracks in this event, ran out of room in array");
+        mf::LogError("PionAbsSelector") << "Event " << e.id() << " not stored because too many beam tracks";
+        return;
       }
       beamTrackXFrontTPC[nBeamTracks] = track.End().X();
       beamTrackYFrontTPC[nBeamTracks] = track.End().Y();
@@ -1243,7 +1244,8 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       const recob::Track & track =  beamEvent.GetBeamTrack(iTrack);
       if(nBeamTracks >= MAXBEAMTRACKS)
       {
-        throw cet::exception("TooManyOldBeamTracks","Too many old beam tracks in this event, ran out of room in array");
+        mf::LogError("PionAbsSelector") << "Event " << e.id() << " not stored because too many old beam tracks";
+        return;
       }
       beamTrackXFrontTPCOld[nBeamTracksOld] = track.End().X();
       beamTrackYFrontTPCOld[nBeamTracksOld] = track.End().Y();
