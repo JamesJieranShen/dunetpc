@@ -229,9 +229,9 @@ namespace protoana {
 
 
     //Basis Vectors for transforming coords
-    TVector3 MonitorBasisX;
-    TVector3 MonitorBasisY;
-    TVector3 MonitorBasisZ;
+    TVector3 MonitorBasisX = TVector3(1.,0.,0.);
+    TVector3 MonitorBasisY = TVector3(0.,1.,0.);
+    TVector3 MonitorBasisZ = TVector3(0.,0.,1.);
 
     bool rotated = false;
 

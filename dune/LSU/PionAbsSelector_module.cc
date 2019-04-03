@@ -292,9 +292,12 @@ private:
   Float_t kinWCInTPCProton; // WC track kinetic energy assuming proton mass, and subtracting constant E MeV
   Float_t yKinkWC; // WC track y-kink
   UInt_t nHitsWC; // WC track n hits
-  Float_t xWC4Hit; // WC4 hit position x coord in cm
-  Float_t yWC4Hit; // WC4 hit position y coord in cm
-  Float_t zWC4Hit; // WC4 hit position z coord in cm
+  Float_t xWC1Hit; // Fiber Tracker hit position x coord in cm
+  Float_t yWC1Hit; // Fiber Tracker hit position y coord in cm
+  Float_t zWC1Hit; // Fiber Tracker hit position z coord in cm
+  Float_t xWC2Hit; // Fiber Tracker hit position x coord in cm
+  Float_t yWC2Hit; // Fiber Tracker hit position y coord in cm
+  Float_t zWC2Hit; // Fiber Tracker hit position z coord in cm
 
   UInt_t nBeamTracks;
   Float_t beamTrackXFrontTPC[MAXBEAMTRACKS];
@@ -464,6 +467,8 @@ private:
   Float_t trueEndT; // ns
   Float_t trueStartTheta; // primary MCParticle initial theta radians
   Float_t trueStartPhi; // primary MCParticle initial phi radians
+  Float_t trueSecondToEndTheta; // primary MCParticle 2nd to last point theta radians (end is 0)
+  Float_t trueSecondToEndPhi; // primary MCParticle 2nd to last point phi radians (end is 0)
   Float_t trueStartMom; // primary MCParticle initial momentum MeV/c
   Float_t trueStartE; // primary MCParticle initial energy MeV
   Float_t trueStartKin; // primary MCParticle initial kinetic energy MeV
@@ -474,6 +479,7 @@ private:
   Float_t trueSecondToEndMom;// primary MCParticle second to last point momentum MeV/c
   Float_t trueSecondToEndE;// primary MCParticle second to last point energy MeV
   Float_t trueSecondToEndKin;// primary MCParticle second to last point kinetic energy MeV
+  Float_t trueAngleStartDirSecondToEndDir; // Angle between start dir and end dir in radians
   Int_t trueSecondPDG[MAXDAUGHTER]; // secondary Pdg Code
   Float_t trueSecondKin[MAXDAUGHTER]; // secondary Kinetic Energy
   Float_t trueSecondAngleToPrimEnd[MAXDAUGHTER]; // secondary angle to prim end
@@ -982,8 +988,8 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       std::cout << "  TOF: " << beamEvent.GetTOF() << "\n";
       std::cout << "  CKov0Status: " << beamEvent.GetCKov0Status() << "\n";
       std::cout << "  CKov1Status: " << beamEvent.GetCKov1Status() << "\n";
-      std::cout << "  CKov0Time: " << beamEvent.GetCKov0Time() << "\n";
-      std::cout << "  CKov1Time: " << beamEvent.GetCKov1Time() << "\n";
+      //std::cout << "  CKov0Time: " << beamEvent.GetCKov0Time() << "\n"; // don't think these are filled
+      //std::cout << "  CKov1Time: " << beamEvent.GetCKov1Time() << "\n"; // don't think these are filled
       std::cout << "  CKov0Pressure: " << beamEvent.GetCKov0Pressure() << "\n";
       std::cout << "  CKov1Pressure: " << beamEvent.GetCKov1Pressure() << "\n";
       std::cout << "  Beam Momenta:\n";
@@ -1088,8 +1094,15 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       {
         xWC = track.End().X();
         yWC = track.End().Y();
+        xWC1Hit = track.LocationAtPoint(0).X();
+        yWC1Hit = track.LocationAtPoint(0).Y();
+        zWC1Hit = track.LocationAtPoint(0).Z();
+        xWC2Hit = track.LocationAtPoint(1).X();
+        yWC2Hit = track.LocationAtPoint(1).Y();
+        zWC2Hit = track.LocationAtPoint(1).Z();
         thetaWC = track.EndDirection().Theta();
         phiWC = track.EndDirection().Phi();
+        track.NPoints();
       }
 
       if(PRINTBEAMEVENT)
@@ -1099,13 +1112,16 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
         std::cout << "    Start Pos: " << track.Vertex().X()
                                   << "  " << track.Vertex().Y()
                                   << "  " << track.Vertex().Z() << "\n";
+        std::cout << "    Mid Pos:   " << track.LocationAtPoint(1).X()
+                                  << "  " << track.LocationAtPoint(1).Y()
+                                  << "  " << track.LocationAtPoint(1).Z() << "\n";
         std::cout << "    End Pos:   " << track.End().X()
                                   << "  " << track.End().Y()
                                   << "  " << track.End().Z() << "\n";
         std::cout << "    Start Theta: " << track.VertexDirection().Theta()*180/CLHEP::pi << " deg\n";
         std::cout << "    Start Phi:   " << track.VertexDirection().Phi()*180/CLHEP::pi << " deg\n";
         std::cout << "    End Theta:   " << track.EndDirection().Theta()*180/CLHEP::pi << " deg\n";
-        std::cout << "    End Theta:   " << track.EndDirection().Phi()*180/CLHEP::pi << " deg\n";
+        std::cout << "    End Phi:     " << track.EndDirection().Phi()*180/CLHEP::pi << " deg\n";
       }
     }
 
@@ -1260,13 +1276,16 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
         std::cout << "    Start Pos: " << track.Vertex().X()
                                   << "  " << track.Vertex().Y()
                                   << "  " << track.Vertex().Z() << "\n";
+        std::cout << "    Mid Pos:   " << track.LocationAtPoint(1).X()
+                                  << "  " << track.LocationAtPoint(1).Y()
+                                  << "  " << track.LocationAtPoint(1).Z() << "\n";
         std::cout << "    End Pos:   " << track.End().X()
                                   << "  " << track.End().Y()
                                   << "  " << track.End().Z() << "\n";
         std::cout << "    Start Theta: " << track.VertexDirection().Theta()*180/CLHEP::pi << " deg\n";
         std::cout << "    Start Phi:   " << track.VertexDirection().Phi()*180/CLHEP::pi << " deg\n";
         std::cout << "    End Theta:   " << track.EndDirection().Theta()*180/CLHEP::pi << " deg\n";
-        std::cout << "    End Theta:   " << track.EndDirection().Phi()*180/CLHEP::pi << " deg\n";
+        std::cout << "    End Phi:     " << track.EndDirection().Phi()*180/CLHEP::pi << " deg\n";
       }
     }
 
@@ -1501,11 +1520,12 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("eWCProton",&eWCProton,"eWCProton/F");
   tree->Branch("kinWCProton",&kinWCProton,"kinWCProton/F");
   tree->Branch("kinWCInTPCProton",&kinWCInTPCProton,"kinWCInTPCProton/F");
-  //tree->Branch("yKinkWC",&yKinkWC,"yKinkWC/F");
-  //tree->Branch("nHitsWC",&nHitsWC,"nHitsWC/i");
-  //tree->Branch("xWC4Hit",&xWC4Hit,"xWC4Hit/F");
-  //tree->Branch("yWC4Hit",&yWC4Hit,"yWC4Hit/F");
-  //tree->Branch("zWC4Hit",&zWC4Hit,"zWC4Hit/F");
+  tree->Branch("xWC1Hit",&xWC1Hit,"xWC1Hit/F");
+  tree->Branch("yWC1Hit",&yWC1Hit,"yWC1Hit/F");
+  tree->Branch("zWC1Hit",&zWC1Hit,"zWC1Hit/F");
+  tree->Branch("xWC2Hit",&xWC2Hit,"xWC2Hit/F");
+  tree->Branch("yWC2Hit",&yWC2Hit,"yWC2Hit/F");
+  tree->Branch("zWC2Hit",&zWC2Hit,"zWC2Hit/F");
 
   tree->Branch("nBeamEvents",&nBeamEvents,"nBeamEvents/i");
   tree->Branch("BITrigger",&BITrigger,"BITrigger/I");
@@ -1677,6 +1697,8 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("trueEndT",&trueEndT,"trueEndT/F");
   tree->Branch("trueStartTheta",&trueStartTheta,"trueStartTheta/F");
   tree->Branch("trueStartPhi",&trueStartPhi,"trueStartPhi/F");
+  tree->Branch("trueSecondToEndTheta",&trueSecondToEndTheta,"trueSecondToEndTheta/F");
+  tree->Branch("trueSecondToEndPhi",&trueSecondToEndPhi,"trueSecondToEndPhi/F");
   tree->Branch("trueStartMom",&trueStartMom,"trueStartMom/F");
   tree->Branch("trueStartE",&trueStartE,"trueStartE/F");
   tree->Branch("trueStartKin",&trueStartKin,"trueStartKin/F");
@@ -1687,6 +1709,7 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("trueSecondToEndMom",&trueSecondToEndMom,"trueSecondToEndMom/F");
   tree->Branch("trueSecondToEndE",&trueSecondToEndE,"trueSecondToEndE/F");
   tree->Branch("trueSecondToEndKin",&trueSecondToEndKin,"trueSecondToEndKin/F");
+  tree->Branch("trueAngleStartDirSecondToEndDir",&trueAngleStartDirSecondToEndDir,"trueAngleStartDirSecondToEndDir/F");
   tree->Branch("trueSecondPDG",&trueSecondPDG,"trueSecondPDG[nSecTracks]/I");
   tree->Branch("trueSecondKin",&trueSecondKin,"trueSecondKin[nSecTracks]/F");
   tree->Branch("trueSecondAngleToPrimEnd",&trueSecondAngleToPrimEnd,"trueSecondAngleToPrimEnd[nSecTracks]/F");
@@ -2310,9 +2333,12 @@ void lana::PionAbsSelector::ResetTreeVars()
   kinWCInTPCProton = DEFAULTNEG;
   yKinkWC = DEFAULTNEG;
   nHitsWC = 0;
-  xWC4Hit = DEFAULTNEG;
-  yWC4Hit = DEFAULTNEG;
-  zWC4Hit = DEFAULTNEG;
+  xWC1Hit = DEFAULTNEG;
+  yWC1Hit = DEFAULTNEG;
+  zWC1Hit = DEFAULTNEG;
+  xWC2Hit = DEFAULTNEG;
+  yWC2Hit = DEFAULTNEG;
+  zWC2Hit = DEFAULTNEG;
 
   nBeamTracks = 0;
   for(size_t iTrack=0; iTrack < MAXBEAMTRACKS; iTrack++)
@@ -2504,6 +2530,8 @@ void lana::PionAbsSelector::ResetTreeVars()
   trueEndT = DEFAULTNEG;
   trueStartTheta = DEFAULTNEG;
   trueStartPhi = DEFAULTNEG;
+  trueSecondToEndTheta = DEFAULTNEG;
+  trueSecondToEndPhi = DEFAULTNEG;
   trueStartMom = DEFAULTNEG;
   trueStartE = DEFAULTNEG;
   trueStartKin = DEFAULTNEG;
@@ -2514,6 +2542,7 @@ void lana::PionAbsSelector::ResetTreeVars()
   trueSecondToEndMom = DEFAULTNEG;
   trueSecondToEndE = DEFAULTNEG;
   trueSecondToEndKin = DEFAULTNEG;
+  trueAngleStartDirSecondToEndDir = DEFAULTNEG;
   for(size_t iSec=0; iSec < MAXDAUGHTER; iSec++)
   {
     trueSecondPDG[iSec] = DEFAULTNEG;
@@ -3011,15 +3040,18 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
     trueStartY = trueStartPos.Y();
     trueStartZ = trueStartPos.Z();
     trueStartT = primaryParticle->T();
-    xWC4Hit = trueStartPos.X();
-    yWC4Hit = trueStartPos.Y();
-    zWC4Hit = trueStartPos.Z();
+    xWC2Hit = trueStartPos.X();
+    yWC2Hit = trueStartPos.Y();
+    zWC2Hit = trueStartPos.Z();
     trueEndX = trueEndPos.X();
     trueEndY = trueEndPos.Y();
     trueEndZ = trueEndPos.Z();
     trueEndT = primaryParticle->EndT();
     trueStartTheta = trueStartMomVec4.Vect().Theta();
     trueStartPhi = trueStartMomVec4.Vect().Phi();
+    trueSecondToEndTheta = trueSecondToEndMomVec4.Vect().Theta();
+    trueSecondToEndPhi = trueSecondToEndMomVec4.Vect().Phi();
+    trueAngleStartDirSecondToEndDir = ROOT::Math::VectorUtil::Angle(trueStartMomVec4,trueSecondToEndMomVec4);
     thetaWC = trueStartMomVec4.Vect().Theta();
     phiWC = trueStartMomVec4.Vect().Phi();
     trueStartMom = trueStartMomVec4.R()*1000.; //in MeV/c
@@ -3279,9 +3311,9 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
       {
         trueTrajPointKinkAngle[iTP] = trajectory.Momentum(iTP-1).Angle(trajMom.Vect());
       }
-      //std::cout << "Trajectory Point " << iTP << " Position: " << trajectory.X(iTP) << "  " << trajectory.Y(iTP) <<"  "<< trajectory.Z(iTP) 
-      //          << "  KE: " << trajMom.E() - trajMom.M() << " GeV Kink: " << trueTrajPointKinkAngle[iTP] 
-      //          << " process: "<<(unsigned) procCode  << " \""<< trajectory.KeyToProcess(procCode) << "\"\n";
+      std::cout << "Trajectory Point " << iTP << " Position: " << trajectory.X(iTP) << "  " << trajectory.Y(iTP) <<"  "<< trajectory.Z(iTP) 
+                << "  KE: " << trajMom.E() - trajMom.M() << " GeV Theta: "<< trajMom.Theta() << " Phi: " << trajMom.Phi() << " Kink: " << trueTrajPointKinkAngle[iTP] 
+                << " process: "<<(unsigned) procCode  << " \""<< trajectory.KeyToProcess(procCode) << "\"\n";
       trueTrajNPoints++;
     } // for iTP
 
