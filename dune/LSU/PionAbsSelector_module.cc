@@ -3311,9 +3311,9 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
       {
         trueTrajPointKinkAngle[iTP] = trajectory.Momentum(iTP-1).Angle(trajMom.Vect());
       }
-      std::cout << "Trajectory Point " << iTP << " Position: " << trajectory.X(iTP) << "  " << trajectory.Y(iTP) <<"  "<< trajectory.Z(iTP) 
-                << "  KE: " << trajMom.E() - trajMom.M() << " GeV Theta: "<< trajMom.Theta() << " Phi: " << trajMom.Phi() << " Kink: " << trueTrajPointKinkAngle[iTP] 
-                << " process: "<<(unsigned) procCode  << " \""<< trajectory.KeyToProcess(procCode) << "\"\n";
+      //std::cout << "Trajectory Point " << iTP << " Position: " << trajectory.X(iTP) << "  " << trajectory.Y(iTP) <<"  "<< trajectory.Z(iTP) 
+      //          << "  KE: " << trajMom.E() - trajMom.M() << " GeV Theta: "<< trajMom.Theta() << " Phi: " << trajMom.Phi() << " Kink: " << trueTrajPointKinkAngle[iTP] 
+      //          << " process: "<<(unsigned) procCode  << " \""<< trajectory.KeyToProcess(procCode) << "\"\n";
       trueTrajNPoints++;
     } // for iTP
 
