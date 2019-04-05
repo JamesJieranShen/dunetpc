@@ -26,6 +26,7 @@
 #include "lardataobj/AnalysisBase/Calorimetry.h"
 #include "lardataobj/RecoBase/Track.h"
 #include "lardataobj/RecoBase/TrackHitMeta.h"
+#include "lardataobj/RecoBase/Cluster.h"
 #include "lardataobj/AnalysisBase/ParticleID.h"
 #include "lardataobj/RawData/TriggerData.h"
 #include "nusimdata/SimulationBase/MCTruth.h"
@@ -244,6 +245,7 @@ private:
   art::InputTag fPFTrackTag;
   art::InputTag fPFShowerTag;
   art::InputTag fPFCaloTag;
+  art::InputTag fPandoraHitTag;
 
   unsigned int fCaloPlane; //The plane we are using for calorimetry
 
@@ -2156,6 +2158,7 @@ void lana::PionAbsSelector::reconfigure(fhicl::ParameterSet const & p)
   fPFTrackTag = p.get<art::InputTag>("PFTrackTag");
   fPFShowerTag = p.get<art::InputTag>("PFShowerTag");
   fPFCaloTag = p.get<art::InputTag>("PFCaloTag");
+  fPandoraHitTag = p.get<art::InputTag>("PandoraHitTag");
   
   fCaloPlane = p.get<unsigned int>("CaloPlane");
 
@@ -3950,7 +3953,7 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
     art::fill_ptr_vector(allPFTrackVec, allPFTrackHand);
   }
   art::FindManyP<recob::Hit> fmHitsForPFTracks(allPFTrackHand, e, fPFTrackTag);
-  art::FindManyP<recob::Hit, recob::TrackHitMeta> fmHitsForPFTracksMeta(allPFTrackHand, e,fPFTrackTag);
+  //art::FindManyP<recob::Hit, recob::TrackHitMeta> fmHitsForPFTracksMeta(allPFTrackHand, e,fPFTrackTag);
   art::FindManyP<anab::Calorimetry>  fmPFCalo(allPFTrackHand, e, fPFCaloTag);
   //auto allPFShowerHand = e.getValidHandle<std::vector<recob::Shower>>(fPFShowerTag);
   //std::vector<art::Ptr<recob::Shower>> allPFShowerVec;
@@ -3959,6 +3962,9 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
   //  art::fill_ptr_vector(allPFShowerVec, allPFShowerHand);
   //}
   //art::FindManyP<recob::Hit> fmHitsForPFShowers(allPFShowerHand, e, fPFShowerTag);
+  auto allPandoraHitHand = e.getValidHandle<std::vector<recob::Hit>>(fPandoraHitTag);
+  std::vector<art::Ptr<recob::Hit>> allPandoraHits;
+  art::fill_ptr_vector(allPandoraHits, allPandoraHitHand);
 
   trkf::TrackMomentumCalculator trackMomCalc;
 
@@ -4063,23 +4069,6 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
 
         art::ServiceHandle<geo::Geometry> geom;
         const auto& pfTrackHits = fmHitsForPFTracks.at(pfTrack->ID());
-        std::map<size_t,art::Ptr<recob::Hit>> tpIndexToHitMap;
-        if(fmHitsForPFTracksMeta.isValid())
-        {
-          const auto& metaHits = fmHitsForPFTracksMeta.at(pfTrack->ID());
-          const auto& metaDatas = fmHitsForPFTracksMeta.data(pfTrack->ID());
-          for (size_t iHit=0; iHit < pfTrackHits.size(); iHit++)
-          {
-            for (size_t iMeta=0; iMeta < metaHits.size(); iMeta++)
-            {
-              if(pfTrackHits[iHit].key() == metaHits[iMeta].key())
-              {
-                tpIndexToHitMap.emplace(metaDatas[iMeta]->Index(),pfTrackHits[iHit]);
-              }
-            } // for iMeta
-          } // for iHit
-        } // if fmHitsForPFTracksMeta.isValid()
-
         if(isMC) // Now MCTruth Matching
         {
           //std::map<size_t,size_t> nHitsPerPlane;
@@ -4203,19 +4192,14 @@ void lana::PionAbsSelector::ProcessPFParticles(const art::Event& e,
 
               if(cRangeIt < pfTrackCalo->TpIndices().size()) 
               {
-                const size_t& tpIndex = pfTrackCalo->TpIndices().at(cRangeIt);
-                //const auto& directionAtPoint = pfTrackTraj.DirectionAtPoint(tpIndex);
-                auto thisHit = pfTrackHits.at(tpIndex);
-                if(tpIndexToHitMap.size() > 0 && tpIndexToHitMap.count(tpIndex) > 0)
-                {
-                  thisHit = tpIndexToHitMap.at(tpIndex);
-                }
+                const size_t& hitIndex = pfTrackCalo->TpIndices().at(cRangeIt);
+                const auto& thisHit = allPandoraHits.at(hitIndex);
                 const auto& thisHitChan = thisHit->Channel();
                 //const auto& thisHitWireID = thisHit->WireID();
                 //const auto& thisHitWire = geom->Wire(thisHitWireID);
-                //const auto& locationAtPoint = pfTrackTraj.LocationAtPoint(tpIndex);
+                //const auto& locationAtPoint = pfTrackTraj.LocationAtPoint(hitIndex);
                 //std::cout << "calo i: " << cRangeIt 
-                //            << " TpIndex: "<< tpIndex
+                //            << " hitIndex: "<< hitIndex
                 //            << std::endl;
                 //std::cout << "    calo XYZ: "
                 //    << thisPoint.X() << ", " << thisPoint.Y() << ", " << thisPoint.Z()

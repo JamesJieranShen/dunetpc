@@ -13,5 +13,5 @@ physics.trigger_paths: [ reco ]
 physics.analysis: [ PiAbsSelector ]
 physics.end_paths: [ analysis ]
 
-physics.producers.pmtrackcalo.module_type: "CalorimetryHack"
-physics.producers.pandoracalo.module_type: "CalorimetryHack"
+#physics.producers.pmtrackcalo.module_type: "CalorimetryHack"
+#physics.producers.pandoracalo.module_type: "CalorimetryHack"
