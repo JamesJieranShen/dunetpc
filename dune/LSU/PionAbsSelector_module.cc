@@ -3369,7 +3369,6 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
       simIDEZ[nIDEs] = ide.z;
       simIDEChannel[nIDEs] = channel;
       simIDETDC[nIDEs] = tdc;
-      simIDETrajDistance[nIDEs] = 
       simIDEPartKin[nIDEs] = trueKinFrontTPC - simIDEEnergySum;
       simIDEEnergySum += ide.energy;
 
@@ -3378,7 +3377,7 @@ const art::Ptr<simb::MCParticle> lana::PionAbsSelector::ProcessMCParticles(const
       trajInterpAlg.pointOfClosestApproach(primaryParticle->Trajectory(),TVector3(ide.x,ide.y,ide.z),distToTraj,interpolatedMom);
       const float interpPitch = geom->WirePitch(geo::kZ)/cos(interpolatedMom.Theta());
       simIDETrajDistance[nIDEs] = distToTraj;
-      simIDETrajKin[nIDEs] = (interpolatedMom.Vect().Mag() - interpolatedMom.M())*1000.;
+      simIDETrajKin[nIDEs] = (interpolatedMom.E() - interpolatedMom.M())*1000.;
       if(myChannelToWireMap.count(channel) > 0)
       {
         simIDEWireZ[nIDEs] = myChannelToWireMap[channel].second;
