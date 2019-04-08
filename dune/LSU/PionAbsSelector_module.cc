@@ -300,6 +300,12 @@ private:
   Float_t xWC2Hit; // Fiber Tracker hit position x coord in cm
   Float_t yWC2Hit; // Fiber Tracker hit position y coord in cm
   Float_t zWC2Hit; // Fiber Tracker hit position z coord in cm
+  Float_t xWC1Old; // Fiber Tracker hit position x coord in cm (old BI reco)
+  Float_t yWC1Old; // Fiber Tracker hit position y coord in cm (old BI reco)
+  Float_t zWC1Old; // Fiber Tracker hit position z coord in cm (old BI reco)
+  Float_t xWC2Old; // Fiber Tracker hit position x coord in cm (old BI reco)
+  Float_t yWC2Old; // Fiber Tracker hit position y coord in cm (old BI reco)
+  Float_t zWC2Old; // Fiber Tracker hit position z coord in cm (old BI reco)
 
   UInt_t nBeamTracks;
   Float_t beamTrackXFrontTPC[MAXBEAMTRACKS];
@@ -1271,6 +1277,17 @@ void lana::PionAbsSelector::analyze(art::Event const & e)
       beamTrackPhiOld[nBeamTracksOld] = track.EndDirection().Phi();
       nBeamTracksOld++;
 
+      if (iTrack == 0)
+      {
+        xWC1Old = track.LocationAtPoint(0).X();
+        yWC1Old = track.LocationAtPoint(0).Y();
+        zWC1Old = track.LocationAtPoint(0).Z();
+        xWC2Old = track.LocationAtPoint(1).X();
+        yWC2Old = track.LocationAtPoint(1).Y();
+        zWC2Old = track.LocationAtPoint(1).Z();
+      }
+
+
       if(PRINTBEAMEVENT)
       {
         std::cout << "  Old Beam Track: "<< iTrack <<"\n";
@@ -1528,6 +1545,13 @@ void lana::PionAbsSelector::beginJob()
   tree->Branch("xWC2Hit",&xWC2Hit,"xWC2Hit/F");
   tree->Branch("yWC2Hit",&yWC2Hit,"yWC2Hit/F");
   tree->Branch("zWC2Hit",&zWC2Hit,"zWC2Hit/F");
+
+  tree->Branch("xWC1Old",&xWC1Old,"xWC1Old/F");
+  tree->Branch("yWC1Old",&yWC1Old,"yWC1Old/F");
+  tree->Branch("zWC1Old",&zWC1Old,"zWC1Old/F");
+  tree->Branch("xWC2Old",&xWC2Old,"xWC2Old/F");
+  tree->Branch("yWC2Old",&yWC2Old,"yWC2Old/F");
+  tree->Branch("zWC2Old",&zWC2Old,"zWC2Old/F");
 
   tree->Branch("nBeamEvents",&nBeamEvents,"nBeamEvents/i");
   tree->Branch("BITrigger",&BITrigger,"BITrigger/I");
@@ -2342,6 +2366,12 @@ void lana::PionAbsSelector::ResetTreeVars()
   xWC2Hit = DEFAULTNEG;
   yWC2Hit = DEFAULTNEG;
   zWC2Hit = DEFAULTNEG;
+  xWC1Old = DEFAULTNEG;
+  yWC1Old = DEFAULTNEG;
+  zWC1Old = DEFAULTNEG;
+  xWC2Old = DEFAULTNEG;
+  yWC2Old = DEFAULTNEG;
+  zWC2Old = DEFAULTNEG;
 
   nBeamTracks = 0;
   for(size_t iTrack=0; iTrack < MAXBEAMTRACKS; iTrack++)

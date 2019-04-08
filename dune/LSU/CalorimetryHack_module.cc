@@ -2,15 +2,12 @@
 //
 // CalorimetryHack class
 //
-//  Justin Hugon hacked this from LArReco version to support tpIndices
-//  on 2018-12-20
-//
+// maddalena.antonello@lngs.infn.it
+// ornella.palamara@lngs.infn.it
+// ART port echurch@fnal.gov
 //  This algorithm is designed to perform the calorimetric reconstruction 
 //  of the 3D reconstructed tracks
 ////////////////////////////////////////////////////////////////////////
-#ifndef CALO_H
-#define CALO_H
-
 
 extern "C" {
 #include <sys/types.h>
@@ -42,6 +39,9 @@ extern "C" {
 #include "larcorealg/Geometry/WireGeo.h"
 #include "larcorealg/CoreUtils/NumericUtils.h" // util::absDiff()
 
+#include "larevt/SpaceCharge/SpaceCharge.h"
+#include "larevt/SpaceChargeServices/SpaceChargeService.h"
+
 // ROOT includes
 #include <TROOT.h>
 #include <TFile.h>
@@ -70,22 +70,16 @@ extern "C" {
 
 
 ///calorimetry
-namespace calo {
+namespace lsu {
    
   class CalorimetryHack : public art::EDProducer {
     
   public:
     
     explicit CalorimetryHack(fhicl::ParameterSet const& pset); 
-    virtual ~CalorimetryHack();
-    
-    void beginJob(); 
-    //    void endJob();
-
-    void produce(art::Event& evt);
 
   private:
-        
+    void produce(art::Event& evt) override;
     void   ReadCaloTree();
 
     bool BeginsOnBoundary(art::Ptr<recob::Track> lar_track);
@@ -97,8 +91,9 @@ namespace calo {
     std::string fSpacePointModuleLabel;
     std::string fT0ModuleLabel;
     bool fUseArea;
+    bool fSCE;
     bool fFlipTrack_dQdx; //flip track direction if significant rise of dQ/dx at the track start
-    CalorimetryAlg caloAlg;
+    calo::CalorimetryAlg caloAlg;
 	
     int fnsps;
     std::vector<int>    fwire;
@@ -111,23 +106,20 @@ namespace calo {
     std::vector<double> fResRng;
     std::vector<float> fpitch;
     std::vector<TVector3> fXYZ;
-    std::vector<size_t> ftpIndex;
+    std::vector<size_t> fHitIndex;
 
-  protected: 
-    
-  
   }; // class CalorimetryHack
 
 }
 
-#endif // CALO_H
-
 //-------------------------------------------------
-calo::CalorimetryHack::CalorimetryHack(fhicl::ParameterSet const& pset)
-  : fTrackModuleLabel(pset.get< std::string >("TrackModuleLabel")      ),
+lsu::CalorimetryHack::CalorimetryHack(fhicl::ParameterSet const& pset)
+  : EDProducer{pset},
+    fTrackModuleLabel(pset.get< std::string >("TrackModuleLabel")      ),
     fSpacePointModuleLabel (pset.get< std::string >("SpacePointModuleLabel")       ),
     fT0ModuleLabel (pset.get< std::string >("T0ModuleLabel") ),
     fUseArea(pset.get< bool >("UseArea") ),
+    fSCE(pset.get< bool >("CorrectSCE")),
     fFlipTrack_dQdx(pset.get< bool >("FlipTrack_dQdx",true)),
     caloAlg(pset.get< fhicl::ParameterSet >("CaloAlg"))
 {
@@ -135,22 +127,13 @@ calo::CalorimetryHack::CalorimetryHack(fhicl::ParameterSet const& pset)
   produces< art::Assns<recob::Track, anab::Calorimetry> >();
 }
 
-//-------------------------------------------------
-calo::CalorimetryHack::~CalorimetryHack()
-{
-  
-}
-
-//-------------------------------------------------
-void calo::CalorimetryHack::beginJob()
-{
-  return;
-}
-
 //------------------------------------------------------------------------------------//
-void calo::CalorimetryHack::produce(art::Event& evt)
+void lsu::CalorimetryHack::produce(art::Event& evt)
 { 
+
+  
   auto const* detprop = lar::providerFrom<detinfo::DetectorPropertiesService>();
+  auto const* sce = lar::providerFrom<spacecharge::SpaceChargeService>();
 
   art::Handle< std::vector<recob::Track> > trackListHandle;
   std::vector<art::Ptr<recob::Track> > tracklist;
@@ -219,7 +202,7 @@ void calo::CalorimetryHack::produce(art::Event& evt)
       fpitch.clear();
       fResRng.clear();
       fXYZ.clear();
-      ftpIndex.clear();
+      fHitIndex.clear();
 
       float Kin_En = 0.;
       float Trk_Length = 0.;
@@ -228,6 +211,24 @@ void calo::CalorimetryHack::produce(art::Event& evt)
       std::vector<float> vdQdx;
       std::vector<float> deadwire; //residual range for dead wires
       std::vector<TVector3> vXYZ;
+
+      // Require at least 2 hits in this view
+      if (hits[ipl].size() < 2){
+        if (hits[ipl].size() == 1){
+          mf::LogWarning("CalorimetryHack") << "Only one hit in plane "<<ipl<<" associated with track id "<<trkIter;
+        }
+	calorimetrycol->push_back(anab::Calorimetry(util::kBogusD,
+						    vdEdx,
+						    vdQdx,
+						    vresRange,
+						    deadwire,
+						    util::kBogusD,
+						    fpitch,
+						    recob::tracking::convertCollToPoint(vXYZ),
+						    planeID));
+	util::CreateAssn(*this, evt, *calorimetrycol, tracklist[trkIter], *assn);
+        continue;
+      }
 
       //range of wire signals
       unsigned int wire0 = 100000;
@@ -250,12 +251,24 @@ void calo::CalorimetryHack::produce(art::Event& evt)
       // find track pitch
       double fTrkPitch = 0;
       for (size_t itp = 0; itp < tracklist[trkIter]->NumberTrajectoryPoints(); ++itp){
+
         const auto& pos = tracklist[trkIter]->LocationAtPoint(itp);
+        const auto& dir = tracklist[trkIter]->DirectionAtPoint(itp);
+        
         const double Position[3] = { pos.X(), pos.Y(), pos.Z() };
         geo::TPCID tpcid = geom->FindTPCAtPosition ( Position );
         if (tpcid.isValid) {
           try{
             fTrkPitch = lar::util::TrackPitchInView(*tracklist[trkIter], geom->Plane(ipl).View(), itp);
+            
+            //Correct for SCE
+            geo::Vector_t posOffsets = {0., 0., 0.};
+            geo::Vector_t dirOffsets = {0., 0., 0.};
+            if(sce->EnableCalSpatialSCE()&&fSCE) posOffsets = sce->GetCalPosOffsets(geo::Point_t(pos));
+            if(sce->EnableCalSpatialSCE()&&fSCE) dirOffsets = sce->GetCalPosOffsets(geo::Point_t{pos.X() + dir.X(), pos.Y() + dir.Y(), pos.Z() + dir.Z()});
+            TVector3 dir_corr = {dir.X() - dirOffsets.X() + posOffsets.X(), dir.Y() + dirOffsets.Y() - posOffsets.Y(), dir.Z() + dirOffsets.Z() - posOffsets.Z()};
+            
+            fTrkPitch = fTrkPitch * dir_corr.Mag() / pow(dir.Mag2(),0.5);
           }
           catch( cet::exception &e){
             mf::LogWarning("CalorimetryHack") << "caught exception " 
@@ -314,6 +327,18 @@ void calo::CalorimetryHack::produce(art::Event& evt)
 	time = allHits[hits[ipl][ihit]]->PeakTime(); // What about here? T0 
 	stime = allHits[hits[ipl][ihit]]->PeakTimeMinusRMS();
 	etime = allHits[hits[ipl][ihit]]->PeakTimePlusRMS();
+	const size_t& hitIndex = allHits[hits[ipl][ihit]].key();
+        std::cout << "CaloHack ihit: " << ihit << " hitIndex: " << hitIndex << std::endl;
+        const auto& thisHit = allHits[hits[ipl][ihit]];
+        //const auto& thisHitChan = thisHit->Channel();
+        const auto& thisHitWireID = thisHit->WireID();
+        const auto& thisHitWire = geom->Wire(thisHitWireID);
+        std::cout << "    Hit channel: " << thisHit->Channel() 
+            << " wire: " << thisHitWireID
+            << " wire Z: " << thisHitWire.GetCenter().Z()
+            << " peak time: " << thisHit->PeakTime()
+            << " time RMS: " << thisHit->RMS()
+            << std::endl;
 	
 	double charge = allHits[hits[ipl][ihit]]->PeakAmplitude();
 	if (fUseArea) charge = allHits[hits[ipl][ihit]]->Integral();
@@ -321,7 +346,6 @@ void calo::CalorimetryHack::produce(art::Event& evt)
 	//not all hits are associated with space points, the method uses neighboring spacepts to interpolate
 	double xyz3d[3];
 	double pitch;
-    size_t tpIndex = hits[ipl][ihit];
         bool fBadhit = false;
         if (fmthm.isValid()){
           auto vhit = fmthm.at(trkIter);
@@ -339,20 +363,31 @@ void calo::CalorimetryHack::produce(art::Event& evt)
                 fBadhit = true;
                 continue;
               }
+              
+              //Correct location for SCE
+              auto loc = tracklist[trkIter]->LocationAtPoint(vmeta[ii]->Index());
+              geo::Vector_t locOffsets = {0., 0., 0.,};
+              if(sce->EnableCalSpatialSCE()&&fSCE) locOffsets = sce->GetCalPosOffsets(geo::Point_t(loc));
+              xyz3d[0] = loc.X() - locOffsets.X();
+              xyz3d[1] = loc.Y() + locOffsets.Y();
+              xyz3d[2] = loc.Z() + locOffsets.Z();
+              
               double angleToVert = geom->WireAngleToVertical(vhit[ii]->View(), vhit[ii]->WireID().TPC, vhit[ii]->WireID().Cryostat) - 0.5*::util::pi<>();
-              const auto& dir = tracklist[trkIter]->DirectionAtPoint(vmeta[ii]->Index());
+              auto dir_tmp = tracklist[trkIter]->DirectionAtPoint(vmeta[ii]->Index());
+              
+              //Correct pitch for SCE
+              geo::Vector_t dirOffsets = {0., 0., 0.};
+              if(sce->EnableCalSpatialSCE()&&fSCE) dirOffsets = sce->GetCalPosOffsets(geo::Point_t{loc.X() + dir_tmp.X(), loc.Y() + dir_tmp.Y(), loc.Z() + dir_tmp.Z()});
+              const TVector3& dir = {dir_tmp.X() - dirOffsets.X() + locOffsets.X(), dir_tmp.Y() + dirOffsets.Y() - locOffsets.Y(), dir_tmp.Z() + dirOffsets.Z() - locOffsets.Z()}; 
+              
               double cosgamma = std::abs(std::sin(angleToVert)*dir.Y() + std::cos(angleToVert)*dir.Z());
               if (cosgamma){
-                pitch = geom->WirePitch(0)/cosgamma;
+                pitch = (geom->WirePitch(0)/cosgamma) * (pow(dir.Mag2(),0.5) / pow(dir_tmp.Mag2(),0.5));
               }
               else{
                 pitch = 0;
               }
-              tpIndex = vmeta[ii]->Index();
-              auto loc = tracklist[trkIter]->LocationAtPoint(tpIndex);
-              xyz3d[0] = loc.X();
-              xyz3d[1] = loc.Y();
-              xyz3d[2] = loc.Z();
+
               break;
             }
           }
@@ -406,7 +441,7 @@ void calo::CalorimetryHack::produce(art::Event& evt)
 	TVector3 v(xyz3d[0],xyz3d[1],xyz3d[2]);
 	//std::cout << "Adding these positions to v and then fXYZ " << xyz3d[0] << " " << xyz3d[1] << " " << xyz3d[2] << "\n" <<std::endl;
 	fXYZ.push_back(v);
-    ftpIndex.push_back(tpIndex);
+	fHitIndex.push_back(hitIndex);
 	++fnsps;
       }
       if (!fnsps){
@@ -434,8 +469,30 @@ void calo::CalorimetryHack::produce(art::Event& evt)
 	ChargeEnd.pop();
 	++countsp;
       }
-      // Going DS if charge is higher at the end
-      GoingDS = (DSChg > USChg) || (!fFlipTrack_dQdx);
+      if (fFlipTrack_dQdx){
+        // Going DS if charge is higher at the end
+        GoingDS = (DSChg > USChg);
+      }
+      else{
+        // Use the track direction to determine the residual range 
+        if (!fXYZ.empty()){
+          TVector3 track_start(tracklist[trkIter]->Trajectory().Vertex().X(),
+                              tracklist[trkIter]->Trajectory().Vertex().Y(),
+                              tracklist[trkIter]->Trajectory().Vertex().Z());
+          TVector3 track_end(tracklist[trkIter]->Trajectory().End().X(),
+                            tracklist[trkIter]->Trajectory().End().Y(),
+                            tracklist[trkIter]->Trajectory().End().Z());
+
+          if ((fXYZ[0] - track_start).Mag()+(fXYZ.back() - track_end).Mag() <
+              (fXYZ[0] - track_end).Mag()+(fXYZ.back() - track_start).Mag()){
+            GoingDS = true;
+          }
+          else{
+            GoingDS = false;
+          }
+        }
+      }
+
       // determine the starting residual range and fill the array
       fResRng.resize(fnsps);
       if(GoingDS) {
@@ -464,6 +521,7 @@ void calo::CalorimetryHack::produce(art::Event& evt)
           nPIDA++;
           PIDA += Ai;
 	}
+
 	MF_LOG_DEBUG("CaloPrtHit") <<std::setw(4)<< trkIter
           //std::cout<<std::setw(4)<< trkIter
                    <<std::setw(4)<< ipl
@@ -563,7 +621,7 @@ void calo::CalorimetryHack::produce(art::Event& evt)
 						  Trk_Length,
 						  fpitch,
 						  recob::tracking::convertCollToPoint(vXYZ),
-                          ftpIndex,
+						  fHitIndex,
 						  planeID));
       util::CreateAssn(*this, evt, *calorimetrycol, tracklist[trkIter], *assn);
       
@@ -576,7 +634,7 @@ void calo::CalorimetryHack::produce(art::Event& evt)
   return;
 }
 
-void calo::CalorimetryHack::GetPitch(art::Ptr<recob::Hit> hit, std::vector<double> trkx, std::vector<double> trky, std::vector<double> trkz, std::vector<double> trkw, std::vector<double> trkx0, double *xyz3d, double &pitch, double TickT0){
+void lsu::CalorimetryHack::GetPitch(art::Ptr<recob::Hit> hit, std::vector<double> trkx, std::vector<double> trky, std::vector<double> trkz, std::vector<double> trkw, std::vector<double> trkx0, double *xyz3d, double &pitch, double TickT0){
   //Get 3d coordinates and track pitch for each hit
   //Find 5 nearest space points and determine xyz and curvature->track pitch
   
@@ -585,6 +643,7 @@ void calo::CalorimetryHack::GetPitch(art::Ptr<recob::Hit> hit, std::vector<doubl
   // Get services
   art::ServiceHandle<geo::Geometry> geom;
   auto const* dp = lar::providerFrom<detinfo::DetectorPropertiesService>();
+  auto const* sce = lar::providerFrom<spacecharge::SpaceChargeService>();
   
   //save distance to each spacepoint sorted by distance
   std::map<double,size_t> sptmap;
@@ -729,19 +788,31 @@ void calo::CalorimetryHack::GetPitch(art::Ptr<recob::Hit> hit, std::vector<doubl
     ky /= tot;
     kz /= tot;
     //get pitch
+    
+    //Correct for SCE
+    geo::Vector_t posOffsets = {0., 0., 0.};
+    geo::Vector_t dirOffsets = {0., 0., 0.};
+    if(sce->EnableCalSpatialSCE()&&fSCE) posOffsets = sce->GetCalPosOffsets(geo::Point_t{xyz3d[0], xyz3d[1], xyz3d[2]});
+    if(sce->EnableCalSpatialSCE()&&fSCE) dirOffsets = sce->GetCalPosOffsets(geo::Point_t{xyz3d[0] + kx, xyz3d[1] + ky, xyz3d[2] + kz});
+    
+    xyz3d[0] = xyz3d[0] - posOffsets.X();
+    xyz3d[1] = xyz3d[1] + posOffsets.Y();
+    xyz3d[2] = xyz3d[2] + posOffsets.Z();
+    
+    TVector3 dir = {kx - dirOffsets.X() + posOffsets.X(), ky + dirOffsets.Y() - posOffsets.Y(), kz + dirOffsets.Z() - posOffsets.Z()}; 
+    
     double wirePitch = geom->WirePitch(hit->WireID().Plane,hit->WireID().TPC,hit->WireID().Cryostat);
     double angleToVert = geom->Plane(hit->WireID().Plane,hit->WireID().TPC,hit->WireID().Cryostat).Wire(0).ThetaZ(false) - 0.5*TMath::Pi();
-    double cosgamma = TMath::Abs(TMath::Sin(angleToVert)*ky+TMath::Cos(angleToVert)*kz);
-    if (cosgamma>0) pitch = wirePitch/cosgamma;   
+    double cosgamma = TMath::Abs(TMath::Sin(angleToVert)*dir.Y()/dir.Mag()+TMath::Cos(angleToVert)*dir.Z()/dir.Mag());
+    if (cosgamma>0) pitch = (wirePitch/cosgamma) * dir.Mag();   
 
   }
   //std::cout << "At end of get pitch " << xyz3d[0] << " " << xyz3d[1] << " " << xyz3d[2] << " " << x0 << " " << std::endl;
 }
 
 
-namespace calo{
+namespace lsu{
 
   DEFINE_ART_MODULE(CalorimetryHack)
   
 } // end namespace 
-
