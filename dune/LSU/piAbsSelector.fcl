@@ -129,7 +129,7 @@ physics:
   analyzers:
   {
     PiAbsSelector: @local::piabsselector
-    BeamMatchingAnalyzer: @local::beammatchinganalyzer
+    #BeamMatchingAnalyzer: @local::beammatchinganalyzer
   }
 
   stream1: [out1]

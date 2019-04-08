@@ -113,7 +113,8 @@ proto_beamevent:
 
 
   //RotateMonitorXZ:   -10.3
-  RotateMonitorYZ:    11.7
+  //RotateMonitorYZ:     11.7
+  RotateMonitorYZ:     0.
   RotateMonitorXZ:     15.676709377408265
   RotateMonitorYX:     227.18669653445150
 

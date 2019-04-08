@@ -2072,6 +2072,7 @@ void proto::BeamEvent::BeamMonitorBasisVectors(){
 
 void proto::BeamEvent::RotateMonitorVector(TVector3 &vec){
   vec.RotateY(fRotateMonitorXZ * TMath::Pi()/180.);
+  vec.RotateX(fRotateMonitorYZ * TMath::Pi()/180.);
   vec.RotateZ(fRotateMonitorYX * TMath::Pi()/180.);
 }
 

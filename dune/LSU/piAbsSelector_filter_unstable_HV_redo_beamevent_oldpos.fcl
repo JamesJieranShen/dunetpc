@@ -1,0 +1,18 @@
+#include "piAbsSelector_filter_unstable_HV_redo_beamevent.fcl"
+
+process_name: PiAbsSelectorFilterUnstableHVRedoBeamOldPos
+
+physics.analyzers.PiAbsSelector.BeamEventTag: "beamevent::PiAbsSelectorFilterUnstableHVRedoBeamOldPos"
+
+# from BeamEvent.fcl 1031dafdc
+physics.producers.beamevent.BeamX: 8.0757
+physics.producers.beamevent.BeamY: 461.06
+physics.producers.beamevent.BeamZ: -196.11
+
+physics.producers.beamevent.FirstTrackingProfZ: 707479
+physics.producers.beamevent.SecondTrackingProfZ: 716048
+
+physics.producers.beamevent.RotateMonitorXZ:   -10.3
+physics.producers.beamevent.RotateMonitorYZ:   11.7
+physics.producers.beamevent.RotateMonitorYX:   0.
+

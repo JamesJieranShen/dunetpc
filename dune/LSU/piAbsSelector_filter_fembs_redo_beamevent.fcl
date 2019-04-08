@@ -10,3 +10,5 @@ physics.filters: {
 }
 physics.reco: [ fembfilter, beamevent ]
 physics.trigger_paths: [ reco ]
+
+physics.analyzers.PiAbsSelector.BeamEventTag: "beamevent::PiAbsSelectorFilterFEMBsRedoBeam"
