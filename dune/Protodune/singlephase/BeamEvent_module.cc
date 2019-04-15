@@ -851,7 +851,6 @@ void proto::BeamEvent::SetBeamEvent(){
 ////////////////////////
 // Producer Method (reads in the event and derives values)
 void proto::BeamEvent::produce(art::Event & e){
-  std::cout << "BeamEvent Justin: started produce " << e.id() << std::endl;
   //Reset 
   acqTime = 0;
   acqStampMBPL = 0;
@@ -1186,16 +1185,13 @@ void proto::BeamEvent::produce(art::Event & e){
 
   std::unique_ptr<std::vector<beam::ProtoDUNEBeamEvent> > beamData(new std::vector<beam::ProtoDUNEBeamEvent>);
   beamData->push_back(beam::ProtoDUNEBeamEvent(*beamevt));
-  std::cout << "BeamEvent Justin: about to put vector of BeamEvent in event " << e.id() << std::endl;
   e.put(std::move(beamData));
-  std::cout << "BeamEvent Justin: just put vector of BeamEvent in event " << e.id() << std::endl;
   delete beamevt;
   delete beamspill;
  
   // Write out the to tree
   if( fSaveOutTree )fOutTree->Fill();
  
-  std::cout << "BeamEvent Justin: end of produce " << e.id() << std::endl;
 }
 // END BeamEvent::produce
 ////////////////////////
@@ -1662,7 +1658,8 @@ void proto::BeamEvent::parseXCETDB(uint64_t time){
   std::vector< double > XCET1_frac,       XCET2_frac;      
   std::vector< double > XCET1_coarse,     XCET2_coarse;    
 
-  bool fetched_XCET1, fetched_XCET2; 
+  bool fetched_XCET1=false;
+  bool fetched_XCET2=false; 
   if( fXCET1 != "" ){
     try{ 
       XCET1_seconds    = FetchAndReport( time + fXCETFetchShift, fXCET1 + ":SECONDS" , bfp_xcet);
@@ -2071,9 +2068,10 @@ void proto::BeamEvent::BeamMonitorBasisVectors(){
 }
 
 void proto::BeamEvent::RotateMonitorVector(TVector3 &vec){
-  vec.RotateY(fRotateMonitorXZ * TMath::Pi()/180.);
-  vec.RotateX(fRotateMonitorYZ * TMath::Pi()/180.);
-  vec.RotateZ(fRotateMonitorYX * TMath::Pi()/180.);
+  vec.RotateX( fRotateMonitorYZ * TMath::Pi()/180. );
+  vec.RotateY( fRotateMonitorXZ * TMath::Pi()/180. );
+
+  std::cout << "Rotated: " << vec.X() << " " << vec.Y() << " " << vec.Z() << std::endl;
 }
 
 void proto::BeamEvent::MakeTrack(size_t theTrigger){
