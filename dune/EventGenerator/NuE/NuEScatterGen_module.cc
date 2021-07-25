@@ -92,6 +92,7 @@ evgen::NuEScatterGen::NuEScatterGen(fhicl::ParameterSet const & p) : EDProducer{
   // ga and gv depend on neutrino flavor
   fdsigdT = new TF1("xsecform","TMath::Power([0] + [1],2) + TMath::Power([0] - [1],2) * TMath::Power(1-x/[2],2) - ([1]*[1] - [0]*[0] * TMath::Power([3]/[2],2))*x");
   fRand = new TRandom3(0);
+  gRandom->SetSeed(0);
 }
 
 //------------------------------------------------------------------------------
