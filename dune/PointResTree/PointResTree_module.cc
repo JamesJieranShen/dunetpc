@@ -338,6 +338,7 @@ namespace {
 			}
 
 		}
+        //std::cout<< "Longest Track Index: " << longest_track << std::endl;
 
 		//-----------------------------------------------------------------------------------------------------
 		// How often is longest track the primary electron? 
@@ -386,28 +387,29 @@ namespace {
 				for(unsigned int h=0; h<fmth.at(i).size(); ++h) {
 
 					// Loop through trackIDEs of hit to get energy of primary electron in hit
-                    int counter = 0;
-
-					for(auto const & trackide : bt->HitToTrackIDEs(art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(event), fmth.at(i)[h])){
+                    // std::cout<<"Channel of Hit: " << fmth.at(i)[h]->Channel() << std::endl;
+                    // std::cout<<"Size of TrackIDE vector: " << bt->HitToTrackIDEs
+                    //         (art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(event), 
+                    //         fmth.at(i)[h]).size() << std::endl;
+                    auto const trk_IDEs = bt->HitToTrackIDEs(art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(event), fmth.at(i)[h]);
+                    // std::cout<<"Size of IDE vector: "<<trk_IDEs.size() << std::endl;
+                    if (trk_IDEs.size()==0) continue;
+					for(auto const & trackide : trk_IDEs){
 
 						// Use particle inventory service to get MCParticle from Geant track ID (different from longest_track)
 						const simb::MCParticle* part = pi_serv->TrackIdToParticle_P(trackide.trackID);
-
+    
 						if(part->PdgCode() == 11 && prim.compare(part->Process()) == 0) {
 
 							prim_energy += trackide.energy;
 
 						}
-                        ++counter;
 
 					} // End of loop through TrackIDEs
 
 					// Check if this hit is closest to true starting position
 					// (Checking alternate definition of "true" primary track - closest to true
 					// starting position)
-					// std::cout<<counter << std::endl;
-                    if (counter==0)
-                        continue;
                     
                     std::vector<double> hit = bt->HitToXYZ(art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(event), fmth.at(i)[h]);
                     //double dist = std::sqrt(std::pow((hit[0] - start_pos_truth[0]),2)
@@ -428,7 +430,7 @@ namespace {
 				}
 
 			} // End of loop through tracks
-
+            //std::cout<<"Max Energy: " << max_en << std::endl;
 			//if(min_dist > maxmindist) maxmindist = min_dist;
 			if(max_en_trk==longest_track) {
 				++longest_is_prim_largest_en_frac;
@@ -438,8 +440,9 @@ namespace {
 			}
 			if(min_dist_trk==longest_track)
                 correct_trk = 1; // potentially? consider both of these criterias to be correct.
-
+            //std::cout<< "Max En Track: " << max_en_trk <<std::endl;
 		} // End of if(fmth.isValid() && numtracks!=0)
+        
 
 		//-----------------------------------------------------------------------------------------------------
 		// Daughter flipping on longest track
