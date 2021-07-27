@@ -141,14 +141,14 @@ pd_reco_modules.opflashTHR35QENonRefl3PE.InputModule:           ophitTHR35QENonR
 pd_reco_modules.opslicerTHR35QENonRefl3PE.OpHitModuleLabel:     ophitTHR35QENonRefl3PE
 
 pd_reco_path: [
-                 ophitDEF35QENonRefl2PE, opflashDEF35QENonRefl2PE, opslicerDEF35QENonRefl2PE,
-                 ophitEFF25QENonRefl2PE, opflashEFF25QENonRefl2PE, opslicerEFF25QENonRefl2PE,
-                 ophitEFF30QENonRefl2PE, opflashEFF30QENonRefl2PE, opslicerEFF30QENonRefl2PE,
-                 ophitEFF40QENonRefl2PE, opflashEFF40QENonRefl2PE, opslicerEFF40QENonRefl2PE,
-                 ophitREF35QEOptRefl2PE, opflashREF35QEOptRefl2PE, opslicerREF35QEOptRefl2PE,
-                 ophitREF35QEPesRefl2PE, opflashREF35QEPesRefl2PE, opslicerREF35QEPesRefl2PE,
-                 ophitTHR35QENonRefl1PE, opflashTHR35QENonRefl1PE, opslicerTHR35QENonRefl1PE,
-                 ophitTHR35QENonRefl3PE, opflashTHR35QENonRefl3PE, opslicerTHR35QENonRefl3PE
+                 ophitDEF35QENonRefl2PE, opflashDEF35QENonRefl2PE, opslicerDEF35QENonRefl2PE#,
+                 #ophitEFF25QENonRefl2PE, opflashEFF25QENonRefl2PE, opslicerEFF25QENonRefl2PE,
+                 #ophitEFF30QENonRefl2PE, opflashEFF30QENonRefl2PE, opslicerEFF30QENonRefl2PE,
+                 #ophitEFF40QENonRefl2PE, opflashEFF40QENonRefl2PE, opslicerEFF40QENonRefl2PE,
+                 #ophitREF35QEOptRefl2PE, opflashREF35QEOptRefl2PE, opslicerREF35QEOptRefl2PE,
+                 #ophitREF35QEPesRefl2PE, opflashREF35QEPesRefl2PE, opslicerREF35QEPesRefl2PE,
+                 #ophitTHR35QENonRefl1PE, opflashTHR35QENonRefl1PE, opslicerTHR35QENonRefl1PE,
+                 #ophitTHR35QENonRefl3PE, opflashTHR35QENonRefl3PE, opslicerTHR35QENonRefl3PE
               ]
 
 ############################################################################
