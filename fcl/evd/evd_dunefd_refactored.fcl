@@ -1,0 +1,17 @@
+#include "evd_dunefd.fcl"
+
+services.RecoDrawingOptions.HitModuleLabels: ["gaushit", "trajcluster"]
+services.SimulationDrawingOptions.SimChannelLabel: "tpcrawdecoder:simpleSC"
+services.RecoDrawingOptions.WireModuleLabels: ["wclsmcnfsp:gauss", "wclsmcnfsp:gauss"]
+services.RecoDrawingOptions.ClusterModuleLabels:      ["trajcluster"]
+services.RecoDrawingOptions.OpFlashModuleLabels: ["opflashDEF35QENonRefl2PE"]
+services.RecoDrawingOptions.VertexModuleLabels: ["pmtracktc"]
+services.RecoDrawingOptions.TrackModuleLabels: ["pmtracktc"]
+services.RawDrawingOptions.RawDataLabels: ["tpcrawdecoder:daq"]
+services.SimulationDrawingOptions.ShowMCTruthTrajectories: true
+
+services.DetPedestalService.FixedDetPedestal.PedMeanZ:  900
+services.DetPedestalService.FixedDetPedestal.PedMeanV:  2350
+services.DetPedestalService.FixedDetPedestal.PedMeanU:  2350
+
+services.RawDrawingOptions.TotalTicks:                6000
