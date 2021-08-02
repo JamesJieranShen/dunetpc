@@ -1,10 +1,13 @@
 #include "evd_dunefd.fcl"
 
-services.RecoDrawingOptions.HitModuleLabels: ["gaushit", "trajcluster"]
+services.AnalysisDrawingOptions.ParticleIDModulesLabels: [pmtrackpid]
+services.RecoDrawingOptions.HitModuleLabels: ["hitfd"]
 services.SimulationDrawingOptions.SimChannelLabel: "tpcrawdecoder:simpleSC"
 services.RecoDrawingOptions.WireModuleLabels: ["wclsmcnfsp:gauss", "wclsmcnfsp:gauss"]
 services.RecoDrawingOptions.ClusterModuleLabels:      ["trajcluster"]
+services.RecoDrawingOptions.ShowerModuleLabels:      ["trajcluster"]
 services.RecoDrawingOptions.OpFlashModuleLabels: ["opflashDEF35QENonRefl2PE"]
+services.RecoDrawingOptions.OpHitModuleLabels: ["ophitDEF35QENonRefl2PE"]
 services.RecoDrawingOptions.VertexModuleLabels: ["pmtracktc"]
 services.RecoDrawingOptions.TrackModuleLabels: ["pmtracktc"]
 services.RawDrawingOptions.RawDataLabels: ["tpcrawdecoder:daq"]
