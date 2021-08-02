@@ -46,7 +46,6 @@
 #include "dune/DuneInterface/Tool/TpcDataTool.h"
 
 class FloatArrayTool;
-class ParFormula;
 class RunDataTool;
 
 class FloatArrayGainCalibration
@@ -68,7 +67,7 @@ private:
   // Configuration parameters.
   int m_LogLevel;
   Name m_Unit;
-  float m_GainDefault;
+  ParFormula* m_GainDefault;
   AdcIndex m_AdcUnderflowDefault;
   AdcIndex m_AdcOverflowDefault;
   Name m_GainTool;
