@@ -63,7 +63,7 @@ services:
   # - Geant4 simulation parameters for liquid argon
   #   Needed by PointResTree module; from larsim/Simulation/services_dune.fcl .
   LArG4Parameters:        @local::dunefd_largeantparameters
-        @table::dunefd_simulation_services
+        @table::dunefd_simulation_services_legacy
 
   Geometry:		  @local::dune10kt_1x2x6_geo
 } # services
