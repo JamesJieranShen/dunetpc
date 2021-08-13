@@ -1,11 +1,38 @@
-
-// Saves characteristics of tracks in a tree for PointRes to find pointing resolution.
-// Author: AJ Roeth
-// Email: ajroeth110@gmail.com
-// Changes by James Shen, 07/2021
-// - Adding Additional Branches: elec_xyz_ndf
-// - Adding Additioanl Branches: trk_charge_noDC, trk_charge_DC
-// - Changing charge integration method 
+/**
+ * Retrieve and calculate relevant infromation from the art reco file. Save all information in a tree.
+ * @author James Shen <jieran.shen@duke.edu>
+ * Based on the original PointResTree module by AJ Roeth <ajroeth110@gmail.com>
+ * 
+ * Specifically, this module does the following:
+ *      - Retrieve relevant MC information for the neutrino and the electron.
+ *      - Resolve track directional ambiguity via daughter flipping.
+ *      - Reconstruct electron energy using charge information from the planes, drift corrected by photon flashes.
+ * 
+ * Structure of the tree:
+ *      - TVector3 truth_e_dir: truth direction of electron;
+ *      - TVector3 truth_nu_dir: truth direction of neutrino;
+ *      - double truth_nu_en: truth energy of neutrino;
+ *      - double truth_e_en: truth energy of electron;
+ *      - int nu_pdg: PDG of neutrino;
+ *      - int Nhits: number of hits in the event;
+ *      - int NTrks: number of tracks for reco;
+ *      - double charge_U: charge from U plane;
+ *      - double charge_V: charge from V plane;
+ *      - double charge_Z: charge from Z plane;
+ *      - double charge_corrected: corrected charge used for energy reco;
+ *      - double drift_time: drift time of electron;
+ *      - TVector3 reco_e_dir: reco direction of electron;
+ *      - double reco_e_en: reco energy of electron;
+ *      - int correct_trk: 1 if correct track is identified, 0 otherwise;
+ *      - int primary_trk_id: index of primary track;
+ *      - The following branches are parallel arrays of track info.
+ *          - vector<double> trk_length: length of tracks;
+ *          - vector<double> trk_start_x, trk_start_y, trk_start_z: unit vectors of start positions;
+ *          - vector<double> trk_end_x, trk_end_y, trk_end_z: unit vectors of end positions;
+ *          - vector<double> trk_start_dir_x, trk_start_dir_y, trk_start_dir_z: unit vectors of start directions;
+ *          - vector<double> trk_end_dir_x, trk_end_dir_y, trk_end_dir_z: unit vectors of end directions;
+ * 
+ * */
 
 #ifndef PointResTree_H
 #define PointResTree_H 1
@@ -59,6 +86,8 @@
 #include "TEfficiency.h"
 #include "TF2.h"
 #include "Math/Functor.h"
+#include "Math/Vector3D.h"
+#include "Math/VectorUtil.h"
 #include "TPolyLine3D.h"
 #include "Math/Vector3D.h"
 #include "TFile.h"
@@ -71,758 +100,441 @@
 #include <iostream>
 #include <fstream>
 
-namespace {
+namespace dune {
 
 	class PointResTree : public art::EDAnalyzer {
 
 		public:
 
-			// Functions that art/LArSoft need
 			PointResTree(fhicl::ParameterSet const&);
+            void reconfigure(fhicl::ParameterSet const&);
+            void beginJob() override;
 			void analyze(art::Event const&) override;
 			void endJob() override;
-
-		private:
-
-			// Parameters we'll read from the fcl-file
-			std::string fSimulationLabel;
+        
+        private:
+            // art module labels
+            std::string fSimulationLabel;
 			std::string fTrackModuleLabel;
 			std::string fHitsModuleLabel;
 			std::string fOpFlashLabel;
 
-			// Tree and tree variables
-			TTree * tr;
-			double nu_x;
-			double nu_y;
-			double nu_z;
-			double nu_true_en;
-			int is_nue;
-			int correct_trk;
-			double PCA_significance;
+            // Tree & branches
+            using XYZVector=ROOT::Math::XYZVector;
+            TTree * tr;
+            XYZVector truth_nu_dir, truth_e_dir;
+            Double_t truth_nu_en, truth_e_en;
+            Int_t nu_pdg;
+
+            Int_t NHits, NTrks;
+            Double_t charge_U, charge_V, charge_Z;
+            Double_t charge_corrected;
+            Double_t drift_time;
+            
+            XYZVector reco_e_dir;
+            Double_t reco_e_en;
+
+            Bool_t correct_trk;
+            Int_t primary_trk_id;
+
+            std::vector<Double_t> trk_length;
+            std::vector<Double_t> trk_start_x, trk_start_y, trk_start_z;
+            std::vector<Double_t> trk_end_x, trk_end_y, trk_end_z;
+            std::vector<Double_t> trk_start_dir_x, trk_start_dir_y, trk_start_dir_z;
+            std::vector<Double_t> trk_end_dir_x, trk_end_dir_y, trk_end_dir_z;
 
 
-			double elec_x_ndf;
-			double elec_y_ndf;
-			double elec_z_ndf;
+            // helper functions
+            void reset_variables();
+            void writeMCTruths_marley(art::Event const&);
+            void writeMCTruths_largeant(art::Event const&);
+            void calculate_electron_energy(art::Event const&);
+            void check_correct_primary_trk(art::Event const&);
+            void calculate_electron_direction();
+            
+	}; // class PointResTree
 
-			double elec_x;
-			double elec_y;
-			double elec_z;
-			double elec_reco_en_noDC;
-			double elec_reco_en_DC;
-			double elec_true_en;
-			double max_flash_time;
-			double trk_charge_U;
-			double trk_charge_V;
-			double trk_charge_Z;
-
-			double trk_charge_noDC;
-			double trk_charge_DC;
-			double driftRecobTime;
-
-			// Counters
-			int has_tracks;
-			int opflashcounter;
-			int longest_is_prim_largest_en_frac;
-			int longest_has_prim_first_pt;
-			double maxmindist;
-
-			// String for finding primary process
-			std::string prim;
-
-			double reco_electron_energy(art::Event const& event, int trk_id, double const trk_charge);
-			double getPCAdirection(recob::Track longest_track, TVector3& PCA_direction);
-	};
-
-}
+}// namespace dune
 
 #endif 
 
-namespace {
-
+namespace dune {
 	DEFINE_ART_MODULE(PointResTree)
-
 }
 
-namespace {
+dune::PointResTree::PointResTree(fhicl::ParameterSet const& parameterSet)
+        :EDAnalyzer(parameterSet){
+    this->reconfigure(parameterSet);
+}
 
-	//-------------------------------------------------------------------------------------------------------
-	//-------------------------------------------------------------------------------------------------------
-	//-------------------------------------------------------------------------------------------------------
-	//-------------------------------------------------------------------------------------------------------
-	// Constructor
-	PointResTree::PointResTree(fhicl::ParameterSet const& parameterSet)
-		: 
-			EDAnalyzer(parameterSet)
-	{
+void dune::PointResTree::reconfigure(fhicl::ParameterSet const& parameterSet){
+    fSimulationLabel = parameterSet.get< std::string >("SimulationLabel");
+	fTrackModuleLabel = parameterSet.get< std::string >("TrackModuleLabel");
+	fHitsModuleLabel = parameterSet.get< std::string >("HitsModuleLabel");
+	fOpFlashLabel = parameterSet.get< std::string >("OpFlashLabel");
+}
 
-		// Read the fcl-file
-		fSimulationLabel = parameterSet.get< std::string >("SimulationLabel");
-		fTrackModuleLabel = parameterSet.get< std::string >("TrackModuleLabel");
-		fHitsModuleLabel = parameterSet.get< std::string >("HitsModuleLabel");
-		fOpFlashLabel = parameterSet.get< std::string >("OpFlashLabel");
+void dune::PointResTree::beginJob(){
+    art::ServiceHandle<art::TFileService> tfs;
 
-		// Create ServiceHandle for TFileService output
-		art::ServiceHandle<art::TFileService> tfs;
+    tr = tfs->make<TTree>("tr", "tr");
 
-		// Make tree and branches
-		tr = tfs->make<TTree>("tr", "tr");
-		tr->Branch("nu_x",&nu_x,"nu_x/D");
-		tr->Branch("nu_y",&nu_y,"nu_y/D");
-		tr->Branch("nu_z",&nu_z,"nu_z/D");
-		tr->Branch("nu_true_en",&nu_true_en,"nu_true_en/D");
-		tr->Branch("elec_x",&elec_x,"elec_x/D");
-		tr->Branch("elec_y",&elec_y,"elec_y/D");
-		tr->Branch("elec_z",&elec_z,"elec_z/D");
-		tr->Branch("is_nue", &is_nue, "is_nue/I");
-		tr->Branch("correct_trk", &correct_trk, "correct_trk/I");
-		tr->Branch("PCA_significance", &PCA_significance, "PCA_significance/D");
+    tr->Branch("truth_e_dir", &truth_e_dir);
+    tr->Branch("truth_nu_dir", &truth_nu_dir);
+    tr->Branch("truth_nu_en", &truth_nu_en);
+    tr->Branch("truth_e_en", &truth_e_en);
+    tr->Branch("nu_pdg", &nu_pdg);
+
+    tr->Branch("NHits", &NHits);
+    tr->Branch("NTrks", &NTrks);
+    tr->Branch("charge_U", &charge_U);
+    tr->Branch("charge_V", &charge_V);
+    tr->Branch("charge_Z", &charge_Z);
+    tr->Branch("charge_corrected", &charge_corrected);
+    tr->Branch("drift_time", &drift_time);
+
+    tr->Branch("reco_e_dir", &reco_e_dir);
+    tr->Branch("reco_e_en", &reco_e_en);
+
+    tr->Branch("correct_trk", &correct_trk);
+    tr->Branch("primary_trk_id", &primary_trk_id);
+
+    tr->Branch("trk_length", &trk_length);
+    tr->Branch("trk_start_x", &trk_start_x);
+    tr->Branch("trk_start_y", &trk_start_y);
+    tr->Branch("trk_start_z", &trk_start_z);
+
+    tr->Branch("trk_end_x", &trk_end_x);
+    tr->Branch("trk_end_y", &trk_end_y);
+    tr->Branch("trk_end_z", &trk_end_z);
+
+    tr->Branch("trk_start_dir_x", &trk_start_dir_x);
+    tr->Branch("trk_start_dir_y", &trk_start_dir_y);
+    tr->Branch("trk_start_dir_z", &trk_start_dir_z);
+
+    tr->Branch("trk_end_dir_x", &trk_end_dir_x);
+    tr->Branch("trk_end_dir_y", &trk_end_dir_y);
+    tr->Branch("trk_end_dir_z", &trk_end_dir_z);
+
+}// beginJob()
 
 
-		tr->Branch("elec_x_ndf",&elec_x_ndf,"elec_x_ndf/D");
-		tr->Branch("elec_y_ndf",&elec_y_ndf,"elec_y_ndf/D");
-		tr->Branch("elec_z_ndf",&elec_z_ndf,"elec_z_ndf/D");
+void dune::PointResTree::endJob(){
+    std::cout<<"Ending Job" << std::endl;
+} //endJob()
 
-		tr->Branch("elec_reco_en_noDC",&elec_reco_en_noDC,"elec_reco_en_noDC/D");
-		tr->Branch("elec_reco_en_DC",&elec_reco_en_DC,"elec_reco_en_DC/D");
-		tr->Branch("elec_true_en",&elec_true_en,"elec_true_en/D");
-		tr->Branch("max_flash_time",&max_flash_time,"max_flash_time/D");
-		tr->Branch("trk_charge_U",&trk_charge_U,"trk_charge_U/D");
-		tr->Branch("trk_charge_V",&trk_charge_V,"trk_charge_V/D");
-		tr->Branch("trk_charge_Z",&trk_charge_Z,"trk_charge_Z/D");
 
-		tr->Branch("trk_charge_noDC", &trk_charge_noDC, "trk_charge_noDC/D");
-		tr->Branch("trk_charge_DC", &trk_charge_DC, "trk_charge_DC/D");
-		tr->Branch("driftRecobTime", &driftRecobTime, "driftRecobTime/D");
-		//tr->Branch("",&,"/");
+void dune::PointResTree::analyze(art::Event const& event){
+    reset_variables();
 
-		// Counters
-		has_tracks = 0;
-		opflashcounter = 0;
-		longest_is_prim_largest_en_frac = 0;
-		longest_has_prim_first_pt = 0;
-		maxmindist = 0.0;
+    // Get MC Truths
+    if(fSimulationLabel == "marley")
+        writeMCTruths_marley(event);
+    if(fSimulationLabel == "largeant")
+        writeMCTruths_largeant(event);
+    
+    // get hit info
+    auto hit_list = event.getValidHandle<std::vector<recob::Hit>>(fHitsModuleLabel);
+    NHits = hit_list->size();
+    for(auto hit : (*hit_list)){
+        // TODO: Filter via distance
+        if(hit.View() == geo::kU) charge_U += hit.SummedADC();
+        if(hit.View() == geo::kV) charge_V += hit.SummedADC();
+        if(hit.View() == geo::kZ) charge_Z += hit.SummedADC();
+    } //end loop through hits
 
-		prim = "primary";
+    // get track info
+    auto trk_list = event.getValidHandle<std::vector<recob::Track>>(fTrackModuleLabel);
+    NTrks = trk_list->size();
+    Double_t max_trk_length = 0;
+    for(int i = 0; i < NTrks; i++){// using index loop to get track idx
+        recob::Track const& trk = trk_list->at(i);
+        trk_length.push_back(trk.Length());
+        if(trk.Length() > max_trk_length){
+            max_trk_length = trk.Length();
+            primary_trk_id = i;
+        }
+        trk_start_x.push_back(trk.Start().X());
+        trk_start_y.push_back(trk.Start().Y());
+        trk_start_z.push_back(trk.Start().Z());
+        trk_end_x.push_back(trk.End().X());
+        trk_end_y.push_back(trk.End().Y());
+        trk_end_z.push_back(trk.End().Z());
+        
+        trk_start_dir_x.push_back(trk.StartDirection().X());
+        trk_start_dir_y.push_back(trk.StartDirection().Y());
+        trk_start_dir_z.push_back(trk.StartDirection().Z());
+        trk_end_dir_x.push_back(trk.EndDirection().X());
+        trk_end_dir_y.push_back(trk.EndDirection().Y());
+        trk_end_dir_z.push_back(trk.EndDirection().Z());
 
-	}
 
-	//-------------------------------------------------------------------------------------------------------
-	//-------------------------------------------------------------------------------------------------------
-	//-------------------------------------------------------------------------------------------------------
-	//-------------------------------------------------------------------------------------------------------
-	void PointResTree::analyze(art::Event const& event)
-	{
+    } //end loop through trks
+    
+    check_correct_primary_trk(event);
+    
+    calculate_electron_energy(event);
+    calculate_electron_direction(); 
 
-		// Initialize tree variables to nonsense values to make events
-		// with no reco'ed track/flashes obvious and possible to cut and
-		// initialize trk_charge to 0
-		nu_x = -10.0;
-		nu_y = -10.0;
-		nu_z = -10.0;
-		nu_true_en = -10.0;
+    tr->Fill();
+} //analyze
 
-		correct_trk = -1;
-		PCA_significance = -0;
+//=================================================================================================
+// Private Helper methods
 
-		elec_x_ndf = -10.0;
-		elec_y_ndf = -10.0;
-		elec_z_ndf = -10.0;
+/**
+ * reset all tree variables to impossible values
+ * */
+void dune::PointResTree::reset_variables(){
+    truth_nu_dir.SetXYZ(-2, -2, -2);
+    truth_e_dir.SetXYZ(-2, -2, -2);
+    reco_e_dir.SetXYZ(-2, -2, -2);
+    
+    reco_e_en = truth_nu_en = truth_e_en = -10;
+    nu_pdg = 0;
 
-		elec_x = -10.0;
-		elec_y = -10.0;
-		elec_z = -10.0;
-		elec_reco_en_noDC = -10.0;
-		elec_reco_en_DC = -10.0;
-		elec_true_en = -10.0;
-		max_flash_time = -3000.0;
-		trk_charge_U = 0.0;
-		trk_charge_V = 0.0;
-		trk_charge_Z = 0.0;
+    NHits = NTrks = -1;
+    charge_U = charge_V = charge_Z = charge_corrected = 0;
+    drift_time = -10;
+    correct_trk = kFALSE;
+    primary_trk_id = -1;
 
-		trk_charge_noDC = 0.0;
-		trk_charge_DC = 0.0;
-		driftRecobTime = -10.0;
+    trk_length.clear();
+    trk_start_x.clear();
+    trk_start_y.clear();
+    trk_start_z.clear();
+    trk_end_x.clear();
+    trk_end_y.clear();
+    trk_end_z.clear();
+    trk_start_dir_x.clear();
+    trk_start_dir_y.clear();
+    trk_start_dir_z.clear();
+    trk_end_dir_x.clear();
+    trk_end_dir_y.clear();
+    trk_end_dir_z.clear();
 
-		//-----------------------------------------------------------------------------------------------------
-		// True neutrino direction and energy and electron energy
-		//-----------------------------------------------------------------------------------------------------
+} //reset_variables
 
-		if(fSimulationLabel == "marley") {
 
-			auto particleHandle_nu
-				= event.getValidHandle<std::vector<simb::MCTruth>> (fSimulationLabel);
+/**
+ * Set Neutrino and Electron truths to tree variables, assuming marley generator
+ * Wrties truth_nu_dir, truth_e_dir, truth_nu_en, truthe_e_en, nu_pdg
+ * @param event art event object
+ * */
+void dune::PointResTree::writeMCTruths_marley(art::Event const& event){
+    Bool_t found_nu, found_e = kFALSE;
+    auto particleHandle_nu = event.getValidHandle<std::vector<simb::MCTruth>>(fSimulationLabel);
+    for (auto const& particle : (*particleHandle_nu)){
+        if(particle.NeutrinoSet()){ // entry is a neutrino
+            found_nu = kTRUE;
+            auto const neutrino = particle.GetNeutrino().Nu();
+            truth_nu_en = neutrino.E()*1000;
+            nu_pdg = neutrino.PdgCode();
 
-			for (auto const& particle : (*particleHandle_nu)) {
+            truth_nu_dir.SetXYZ(neutrino.Px(),
+                                neutrino.Py(),
+                                neutrino.Pz());
+            truth_nu_dir/=neutrino.P();
+        }
+    }
 
-				if( particle.NeutrinoSet() ) {
+    auto particleHandle_elec = event.getValidHandle<std::vector<simb::MCParticle>> ("largeant");
+    for(auto const& particle : (*particleHandle_elec)){
+        if(particle.Process()=="primary" && particle.PdgCode()==11){
+            found_e = kTRUE;
+            truth_e_en = 1000*(particle.E() - particle.Mass());
+            
+            truth_e_dir.SetXYZ( particle.Px(),
+                                particle.Py(),
+                                particle.Pz());
+            truth_e_dir/=particle.P();
+        }
+    }
+    if (!found_nu)
+        std::cerr<<"WARNING: Neutrino MC info not found" << std::endl;
+    if (!found_e)
+        std::cerr<<"WARNING: Electron MC info not found" << std::endl;
+    
+}
 
-					nu_true_en = particle.GetNeutrino().Nu().E()*1000;
-					nu_x = particle.GetNeutrino().Nu().Px()/particle.GetNeutrino().Nu().P();
-					nu_y = particle.GetNeutrino().Nu().Py()/particle.GetNeutrino().Nu().P();
-					nu_z = particle.GetNeutrino().Nu().Pz()/particle.GetNeutrino().Nu().P();
-					is_nue = std::abs(particle.GetNeutrino().Nu().PdgCode())==12;
 
-				}
-
-			}
-
-			auto particleHandle_elec
-				= event.getValidHandle<std::vector<simb::MCParticle>> ("largeant");
-
-			for (auto const& particle : (*particleHandle_elec)) {
-
-				if ( particle.Process() == "primary" && particle.PdgCode() == 11 ) {
-
-					elec_true_en = 1000*(particle.E() - particle.Mass());
-
-				}
-
-			}
-
-		}
-
-		if(fSimulationLabel == "largeant") {
-
-			auto particleHandle
+/**
+ * Set Neutrino and Electron truths to tree variables, assuming geant4/NuE generator
+ * Wrties truth_nu_dir, truth_e_dir, truth_nu_en, truthe_e_en, nu_pdg
+ * @param event art event object
+ * */
+void dune::PointResTree::writeMCTruths_largeant(art::Event const& event){
+    Bool_t found_nu, found_e = kFALSE;
+    auto particleHandle
 				= event.getValidHandle<std::vector<simb::MCParticle>> (fSimulationLabel);
 
-			for (auto const& particle : (*particleHandle)) {
-
-				if ( particle.Process() == "primary" && 
-						(particle.PdgCode() == 12 
-						 || particle.PdgCode() == 14
-						 || particle.PdgCode() == 16
-						 || particle.PdgCode() == -12 
-						 || particle.PdgCode() == -14
-						 || particle.PdgCode() == -16) ) {
-
-					nu_true_en = 1000*(particle.E() - particle.Mass());
-					nu_x = particle.Px()/particle.P();
-					nu_y = particle.Py()/particle.P();
-					nu_z = particle.Pz()/particle.P();
-					is_nue = std::abs(particle.PdgCode())==12;
-
-				}
-
-				if ( particle.Process() == "primary" && particle.PdgCode() == 11 ) {
-
-					elec_true_en = 1000*(particle.E() - particle.Mass());
-
-				}
-
-			}
-
-		}
-		//-----------------------------------------------------------------------------------------------------
-		// Finding longest track
-		//-----------------------------------------------------------------------------------------------------
-
-		auto tracklistHandle
-			= event.getValidHandle<std::vector<recob::Track>> (fTrackModuleLabel);
-
-		int numtracks = tracklistHandle->size();
-		if( numtracks != 0 ) ++has_tracks;
-		//std::cout << "numtracks = " << numtracks << std::endl;
-
-		int longest_track = -1;    
-		double longest_length = 0;
-
-		for (int i=0; i<numtracks; ++i) {
-
-			if ( tracklistHandle->at(i).Length() > longest_length ) {
-
-				longest_track = i;
-				longest_length = tracklistHandle->at(i).Length();
-
-			}
-
-		}
-        //std::cout<< "Longest Track Index: " << longest_track << std::endl;
-
-		//-----------------------------------------------------------------------------------------------------
-		// How often is longest track the primary electron? 
-		//-----------------------------------------------------------------------------------------------------
-		//
-		// Create BackTrackerService and ParticleInventoryService objects
-		art::ServiceHandle<cheat::BackTrackerService> bt;
-		art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
-
-		// Get hits from longest track (bc there's no way to directly get truth track info from track)
-		art::FindManyP<recob::Hit> fmth(tracklistHandle, event, fTrackModuleLabel);
-
-		if(fmth.isValid() && numtracks!=0) {
-
-			double prim_energy;
-			double max_en = 0.0;
-			int max_en_trk = -1;
-			//double min_dist = 9999.0;
-			int min_dist_trk = -1;
-
-			TVector3 start_pos_truth;
-
-			if(fSimulationLabel == "largeant") {
-
-				auto particleHandle
-					= event.getValidHandle<std::vector<simb::MCParticle>> (fSimulationLabel);
-
-				// Find primary electron and save its true starting position
-
-				for (auto const& particle : (*particleHandle)) {
-					if(particle.PdgCode() == 11 && prim.compare(particle.Process()) == 0) {
-						start_pos_truth.SetXYZ(particle.Vx(),particle.Vy(),particle.Vz());
-					}
-				}
-
-			}
-
-			// Loop through tracks to find which one has the most energy from the primary electron
-
-			for(int i=0; i<numtracks; ++i) {
-
-				prim_energy = 0.0;
-
-				// Loop through hits in track to add up primary electron's energy in track
-
-				for(unsigned int h=0; h<fmth.at(i).size(); ++h) {
-
-					// Loop through trackIDEs of hit to get energy of primary electron in hit
-                    // std::cout<<"Channel of Hit: " << fmth.at(i)[h]->Channel() << std::endl;
-                    // std::cout<<"Size of TrackIDE vector: " << bt->HitToTrackIDEs
-                    //         (art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(event), 
-                    //         fmth.at(i)[h]).size() << std::endl;
-                    auto const trk_IDEs = bt->HitToTrackIDEs(art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(event), fmth.at(i)[h]);
-                    // std::cout<<"Size of IDE vector: "<<trk_IDEs.size() << std::endl;
-                    if (trk_IDEs.size()==0) continue;
-					for(auto const & trackide : trk_IDEs){
-
-						// Use particle inventory service to get MCParticle from Geant track ID (different from longest_track)
-						const simb::MCParticle* part = pi_serv->TrackIdToParticle_P(trackide.trackID);
-    
-						if(part->PdgCode() == 11 && prim.compare(part->Process()) == 0) {
-
-							prim_energy += trackide.energy;
-
-						}
-
-					} // End of loop through TrackIDEs
-
-					// Check if this hit is closest to true starting position
-					// (Checking alternate definition of "true" primary track - closest to true
-					// starting position)
-                    
-                    std::vector<double> hit = bt->HitToXYZ(art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(event), fmth.at(i)[h]);
-                    //double dist = std::sqrt(std::pow((hit[0] - start_pos_truth[0]),2)
-                    //        + std::pow((hit[1] - start_pos_truth[1]),2)
-                    //        + std::pow((hit[2] - start_pos_truth[2]),2));
-
-                    //if(dist < min_dist) {
-                    //    min_dist = dist;
-                    //    min_dist_trk = i;
-                    //}
-					   
-
-				} // End of loop through hits
-
-				if(prim_energy > max_en) {
-					max_en_trk = i;
-					max_en = prim_energy;
-				}
-
-			} // End of loop through tracks
-            //std::cout<<"Max Energy: " << max_en << std::endl;
-			//if(min_dist > maxmindist) maxmindist = min_dist;
-			if(max_en_trk==longest_track) {
-				++longest_is_prim_largest_en_frac;
-				correct_trk = 1;
-			}else{
-				correct_trk = 0;
-			}
-			if(min_dist_trk==longest_track)
-                correct_trk = 1; // potentially? consider both of these criterias to be correct.
-            //std::cout<< "Max En Track: " << max_en_trk <<std::endl;
-		} // End of if(fmth.isValid() && numtracks!=0)
-        
-
-		//-----------------------------------------------------------------------------------------------------
-		// Daughter flipping on longest track
-		//-----------------------------------------------------------------------------------------------------
-
-		TVector3 dir_reco_longest_dflip;
-		TVector3 dir_reco_longest_flipped;
-		TVector3 longest_start;
-		TVector3 longest_end;
-		double avg_daughter_cos_start = 0.0;
-		double avg_daughter_cos_end = 0.0;
-		int num_daughter_tracks = 0;
-		TVector3 daughter_start;
-		daughter_start.SetXYZ(0,0,0);
-
-		// Get Handle of tracks if not done already
-		//tracklistHandle
-		//  = event.getValidHandle<std::vector<recob::Track>> (fTrackModuleLabel);
-
-		if( numtracks != 0 ) {
-			// TESTING NEW MODULE FIXME:
-			TVector3 PCA_dir;
-			PCA_significance = getPCAdirection(tracklistHandle->at(longest_track), PCA_dir);
-			// Save reconstructed direction of electron
-			dir_reco_longest_dflip.SetXYZ(tracklistHandle->at(longest_track).StartDirection().X(),
-					tracklistHandle->at(longest_track).StartDirection().Y(),
-					tracklistHandle->at(longest_track).StartDirection().Z());
-
-			// save to tree:
-			elec_x_ndf = dir_reco_longest_dflip.X();
-			elec_y_ndf = dir_reco_longest_dflip.Y();
-			elec_z_ndf = dir_reco_longest_dflip.Z();
-			// Save negative of end direction of electron -- this will be the direction
-			// if we decide to flip it
-			dir_reco_longest_flipped.SetXYZ(-tracklistHandle->at(longest_track).EndDirection().X(),
-					-tracklistHandle->at(longest_track).EndDirection().Y(),
-					-tracklistHandle->at(longest_track).EndDirection().Z());
-			// Save start and end points of electron track for use in daughter flipping
-			longest_start.SetXYZ(tracklistHandle->at(longest_track).Start().X(),
-					tracklistHandle->at(longest_track).Start().Y(),
-					tracklistHandle->at(longest_track).Start().Z());
-			longest_end.SetXYZ(tracklistHandle->at(longest_track).End().X(),
-					tracklistHandle->at(longest_track).End().Y(),
-					tracklistHandle->at(longest_track).End().Z());
-
-			// Loop through all tracks except for the longest one (daughter tracks). Find avg cos of
-			// angles between electron direction and vector from the the vertex of 
-			// the track to the daughter track, for each end.
-
-			for ( int i=0; i<numtracks; ++i ) {
-
-				if( i != longest_track ) {
-
-					++num_daughter_tracks;
-
-					daughter_start.SetXYZ(tracklistHandle->at(i).Start().X(),
-							tracklistHandle->at(i).Start().Y(),
-							tracklistHandle->at(i).Start().Z());
-
-					avg_daughter_cos_start += TMath::Cos(dir_reco_longest_dflip.Angle(daughter_start-longest_start));
-					avg_daughter_cos_end += TMath::Cos(dir_reco_longest_flipped.Angle(daughter_start-longest_end));
-
-				}
-
-			} // End loop through daughter tracks
-
-			avg_daughter_cos_start /= num_daughter_tracks;
-			avg_daughter_cos_end /= num_daughter_tracks;
-
-			// If avg cos from what reco called the "end" side of the track is
-			// is larger than what reco called the "start" side of the track,
-			// flip the track.
-
-			if ( avg_daughter_cos_start < avg_daughter_cos_end ) {
-
-				dir_reco_longest_dflip = dir_reco_longest_flipped;
-
-			}
-
-			// Save post-flipping reco'ed electron direction in tree
-			elec_x = dir_reco_longest_dflip.X();
-			elec_y = dir_reco_longest_dflip.Y();
-			elec_z = dir_reco_longest_dflip.Z();
-
-		}
-
-		//-----------------------------------------------------------------------------------------------------
-		//Total event charge -- for energy reco for clean events
-		//-----------------------------------------------------------------------------------------------------
-		/*
-		   auto hitListHandle = event.getValidHandle<std::vector<recob::Hit>>(fHitsModuleLabel);
-
-		   double tot_charge_U = 0.0;
-		   double tot_charge_V = 0.0;
-		   double tot_charge_Z = 0.0;
-		   double totalevtCharge = 0.0;
-
-		// Loop over hits and add up charge for each wire plane
-
-		for(size_t iHit = 0; iHit < hitListHandle->size(); ++iHit){
-
-		art::Ptr<recob::Hit> hitPtr(hitListHandle, iHit);
-
-		if(hitPtr->View() == geo::kU) {
-		tot_charge_U += hitPtr->Integral();
-		}
-		if(hitPtr->View() == geo::kV) {
-		tot_charge_V += hitPtr->Integral();
-		}
-		if(hitPtr->View() == geo::kZ) {
-		tot_charge_Z += hitPtr->Integral();
-		}
-
-		}
-
-		// Save charge from wire plane with the most charge as
-		// the total event charge
-
-		if(tot_charge_Z>=tot_charge_U) {
-		totalevtCharge = tot_charge_Z;
-		}
-		else {
-		totalevtCharge = tot_charge_U;
-		}
-		if(tot_charge_V>totalevtCharge) {
-		totalevtCharge = tot_charge_V;
-		}
-		*/
-
-		//-----------------------------------------------------------------------------------------------------
-		// Primary track charge -- for energy reco for events w bkgs/noise
-		//-----------------------------------------------------------------------------------------------------
-
-		//art::FindManyP<recob::Hit> fmth(tracklistHandle, event, fTrackModuleLabel);
-
-		if ( fmth.isValid() && numtracks != 0) {
-
-			//std::cout << "fmth is valid. Size: " << fmth.size() << "\n";
-
-			// Get the hits of the longest track
-			std::vector< art::Ptr<recob::Hit> > vhit = fmth.at(longest_track);
-
-			//std::cout << "vhit size: " << vhit.size() << "\n";
-
-			// Loop through hits and add up charge for each wire plane
-
-			for (size_t i = 0; i < vhit.size(); ++i){
-				// changed charge counting method
-				if (vhit[i]->WireID().Plane == geo::kU) trk_charge_U += vhit[i]->SummedADC();
-				if (vhit[i]->WireID().Plane == geo::kV) trk_charge_V += vhit[i]->SummedADC();
-				if (vhit[i]->WireID().Plane == geo::kZ) trk_charge_Z += vhit[i]->SummedADC();
-
-			}
-
-		}
-
-		//std::cout << "trk_charge_U = " << trk_charge_U << std::endl;
-		//std::cout << "trk_charge_V = " << trk_charge_V << std::endl;
-		//std::cout << "trk_charge_Z = " << trk_charge_Z << std::endl;
-
-		// Save charge from wire plane with the most charge as
-		// the track charge
-
-
-		if(trk_charge_Z > trk_charge_U) trk_charge_noDC = trk_charge_Z;
-		else trk_charge_noDC = trk_charge_U;
-		if(trk_charge_V > trk_charge_noDC) trk_charge_noDC = trk_charge_V;
-
-		//trk_charge_noDC=trk_charge_Z+trk_charge_U+trk_charge_V;
-		double noDCb = 31.1126;
-		double noDCm = 90.3919;
-		if(numtracks!=0)
-			elec_reco_en_noDC = (trk_charge_noDC-noDCb)/noDCm;
-		//std::cout << "trk_charge = " << trk_charge << std::endl;
-		//-----------------------------------------------------------------------------------------------------
-		// Energy reco - uses track charge and has cut on opflash time
-		//-----------------------------------------------------------------------------------------------------
-		// REFACTORING
-		elec_reco_en_DC = reco_electron_energy(event, longest_track, trk_charge_noDC);
-
-
-		//-----------------------------------------------------------------------------------------------------
-		// Fill tree - last thing in analyze function, at the end of each event analysis
-		//-----------------------------------------------------------------------------------------------------
-
-		tr->Fill();
-
-	}
-
-	//-------------------------------------------------------------------------------------------------------
-	//-------------------------------------------------------------------------------------------------------
-	//-------------------------------------------------------------------------------------------------------
-	//-------------------------------------------------------------------------------------------------------
-
-	void PointResTree::endJob(){
-
-		std::cout << "has_tracks = " << has_tracks << std::endl;
-		std::cout << "opflashcounter = " << opflashcounter << std::endl;
-		std::cout << "longest_is_prim_largest_en_frac = " << longest_is_prim_largest_en_frac << std::endl;
-		std::cout << "longest_has_prim_first_pt = " << longest_has_prim_first_pt << std::endl;
-		std::cout << "maxmindist = " << maxmindist << std::endl;
-
-	}
-
-	/**
-	 * Given track charge, do drift correction using OpFlash time and hit peak time, then convert
-	 * the corrected charge to energy.
-	 * event:       ART event
-	 * trk_charge:  Raw charge value without correction
-	 * tr
-	 * @return reconstructed energy
-	 * */
-	double PointResTree::reco_electron_energy(art::Event const& event, int trk_id, double const trk_charge){
-		double DCb = 57.8044;
-		double DCm = 127.382;
-		auto tracklistHandle =
-			event.getValidHandle<std::vector<recob::Track>> (fTrackModuleLabel);
-		int numtracks = tracklistHandle->size();
-		double reco_en = elec_reco_en_noDC;
-		if(numtracks != 0) {
-
-			// Set up detectorClocks
-			// Modified for lar v9
-			//auto const detectorClockData= lar::providerFrom< detinfo::DetectorClocksService >();
-			auto const detectorClockData = 
-				art::ServiceHandle<detinfo::DetectorClocksService const>() -> DataFor(event);
-			auto const * detectorClocks = &detectorClockData;
-
-			// Handle for the opFlash
-			auto opflashHandle = event.getValidHandle<std::vector<recob::OpFlash>>(fOpFlashLabel);
-			double photonFlashTime = 0.0;
-			std::vector<double> totalPEs; std::vector<float> flashtimes;
-
-			//std::cout << "opflashHandle->size() = " << opflashHandle->size() << std::endl;
-			if(opflashHandle->size() > 0) ++opflashcounter;
-
-			// Loop thru flashes and make vectors of PEs and flash times
-			for (std::size_t iFlash = 0; iFlash < opflashHandle->size(); ++iFlash) {
-				art::Ptr<recob::OpFlash> opFlashPtr(opflashHandle, iFlash);
-				totalPEs.emplace_back(opFlashPtr->TotalPE());
-				//std::cout << "opFlashPtr->TotalPE() = " << opFlashPtr->TotalPE() << std::endl;
-				flashtimes.emplace_back(opFlashPtr->Time()); //units us
-				//std::cout << "opFlashPtr->Time() = " << opFlashPtr->Time() << std::endl;
-			}
-
-			// Declare variables
-			std::vector<double> hitPeakTimes;
-			driftRecobTime = 0.0;
-
-			// Get track information
-
-
-			// Find hits associated w tracks
-			//commented out bc created above
-			//art::FindMany<recob::Hit> fmth(tracklistHandle, event, fTrackModuleLabel);
-			art::FindManyP<recob::Hit> fmth(tracklistHandle, event, fTrackModuleLabel);
-
-			// Hits in longest track
-			//std::vector<const recob::Hit*> hits = fmth.at(longest_track);
-			std::vector< art::Ptr<recob::Hit> > hits = fmth.at(trk_id);
-
-			// Now we can set the time if there is information available
-			if(hits.size() > 0 && opflashHandle->size() > 0){ //check that there are hits associated with track
-
-				double hitTime = detectorClocks->TPCTick2Time(hits[0]->PeakTime());
-
-				// Find max opflash within physical constraints and save time of that flash
-				while(1) {
-					int index = std::distance(totalPEs.begin(), std::max_element(totalPEs.begin(), totalPEs.end()));
-					//std::cout << "hitTime = " << hitTime << std::endl;
-					//std::cout << "max flashtime = " << flashtimes[index] << std::endl;
-
-					// If the max PE opflash makes sense physically, save as photonFlashTime
-					if( flashtimes[index] <= hitTime && hitTime - flashtimes[index] < 2400.0) {
-						photonFlashTime = flashtimes[index];
-						max_flash_time = photonFlashTime;
-						//std::cout << "photonFlashTime = " << photonFlashTime << std::endl;
-						break;
-					}
-					// Else break loop if that was the last opflash
-					else if( totalPEs.size()==1 ) break;
-					// Else remove max PE opflash in order to find second highest PE opflash
-					else{
-						totalPEs.erase(totalPEs.begin() + index);
-						flashtimes.erase(flashtimes.begin() + index);
-					}
-				}
-
-				// Set driftRecobTime here
-				driftRecobTime = hitTime - photonFlashTime;
-
-			}
-
-			//std::cout << "driftRecobTime = " << driftRecobTime << std::endl;
-
-			// modified for lar v9
-			//auto const* detectorProperties =
-			//		lar::providerFrom< detinfo::DetectorPropertiesService >();
-
-			auto const detectorPropertiesData = art::ServiceHandle<detinfo::DetectorPropertiesService const>() -> DataFor(event);
-			//auto const * detectorProperties = &detectorPropertiesData;
-
-			double tau = detectorPropertiesData.ElectronLifetime(); //microseconds
-
-			// Drift-corrected charge
-			//double totalevtChargeDC = totalevtCharge*exp(driftRecobTime/tau);
-			trk_charge_DC = trk_charge * exp(driftRecobTime/tau);
-
-
-			// Drift-corrected energy
-			//if(driftRecobTime != 0) elec_reco_en = (totalevtChargeDC-DCb)/DCm;
-			if(driftRecobTime != 0) reco_en = (trk_charge_DC-DCb)/DCm;
-
-		}
-		return reco_en;
-
-
-	}
-
-
-	/**
-	 * Given the recob::Track object for the longeset track, calculate the
-	 * Principle Compoment of the track.
-	 * This method uses the length of each segment as the magnitude of the 
-	 * direction vectors.
-	 * Sets PCA_direction as the pcrincipal direction.
-	 * @return Eigenvalue of the PCA direction divided by sum of all eigenvalues
-	 * */
-	double PointResTree::getPCAdirection(
-			recob::Track longest_track, TVector3& PCA_direction){
-		TVector3 pt_dir;
-		double dir_array[3];
-		auto current_pt = longest_track.FirstValidPoint();
-		auto last_pt = longest_track.LastValidPoint();
-		size_t next_pt = 0;
-		double segment_length = 0;
-
-		TPrincipal* principal = new TPrincipal(3, "D");
-		while(current_pt!=last_pt){
-			next_pt = longest_track.NextValidPoint(current_pt+1);
-			segment_length = longest_track.Length(next_pt) - 
-				longest_track.Length(current_pt);
-			pt_dir.SetXYZ(longest_track.DirectionAtPoint(current_pt).X(),
-					longest_track.DirectionAtPoint(current_pt).Y(), 
-					longest_track.DirectionAtPoint(current_pt).Z());
-			pt_dir *= segment_length;
-			pt_dir.GetXYZ(dir_array);
-			principal->AddRow(dir_array);
-			//std::cout   << "Segment " << current_pt << ": Direction [" << dir_array[0]
-			//            << "\t" << dir_array[1] << "\t" << dir_array[2] << "]\n";
-			current_pt = next_pt;
-		}
-
-		principal->MakePrincipals();
-		// loop through all eigen values, find the greatest one
-		double evalue_max = 0;
-		double evalue_sum = 0;
-		Int_t max_idx = -1;
-		const TVectorD* evalues = principal->GetEigenValues();
-		for(Int_t i = 0; i < evalues->GetNoElements(); i++){
-			evalue_sum += (*evalues)(i);
-			if ((*evalues)(i) > evalue_max){
-				evalue_max = (*evalues)(i);
-				max_idx = i;
-			}
-		}
-		// set eigenvector
-		const TMatrixD* evectors = principal->GetEigenVectors();
-        if(max_idx>=0 && max_idx < 3){
-            PCA_direction.SetX((*evectors)(0, max_idx));
-            PCA_direction.SetY((*evectors)(1, max_idx));
-            PCA_direction.SetZ((*evectors)(2, max_idx));
+    for (auto const& particle : (*particleHandle)) {
+        if ( particle.Process() == "primary" && 
+                (particle.PdgCode() == 12 
+                    || particle.PdgCode() == 14
+                    || particle.PdgCode() == 16
+                    || particle.PdgCode() == -12 
+                    || particle.PdgCode() == -14
+                    || particle.PdgCode() == -16) ) {
+            found_nu = kTRUE;
+            truth_nu_en = 1000*(particle.E() - particle.Mass());
+
+            nu_pdg = particle.PdgCode();
+
+            truth_nu_dir.SetXYZ(particle.Px(),
+                                particle.Py(),
+                                particle.Pz());
+            truth_nu_dir/=particle.P();
         }
-		//std::cout << "PCA Eigenvalue: " << evalue_max << " Significance: "<<
-		//            evalue_max / evalue_sum << std::endl;
-		//std::cout 	<< "PCA direction: " << PCA_direction.X() << " " 
-		//			<< PCA_direction.Y() << " "
-		//			<< PCA_direction.Z() << std::endl;
-		return evalue_max / evalue_sum;
 
-	}
+        if ( particle.Process() == "primary" && particle.PdgCode() == 11 ) {
+            found_e = kTRUE;
+            truth_e_en = 1000*(particle.E() - particle.Mass());
+            
+            truth_e_dir.SetXYZ( particle.Px(),
+                                particle.Py(),
+                                particle.Pz());
+            truth_e_dir/=particle.P();
+        }
+    }//endfor
+    if (!found_nu)
+        std::cerr<<"WARNING: Neutrino MC info not found" << std::endl;
+    if (!found_e)
+        std::cerr<<"WARNING: Electron MC info not found" << std::endl;
+}
 
-} // end namespace
+
+/**
+ * Given accumulated charges on the U, V, and Z planes, reconstruct the energy of the electron.
+ * Use Optical Detector information for drift correction.
+ * sets reco_e_en, charge_corrected, drift_time.
+ * */
+void dune::PointResTree::calculate_electron_energy(art::Event const& event){
+    // use collection plane charge for reconstruction
+    Double_t charge_raw = charge_Z;
+    // drift correction
+    if(NTrks == 0){ // no tracks found, do not do drift correction
+        charge_corrected = charge_raw;
+        return;
+    }
+
+    auto const detectorClockData = 
+            art::ServiceHandle<detinfo::DetectorClocksService const>() -> DataFor(event);
+    auto opflashHandle = event.getValidHandle<std::vector<recob::OpFlash>>(fOpFlashLabel);
+    std::vector<double> totalPEs; std::vector<float> flashtimes;
+    //std::cout<<opflashHandle->size()<<std::endl;
+    if(opflashHandle->size() == 0){ // do not do drift correction
+        charge_corrected = charge_raw;
+        return; 
+    }
+
+    for(unsigned int i = 0; i < opflashHandle->size(); i++){
+        auto flash = opflashHandle->at(i);
+        totalPEs.push_back(flash.TotalPE());
+        flashtimes.push_back(flash.Time()); //units us
+    }
+
+    std::vector<double> hitPeakTimes;
+    drift_time = 0.0;
+    // Create FindManyP object to find hits associated with Tracks
+    auto tracklistHandle = event.getValidHandle<std::vector<recob::Track>>(fTrackModuleLabel);
+    art::FindManyP<recob::Hit> hitsFromTracks(tracklistHandle, event, fTrackModuleLabel);
+    // hits in primary track:
+    auto hits_primary = hitsFromTracks.at(primary_trk_id); // pointers to hits
+    Double_t hitTime = detectorClockData.TPCTick2Time(hits_primary[0]->PeakTime());
+            //FIXME: Hits should correspond to daughter flipping
+    Double_t current_drift_time = 0;
+    while(totalPEs.size() != 0){
+        int max_flash_idx = std::distance(totalPEs.begin(), 
+                std::max_element(totalPEs.begin(), totalPEs.end()));
+        current_drift_time = hitTime - flashtimes[max_flash_idx];
+        if(current_drift_time>0 && current_drift_time < 2400.0){ // drift time found
+            drift_time = current_drift_time;
+            break;
+        }
+        // if the flashtime found is not physical
+        totalPEs.erase(totalPEs.begin() + max_flash_idx);
+        flashtimes.erase(flashtimes.begin() + max_flash_idx);
+    }
+
+    auto const detectorProperrtiesData = 
+            art::ServiceHandle<detinfo::DetectorPropertiesService const>() ->DataFor(event);
+    Double_t electron_lifetime = detectorProperrtiesData.ElectronLifetime(); //us
+    charge_corrected = charge_raw * ROOT::Math::exp(drift_time/electron_lifetime);
+
+    //TODO: Calculate reco energy
+}
+
+
+/**
+ * Using backtrackers to determine if the correct electron track is selected.
+ * Sets correct_trk. Assumes NTrk, track directions, and primary_trk_id is set.
+ * */
+void dune::PointResTree::check_correct_primary_trk(art::Event const& event){
+    //TODO: complete method
+}
+
+
+/**
+ * Reads the track direction information, calculate the direction of the primary track.
+ * Sets reco_en_dir. Assumes NTrk, track directions, and primary_trk_id is set.
+ * */
+void dune::PointResTree::calculate_electron_direction(){
+    // std::cerr << "Daughter Flipping" << std::endl;
+    // std::cerr << "NTrk: " << NTrks << std::endl;
+    // std::cerr << "Vector size: " << trk_start_x.size() << std::endl;
+    // std::cerr << "Primary Index:" << primary_trk_id << std::endl;
+    if (primary_trk_id < 0) return; // if no trk is in reco, do nothing
+    using XYZVector=ROOT::Math::XYZVector;
+    XYZVector primary_forward(  trk_start_dir_x.at(primary_trk_id),
+                                trk_start_dir_y.at(primary_trk_id),
+                                trk_start_dir_z.at(primary_trk_id));
+    XYZVector primary_backward( -trk_end_dir_x.at(primary_trk_id),
+                                -trk_end_dir_y.at(primary_trk_id),
+                                -trk_end_dir_z.at(primary_trk_id));
+    XYZVector primary_start(    trk_start_x.at(primary_trk_id),
+                                trk_start_y.at(primary_trk_id),
+                                trk_start_z.at(primary_trk_id));
+    XYZVector primary_end(      trk_end_x.at(primary_trk_id),
+                                trk_end_y.at(primary_trk_id),
+                                trk_end_z.at(primary_trk_id));
+    
+	
+	Double_t sum_cos_forward = 0.0;
+    Double_t sum_cos_backward = 0.0;
+    XYZVector current_trk;
+    XYZVector difference_start, difference_end; 
+    // loop through all tracks to find avg cos between primary track and all daughter tracks.
+	for (int i = 0; i < NTrks; i++)
+    {
+		if(i==primary_trk_id) continue; // don't include primary track
+        current_trk.SetXYZ(trk_start_x.at(i), trk_start_y.at(i), trk_start_z.at(i));
+        difference_start = current_trk-primary_start;
+        difference_end = current_trk - primary_end;
+        sum_cos_forward += ROOT::Math::VectorUtil::CosTheta(difference_start, primary_forward);
+        sum_cos_backward += ROOT::Math::VectorUtil::CosTheta(difference_end, primary_backward);
+
+        // if(difference_start.mag2()==0){
+        //     sum_cos_forward += 1;
+        // }else{
+        //     difference_start /= difference_start.R(); //noramlize to mag of 1
+        //     sum_cos_forward+= primary_forward.Dot(difference_start);
+        // }
+
+		// difference_end = current_trk - primary_end;
+        // if(difference_end.mag2()==0){
+        //     sum_cos_backward += 1;
+        // }else{
+        //     difference_end /= difference_end.R();
+        //     sum_cos_backward+= primary_backward.Dot(difference_end);
+        // }
+    }
+    //std::cout<<sum_cos_forward << std::endl;
+    //std::cout<<sum_cos_backward<<std::endl;
+    if(sum_cos_backward > sum_cos_forward){
+        reco_e_dir = primary_backward;
+		//std::cout<<"Flipped"<<std::endl;
+    }else{
+        reco_e_dir = primary_forward;
+    }
+}
