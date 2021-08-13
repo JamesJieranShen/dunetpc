@@ -11,14 +11,14 @@ BEGIN_PROLOG
 
 ############################################################################
 pd_detsim_modules: {
-      opdigiDEF35QENonRefl2PE:    @local::dunefd_opdigi_threegang
-      opdigiEFF25QENonRefl2PE:    @local::dunefd_opdigi_threegang
-      opdigiEFF30QENonRefl2PE:    @local::dunefd_opdigi_threegang
-      opdigiEFF40QENonRefl2PE:    @local::dunefd_opdigi_threegang
-      opdigiREF35QEOptRefl2PE:    @local::dunefd_opdigi_threegang
-      opdigiREF35QEPesRefl2PE:    @local::dunefd_opdigi_threegang
-      opdigiTHR35QENonRefl1PE:    @local::dunefd_opdigi_threegang
-      opdigiTHR35QENonRefl3PE:    @local::dunefd_opdigi_threegang
+      opdigiDEF35QENonRefl2PE:    @local::dunefd_opdigi_threegang_refactor
+      opdigiEFF25QENonRefl2PE:    @local::dunefd_opdigi_threegang_refactor
+      opdigiEFF30QENonRefl2PE:    @local::dunefd_opdigi_threegang_refactor
+      opdigiEFF40QENonRefl2PE:    @local::dunefd_opdigi_threegang_refactor
+      opdigiREF35QEOptRefl2PE:    @local::dunefd_opdigi_threegang_refactor
+      opdigiREF35QEPesRefl2PE:    @local::dunefd_opdigi_threegang_refactor
+      opdigiTHR35QENonRefl1PE:    @local::dunefd_opdigi_threegang_refactor
+      opdigiTHR35QENonRefl3PE:    @local::dunefd_opdigi_threegang_refactor
 }
 
 pd_detsim_modules.opdigiDEF35QENonRefl2PE.QEOverride:                  0.035000
