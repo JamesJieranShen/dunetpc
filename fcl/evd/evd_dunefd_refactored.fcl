@@ -1,5 +1,11 @@
 #include "evd_dunefd.fcl"
 
+services:
+{
+  @table::services
+  @table::dunefd_1x2x6_simulation_services
+}
+
 services.AnalysisDrawingOptions.ParticleIDModulesLabels: [pmtrackpid]
 services.RecoDrawingOptions.HitModuleLabels: ["hitfd"]
 services.SimulationDrawingOptions.SimChannelLabel: "tpcrawdecoder:simpleSC"
@@ -13,8 +19,9 @@ services.RecoDrawingOptions.TrackModuleLabels: ["pmtracktc"]
 services.RawDrawingOptions.RawDataLabels: ["tpcrawdecoder:daq"]
 services.SimulationDrawingOptions.ShowMCTruthTrajectories: true
 
-services.DetPedestalService.FixedDetPedestal.PedMeanZ:  900
-services.DetPedestalService.FixedDetPedestal.PedMeanV:  2350
-services.DetPedestalService.FixedDetPedestal.PedMeanU:  2350
+services.RawDrawingOptions.PedestalOption:1
+# services.DetPedestalService.FixedDetPedestal.PedMeanZ:  900
+# services.DetPedestalService.FixedDetPedestal.PedMeanV:  2350
+# services.DetPedestalService.FixedDetPedestal.PedMeanU:  2350
 
 services.RawDrawingOptions.TotalTicks:                6000
