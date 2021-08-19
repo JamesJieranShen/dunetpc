@@ -126,7 +126,7 @@ namespace dune {
             Double_t truth_nu_en, truth_e_en;
             Int_t nu_pdg;
 
-            Int_t NHits, NTrks;
+            Int_t NParticles, NHits, NTrks;
             Double_t charge_U, charge_V, charge_Z;
             Double_t charge_corrected;
             Double_t drift_time;
@@ -185,6 +185,7 @@ void dune::PointResTree::beginJob(){
     tr->Branch("truth_e_en", &truth_e_en);
     tr->Branch("nu_pdg", &nu_pdg);
 
+	tr->Branch("NParticles", &NParticles);
     tr->Branch("NHits", &NHits);
     tr->Branch("NTrks", &NTrks);
     tr->Branch("charge_U", &charge_U);
@@ -293,7 +294,7 @@ void dune::PointResTree::reset_variables(){
     reco_e_en = truth_nu_en = truth_e_en = -10;
     nu_pdg = 0;
 
-    NHits = NTrks = -1;
+    NParticles = NHits = NTrks = -1;
     charge_U = charge_V = charge_Z = charge_corrected = 0;
     drift_time = -10;
     correct_trk = kFALSE;
@@ -367,9 +368,15 @@ void dune::PointResTree::writeMCTruths_largeant(art::Event const& event){
     Bool_t found_nu, found_e = kFALSE;
     auto particleHandle
 				= event.getValidHandle<std::vector<simb::MCParticle>> (fSimulationLabel);
+	NParticles = 0;
 
+	art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
+	//std::cout<<pi_serv->GetSetOfTrackIds().size() << std::endl;
     for (auto const& particle : (*particleHandle)) {
-        if ( particle.Process() == "primary" && 
+        if(particle.PdgCode() == 11){
+			NParticles++;
+		}
+		if ( particle.Process() == "primary" && 
                 (particle.PdgCode() == 12 
                     || particle.PdgCode() == 14
                     || particle.PdgCode() == 16
@@ -423,10 +430,10 @@ void dune::PointResTree::calculate_electron_energy(art::Event const& event){
     auto opflashHandle = event.getValidHandle<std::vector<recob::OpFlash>>(fOpFlashLabel);
     std::vector<double> totalPEs; std::vector<float> flashtimes;
     //std::cout<<opflashHandle->size()<<std::endl;
-    if(opflashHandle->size() == 0){ // do not do drift correction
-        charge_corrected = charge_raw;
-        return; 
-    }
+    // if(opflashHandle->size() == 0){ // do not do drift correction
+    //     charge_corrected = charge_raw;
+    //     return; 
+    // }
 
     for(unsigned int i = 0; i < opflashHandle->size(); i++){
         auto flash = opflashHandle->at(i);
@@ -441,13 +448,16 @@ void dune::PointResTree::calculate_electron_energy(art::Event const& event){
     art::FindManyP<recob::Hit> hitsFromTracks(tracklistHandle, event, fTrackModuleLabel);
     // hits in primary track:
     auto hits_primary = hitsFromTracks.at(primary_trk_id); // pointers to hits
+    // for(auto hit : hits_primary){
+    //     std::cout<<detectorClockData.TPCTick2Time(hit->PeakTime()) << std::endl;
+    // }
     Double_t hitTime = detectorClockData.TPCTick2Time(hits_primary[0]->PeakTime());
-            //FIXME: Hits should correspond to daughter flipping
     Double_t current_drift_time = 0;
     while(totalPEs.size() != 0){
         int max_flash_idx = std::distance(totalPEs.begin(), 
                 std::max_element(totalPEs.begin(), totalPEs.end()));
         current_drift_time = hitTime - flashtimes[max_flash_idx];
+		std::cout<<current_drift_time<<std::endl;
         if(current_drift_time>0 && current_drift_time < 2400.0){ // drift time found
             drift_time = current_drift_time;
             break;
