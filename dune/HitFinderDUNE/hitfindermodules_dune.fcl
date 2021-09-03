@@ -192,6 +192,11 @@ dunefd_hitfinderfd:       @local::dune35t_hitfinder35t
 dunefd_hitfinderfd.DisambigAlg.DoCleanUpHits:  false
 dunefd_hitfinderfd.DisambigAlg.DistanceCutClu: 100
 
+# modify gauss threshold
+dunefd_gaushitfinder.HitFinderToolVec.CandidateHitsPlane0.RoiThreshold: 0.6
+dunefd_gaushitfinder.HitFinderToolVec.CandidateHitsPlane1.RoiThreshold: 0.6
+dunefd_gaushitfinder.HitFinderToolVec.CandidateHitsPlane2.RoiThreshold: 0.6
+
 # gauss hit finder for VD module
 dunevdfd_gaushitfinder: @local::gaus_hitfinder
 dunevdfd_gaushitfinder.HitFinderToolVec.CandidateHitsPlane0.RoiThreshold: 6.0
