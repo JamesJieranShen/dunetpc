@@ -22,6 +22,7 @@ simple_plugin(PointResTree "module"
 		${MF_UTILITIES}
 		${CETLIB}
 		${ROOT_BASIC_LIB_LIST}
+        dune_AnaUtils
 )
 
 	install_headers()
