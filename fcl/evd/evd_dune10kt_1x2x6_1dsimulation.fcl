@@ -1,0 +1,30 @@
+#include "evd_dunefd.fcl"
+
+services:
+{
+  @table::services
+  @table::dunefd_1x2x6_simulation_services
+}
+
+services.BackTrackerService.BackTracker.SimChannelModuleLabel: "elecDrift"
+services.AnalysisDrawingOptions.ParticleIDModulesLabels: [pmtrackpid]
+services.RecoDrawingOptions.HitModuleLabels: ["hitfd"]
+services.SimulationDrawingOptions.SimChannelLabel: "elecDrift"
+services.RecoDrawingOptions.WireModuleLabels: ["caldata"]
+services.RecoDrawingOptions.ClusterModuleLabels:      ["trajcluster"]
+services.RecoDrawingOptions.ShowerModuleLabels:      ["trajcluster"]
+services.RecoDrawingOptions.OpFlashModuleLabels: ["opflashDEF35QENonRefl2PE"]
+services.RecoDrawingOptions.OpHitModuleLabels: ["ophitDEF35QENonRefl2PE"]
+services.RecoDrawingOptions.VertexModuleLabels: ["pmtracktc"]
+services.RecoDrawingOptions.TrackModuleLabels: ["pmtracktc"]
+services.RecoDrawingOptions.DrawOpFlashes: 0
+
+services.RawDrawingOptions.RawDataLabels: ["daq"]
+services.SimulationDrawingOptions.ShowMCTruthTrajectories: true
+
+services.RawDrawingOptions.PedestalOption: 1
+# services.DetPedestalService.FixedDetPedestal.PedMeanZ:  900
+# services.DetPedestalService.FixedDetPedestal.PedMeanV:  2350
+# services.DetPedestalService.FixedDetPedestal.PedMeanU:  2350
+
+services.RawDrawingOptions.TotalTicks:                6000
