@@ -23,7 +23,7 @@
  *      - double drift_time: drift time of electron;
  *      - TVector3 reco_e_dir: reco direction of electron;
  *      - double reco_e_en: reco energy of electron;
- *      - int correct_trk: 1 if correct track is identified, 0 otherwise;
+ *      - double reco_distance distance between reco start position and truth start position
  *      - int primary_trk_id: index of primary track;
  *      - The following branches are parallel arrays of track info.
  *          - vector<double> trk_length: length of tracks;
@@ -102,8 +102,45 @@
 #include <fstream>
 
 namespace dune {
+    struct genFinder{
+    private:
+        typedef std::pair<int, std::string> track_id_to_string;
+        std::vector<track_id_to_string> track_id_map;
+        std::set<std::string> generator_names;
+        bool isSorted = false;
 
-	class PointResTree : public art::EDAnalyzer {
+    public:
+        void sort_now(){
+            std::sort(this->track_id_map.begin(),
+                      this->track_id_map.end(),
+                      [](const auto &a, const auto &b)
+                      { return (a.first < b.first); });
+            isSorted = true;
+        }
+
+        void add(const int &track_id, const std::string &gname){
+            this->track_id_map.push_back(std::make_pair(track_id, gname));
+            generator_names.emplace(gname);
+            isSorted = false;
+        }
+
+        bool has_gen(std::string gname){
+            return static_cast<bool>(generator_names.count(gname));
+        };
+
+        std::string get_gen(int tid){
+            if (!isSorted)
+                this->sort_now();
+            return std::lower_bound(track_id_map.begin(),
+                                    track_id_map.end(),
+                                    tid,
+                                    [](const auto &a, const auto &b)
+                                    { return (a.first < b); })
+                ->second;
+        };
+    };
+
+    class PointResTree : public art::EDAnalyzer {
 
 		public:
 
@@ -115,6 +152,7 @@ namespace dune {
         
         private:
             //NOT IN TREE:
+            genFinder* gf;
 
             // art module labels
             std::string fSimulationLabel;
@@ -128,6 +166,7 @@ namespace dune {
             using XYZVector=ROOT::Math::XYZVector;
             TH1D * hit_hist;
 			TH1D * good_hit_hist;
+            TH1D * hit_distance;
             TH1D * IDE_distance;
             TTree * tr;
             XYZVector truth_nu_dir, truth_e_dir;
@@ -138,6 +177,7 @@ namespace dune {
 
             Int_t NParticles, NHits, NTrks;
             Double_t charge_U, charge_V, charge_Z;
+            std::vector<Double_t> charge_Z_dist;
             Double_t charge_corrected;
             Double_t cut_charge_loss;
             Double_t drift_time;
@@ -147,7 +187,7 @@ namespace dune {
             XYZVector reco_e_position;
 
 
-            Bool_t correct_trk;
+            Double_t reco_distance;
             Int_t primary_trk_id;
 
             std::vector<Double_t> trk_length;
@@ -165,6 +205,9 @@ namespace dune {
             void check_correct_primary_trk(art::Event const&);
             void calculate_electron_direction();
             Bool_t distance_cut(art::Event const&, recob::Hit const&, std::vector<art::Ptr<recob::SpacePoint>>);
+
+            /* Function to write hit as a distance of truth distance. */
+            void write_multi_distance(art::Event const&, recob::Hit const&, std::vector<art::Ptr<recob::SpacePoint>>);
             
 	}; // class PointResTree
 
@@ -191,9 +234,11 @@ void dune::PointResTree::reconfigure(fhicl::ParameterSet const& parameterSet){
 
 void dune::PointResTree::beginJob(){
     art::ServiceHandle<art::TFileService> tfs;
-    hit_hist = tfs->make<TH1D>("hit_hist", "Hit Amplitudes", 100, 0, 10);
-	good_hit_hist = tfs->make<TH1D>("good_hit_hist", "Hit Amplitude with associated IDE", 100, 0, 10);
-    IDE_distance = tfs->make<TH1D>("IDE_distance", "Distance from IDE to start position of electron", 100, 0, 1);
+    hit_hist = tfs->make<TH1D>("hit_hist", "Hit Amplitudes", 100, 0, 50);
+	good_hit_hist = tfs->make<TH1D>("good_hit_hist", "Hit Amplitude with associated IDE", 100, 0, 50);
+    hit_distance = tfs->make<TH1D>("hit_distance", "Distance from hit to start position of electron", 100, 0, 400);
+    IDE_distance = tfs->make<TH1D>("IDE_distance", "Distance from IDE to start position of electron", 100, 0, 400);
+
     tr = tfs->make<TTree>("tr", "tr");
 
     tr->Branch("truth_e_dir", &truth_e_dir);
@@ -213,6 +258,7 @@ void dune::PointResTree::beginJob(){
     tr->Branch("charge_U", &charge_U);
     tr->Branch("charge_V", &charge_V);
     tr->Branch("charge_Z", &charge_Z);
+    tr->Branch("charge_Z_dist", &charge_Z_dist);
     tr->Branch("charge_corrected", &charge_corrected);
     tr->Branch("cut_charge_loss", &cut_charge_loss);
     tr->Branch("drift_time", &drift_time);
@@ -221,7 +267,7 @@ void dune::PointResTree::beginJob(){
     tr->Branch("reco_e_en", &reco_e_en);
     tr->Branch("reco_e_position", &reco_e_position);
 
-    tr->Branch("correct_trk", &correct_trk);
+    tr->Branch("reco_distance", &reco_distance);
     tr->Branch("primary_trk_id", &primary_trk_id);
 
     tr->Branch("trk_length", &trk_length);
@@ -251,6 +297,24 @@ void dune::PointResTree::endJob(){
 
 void dune::PointResTree::analyze(art::Event const& event){
     reset_variables();
+    gf = new genFinder();
+    // ... Create a map of track IDs to generator labels
+    //Get a list of generator names.
+    std::vector<art::Handle<std::vector<simb::MCTruth>>> mcHandles;
+    event.getManyByType(mcHandles);
+    std::vector<std::pair<int, std::string>> track_id_to_label;
+
+    for (auto const &mcHandle : mcHandles)
+    {
+        const std::string &sModuleLabel = mcHandle.provenance()->moduleLabel();
+        art::FindManyP<simb::MCParticle> findMCParts(mcHandle, event, fSimulationLabel);
+        std::vector<art::Ptr<simb::MCParticle>> mcParts = findMCParts.at(0);
+        for (const art::Ptr<simb::MCParticle> ptr : mcParts)
+        {
+            int track_id = ptr->TrackId();
+            gf->add(track_id, sModuleLabel);
+        }
+    }
 
     // Get MC Truths
     if(fSimulationLabel == "marley")
@@ -276,6 +340,10 @@ void dune::PointResTree::analyze(art::Event const& event){
         trk_end_x.push_back(trk.End().X());
         trk_end_y.push_back(trk.End().Y());
         trk_end_z.push_back(trk.End().Z());
+        // double distance = sqrt(pow(trk.Start().X() - truth_e_position.X(), 2) +
+        //                         pow(trk.Start().Y() - truth_e_position.Y(), 2) + 
+        //                         pow(trk.Start().Z() - truth_e_position.Z(), 2));
+        // std::cout<<distance<<std::endl;
         
         trk_start_dir_x.push_back(trk.StartDirection().X());
         trk_start_dir_y.push_back(trk.StartDirection().Y());
@@ -283,23 +351,30 @@ void dune::PointResTree::analyze(art::Event const& event){
         trk_end_dir_x.push_back(trk.EndDirection().X());
         trk_end_dir_y.push_back(trk.EndDirection().Y());
         trk_end_dir_z.push_back(trk.EndDirection().Z());
-
-
     } //end loop through trks
+    
     calculate_electron_direction(); 
     check_correct_primary_trk(event);
 
-    // For 2D cut: find hit time    
     auto const& clockData = art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(event);
     auto tracklistHandle = event.getValidHandle<std::vector<recob::Track>>(fTrackModuleLabel);
     art::FindManyP<recob::Hit> hitsFromTracks(tracklistHandle, event, fTrackModuleLabel);
+    // art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
+    
+    // // look at gaushits FIXME:
+    // auto gaushit_handle = event.getValidHandle<std::vector<recob::Hit>>("gaushit");
+    // for(int i = 0; i < (int)gaushit_handle->size(); i++){
+    //     auto const hit = gaushit_handle->at(i);
+    //     if(hit.View() == geo::kU || hit.View() == geo::kV)
+    //         std::cout<<(hit.WireID().TPC%2) << std::endl;
+    // }
 
     // get hit info
     auto hit_handle = event.getValidHandle<std::vector<recob::Hit>>(fHitsModuleLabel);
     std::vector<art::Ptr<recob::Hit>> hit_list;
     art::fill_ptr_vector(hit_list, hit_handle);
     auto const detectorPropertiesData = 
-            art::ServiceHandle<detinfo::DetectorPropertiesService const>() ->DataFor(event);
+            art::ServiceHandle<detinfo::DetectorPropertiesService const>() -> DataFor(event);
 	art::ServiceHandle<cheat::BackTrackerService> bt;
     float NHits_Z = 0;
     float NspHits_Z = 0;
@@ -309,18 +384,16 @@ void dune::PointResTree::analyze(art::Event const& event){
     for(int i = 0; i<NHits; i++){
         auto const hit = hit_list.at(i);
         //if(hit->PeakAmplitude()<3.0) continue;
-        auto spacepoints = dune_ana::DUNEAnaHitUtils::GetSpacePoints(hit, event, 
-				fHitsModuleLabel, fHitToSpacePointLabel);
-        // TODO: Filter via distance
+        
         
         auto const trk_IDEs = bt->HitToTrackIDEs(clockData, hit);
-        if(hit->View() == geo::kZ){
+        //if(hit->View() == geo::kZ){
             hit_hist->Fill(hit->PeakAmplitude());
             if(trk_IDEs.size() != 0) {
 				good_hit_hist->Fill(hit->PeakAmplitude());
 			}
 
-        }
+        //}
         if(hit->PeakAmplitude()>4.8){
             // for induction planes, just sum all hits (not used)
             if(hit->View() == geo::kU) charge_U += hit->Integral();
@@ -329,21 +402,34 @@ void dune::PointResTree::analyze(art::Event const& event){
             if(hit->View() == geo::kZ) uncut_charge += hit->Integral();
             // for collection plane, apply distance cut
 			if(hit->View() == geo::kZ){
-                if(distance_cut(event, *hit, spacepoints)) continue;
+                auto spacepoints = dune_ana::DUNEAnaHitUtils::GetSpacePoints(hit, event, 
+				        fHitsModuleLabel, fHitToSpacePointLabel);
+                NHits_Z++;
+                if(spacepoints.size()) NspHits_Z++;
+                write_multi_distance(event, *hit, spacepoints);
+                if(distance_cut(event, *hit, spacepoints)){
+                    // for(auto trkide : trk_IDEs){
+                    //     auto particle = pi_serv->TrackIdToParticle(trkide.trackID);
+                    //     std::cout<<"pdg:\t" << particle.PdgCode() << "\tProcess:\t" << particle.Process() << std::endl;
+                    // }
+                    continue;
+                }
                 else charge_Z+=hit->Integral();
             }
         }
         
     } //end loop through hits
     cut_charge_loss = charge_Z/uncut_charge;
-    //std::cout<<"Spacepoint reco hits / total hits: " << NspHits_Z/NHits_Z << std::endl;
-    IDE_distance->Fill(NspHits_Z/NHits_Z);
+    // std::cout<<"Spacepoint reco hits / total hits: " << NspHits_Z/NHits_Z << std::endl;
+    // std::cout<<NHits_Z/NHits<< std::endl;
+    //hit_distance->Fill(NspHits_Z/NHits_Z);
+	reco_distance = (truth_e_position - reco_e_position).R();
 
     
     
     calculate_electron_energy(event);
     
-
+    delete gf;
     tr->Fill();
 } //analyze
 
@@ -363,9 +449,11 @@ void dune::PointResTree::reset_variables(){
 
     NParticles = NHits = NTrks = -1;
     charge_U = charge_V = charge_Z = charge_corrected = 0;
+    charge_Z_dist.resize(20, 0);
+    std::fill(charge_Z_dist.begin(), charge_Z_dist.end(), 0);
     cut_charge_loss = 0;
     drift_time = -10;
-    correct_trk = kFALSE;
+    reco_distance = -10;
     primary_trk_id = -1;
     truth_en_deposition = 0;
     truth_charge_deposition = 0;
@@ -383,6 +471,7 @@ void dune::PointResTree::reset_variables(){
     trk_end_dir_x.clear();
     trk_end_dir_y.clear();
     trk_end_dir_z.clear();
+
 
 } //reset_variables
 
@@ -439,13 +528,14 @@ void dune::PointResTree::writeMCTruths_largeant(art::Event const& event){
     auto particleHandle
 				= event.getValidHandle<std::vector<simb::MCParticle>> (fSimulationLabel);
 	NParticles = 0;
-	art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
+	//art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
 	//std::cout<<pi_serv->GetSetOfTrackIds().size() << std::endl;
 
     for (auto const& particle : (*particleHandle)) {
-        if(particle.PdgCode() == 11){
-			NParticles++;
-		}
+		//simb::MCTruth truth = pi_serv->TrackIdToMCTruth(particle.TrackId());
+        
+		if(gf->get_gen(particle.TrackId())!="generator") continue; // do not track radiologicals
+		// neutrino
 		if ( particle.Process() == "primary" && 
                 (particle.PdgCode() == 12 
                     || particle.PdgCode() == 14
@@ -463,16 +553,18 @@ void dune::PointResTree::writeMCTruths_largeant(art::Event const& event){
                                 particle.Pz());
             truth_nu_dir/=particle.P();
         }
-
+		// electron
         if ( particle.Process() == "primary" && particle.PdgCode() == 11 ) {
             found_e = kTRUE;
             truth_e_en = 1000*(particle.E() - particle.Mass());
-            
             truth_e_dir.SetXYZ( particle.Px(),
                                 particle.Py(),
                                 particle.Pz());
             truth_e_dir/=particle.P();
             truth_e_position = particle.Trajectory().Position(0).Vect();
+			NParticles++;
+			//std::cout<<"Particle trackID: " << particle.TrackId() << std::endl;
+			//std::cout<<"Particle origin: " << truth.Origin() << std::endl;;
         }
     }//endfor
 
@@ -482,15 +574,18 @@ void dune::PointResTree::writeMCTruths_largeant(art::Event const& event){
         for(auto const& TDCIDE: TDCIDEs){
             auto simIDEs = TDCIDE.second;
                 for(auto& IDE:simIDEs){
+                    // simb::MCTruth truth = pi_serv->TrackIdToMCTruth(IDE.trackID);
+		            // if(truth.Origin() == simb::kSingleParticle) continue; // do not track radiologicals
                     truth_en_deposition+=IDE.energy;
                     truth_charge_deposition+=IDE.numElectrons;
-                    // TVector3 IDE_position(IDE.x, IDE.y, IDE.z);
-                    // IDE_distance->Fill((IDE_position-truth_e_position).Mag());
+                    //XYZVector IDE_position(IDE.x, IDE.y, IDE.z);
+                    //IDE_distance->Fill((IDE_position-truth_e_position).R());
 
                 }
         }
     }
-
+	if(NParticles!=1)
+		std::cerr<<"WARNING: More than one primary electron is found" << std::endl;
     if (!found_nu)
         std::cerr<<"WARNING: Neutrino MC info not found" << std::endl;
     if (!found_e)
@@ -649,8 +744,12 @@ void dune::PointResTree::calculate_electron_direction(){
  * */
 Bool_t dune::PointResTree::distance_cut(art::Event const& event, recob::Hit const& hit, std::vector<art::Ptr<recob::SpacePoint>> spacepoints){
     if(primary_trk_id<0) return kFALSE; // don't cut anything if there are no tracks
-    double dist_th = 14.0 * 10; // 14 is wavelenth
+    double dist_th = 14.0 * 10; // 14 is radiation length
     Double_t distance = 0;
+    //art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
+    //auto const& clockData = art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(event);
+    //art::ServiceHandle<cheat::BackTrackerService> bt;
+
     if(spacepoints.size()){
         // average of all spacepoint recos
         for(auto spacepoint:spacepoints){
@@ -666,10 +765,63 @@ Bool_t dune::PointResTree::distance_cut(art::Event const& event, recob::Hit cons
         auto wireID = hit.WireID();
         auto plane = geom.Plane(wireID);
         auto pos = plane.Wire(wireID).GetCenter<geo::Point_t>();
-        plane.DriftPoint(pos, -detProperties.ConvertTicksToX(hit.PeakTime(), wireID));
+        plane.DriftPoint(pos, -abs(detProperties.ConvertTicksToX(hit.PeakTime(), wireID))); // drift away from plane
         distance = std::pow(pos.X() - reco_e_position.X(), 2)+std::pow(pos.Z() - reco_e_position.Z(), 2);
         distance = sqrt(distance);
     }
+    hit_distance->Fill(distance);
+
+    bool isSupernova = false;
+    //auto const trk_IDEs = bt->HitToTrackIDEs(clockData, hit);
+    // for(auto trk_IDE : trk_IDEs){
+    //     int trackID = trk_IDE.trackID;
+    //     simb::MCTruth truth = pi_serv->TrackIdToMCTruth(trackID);
+    //     if(truth.Origin() != simb::kSingleParticle){
+    //         isSupernova = true;
+    //         break;
+    //     }
+    //}
+    if (isSupernova){
+        IDE_distance->Fill(distance);
+    }
+
     return(distance > dist_th);
+
+}
+
+
+void dune::PointResTree::write_multi_distance(art::Event const& event, recob::Hit const& hit, std::vector<art::Ptr<recob::SpacePoint>> spacepoints){
+    if(primary_trk_id<0) return; // don't cut anything if there are no tracks
+    Double_t distance = 0;
+    //art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
+    //auto const& clockData = art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(event);
+    //art::ServiceHandle<cheat::BackTrackerService> bt;
+
+    if(spacepoints.size()){
+        // average of all spacepoint recos
+        for(auto spacepoint:spacepoints){
+            auto pos = XYZVector(spacepoint->XYZ()[0],
+                                spacepoint->XYZ()[1],
+                                spacepoint->XYZ()[2]);
+            distance += (pos - truth_e_position).R();
+        }
+        distance /= spacepoints.size();
+    }else{ // no spacepoint found, do 2D reconstruction (X, Z)
+        geo::GeometryCore const& geom = *(lar::providerFrom<geo::Geometry>());
+        auto const detProperties = art::ServiceHandle<detinfo::DetectorPropertiesService>()->DataFor(event);
+        auto wireID = hit.WireID();
+        auto plane = geom.Plane(wireID);
+        auto pos = plane.Wire(wireID).GetCenter<geo::Point_t>();
+        plane.DriftPoint(pos, -abs(detProperties.ConvertTicksToX(hit.PeakTime(), wireID))); // drift away from plane
+        distance = std::pow(pos.X() - truth_e_position.X(), 2)+std::pow(pos.Z() - truth_e_position.Z(), 2);
+        distance = sqrt(distance);
+    }
+
+    // write charge to respective distance cut bins
+    for(int i = 0; i < 20; i++){
+        double cut = 14.0*(i+1); // each bin signifies a cut applied at 14*bin
+        if(distance<cut)
+            charge_Z_dist.at(i)+=hit.Integral();
+    }
 
 }

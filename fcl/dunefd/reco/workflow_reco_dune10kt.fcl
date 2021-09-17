@@ -151,7 +151,7 @@ dunefd_horizdrift_workflow_reco:
     @sequence::dunefd_horizdrift_lowlevelreco,
     @sequence::dunefd_horizdrift_hitdisambiguation,
     @sequence::dunefd_horizdrift_2dclustering,
-    #@sequence::dunefd_horizdrift_pandora,
+    @sequence::dunefd_horizdrift_pandora,
     #@sequence::dunefd_horizdrift_pmtrack,
     @sequence::dunefd_horizdrift_pmtrack_trajcluster,
     #@sequence::dunefd_horizdrift_pmtrack_trajcluster_pfp,
