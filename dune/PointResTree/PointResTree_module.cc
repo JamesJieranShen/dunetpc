@@ -153,10 +153,12 @@ namespace dune {
         private:
             //NOT IN TREE:
             genFinder* gf;
+            std::string primary_trk_label;
+            Int_t primary_trk_idx; // index of the primary track IN THE TRACK LABEL
 
             // art module labels
             std::string fSimulationLabel;
-			std::string fTrackModuleLabel;
+			std::vector<std::string> fTrackModuleLabel;
 			std::string fHitsModuleLabel;
 			std::string fOpFlashLabel;
             std::string fHitFdModuleLabel;
@@ -226,7 +228,7 @@ dune::PointResTree::PointResTree(fhicl::ParameterSet const& parameterSet)
 
 void dune::PointResTree::reconfigure(fhicl::ParameterSet const& parameterSet){
     fSimulationLabel = parameterSet.get< std::string >("SimulationLabel");
-	fTrackModuleLabel = parameterSet.get< std::string >("TrackModuleLabel");
+	fTrackModuleLabel = parameterSet.get< std::vector<std::string> >("TrackModuleLabel");
 	fHitsModuleLabel = parameterSet.get< std::string >("HitsModuleLabel");
 	fOpFlashLabel = parameterSet.get< std::string >("OpFlashLabel");
 	fHitToSpacePointLabel = parameterSet.get<std::string>("HitToSpacePointLabel");
@@ -323,42 +325,46 @@ void dune::PointResTree::analyze(art::Event const& event){
         writeMCTruths_largeant(event);
 
     // get track info
-    auto trk_list = event.getValidHandle<std::vector<recob::Track>>(fTrackModuleLabel);
-    NTrks = trk_list->size();
     Double_t max_trk_length = 0;
-    //std::cout<<"NTrks: "<<NTrks <<std::endl;
-    for(int i = 0; i < NTrks; i++){// using index loop to get track idx
-        recob::Track const& trk = trk_list->at(i);
-        trk_length.push_back(trk.Length());
-        if(trk.Length() > max_trk_length){
-            max_trk_length = trk.Length();
-            primary_trk_id = i;
-        }
-        trk_start_x.push_back(trk.Start().X());
-        trk_start_y.push_back(trk.Start().Y());
-        trk_start_z.push_back(trk.Start().Z());
-        trk_end_x.push_back(trk.End().X());
-        trk_end_y.push_back(trk.End().Y());
-        trk_end_z.push_back(trk.End().Z());
-        // double distance = sqrt(pow(trk.Start().X() - truth_e_position.X(), 2) +
-        //                         pow(trk.Start().Y() - truth_e_position.Y(), 2) + 
-        //                         pow(trk.Start().Z() - truth_e_position.Z(), 2));
-        // std::cout<<distance<<std::endl;
+    for(std::string track_label:fTrackModuleLabel){
+        auto trk_list = event.getValidHandle<std::vector<recob::Track>>(track_label);
+        NTrks += trk_list->size();
+        for(int i = 0; i < (int)trk_list->size(); i++){// using index loop to get track idx
+            recob::Track const& trk = trk_list->at(i);
+            trk_length.push_back(trk.Length());
+            if(trk.Length() > max_trk_length){
+                max_trk_length = trk.Length();
+                primary_trk_id = trk_length.size() - 1; // most recent entry
+                primary_trk_label = track_label;
+                primary_trk_idx = i;
+            }
+            
+            // double distance = sqrt(pow(trk.Start().X() - truth_e_position.X(), 2) +
+            //                         pow(trk.Start().Y() - truth_e_position.Y(), 2) + 
+            //                         pow(trk.Start().Z() - truth_e_position.Z(), 2));
+            // std::cout<<distance<<std::endl;
+            trk_start_x.push_back(trk.Start().X());
+            trk_start_y.push_back(trk.Start().Y());
+            trk_start_z.push_back(trk.Start().Z());
+            trk_end_x.push_back(trk.End().X());
+            trk_end_y.push_back(trk.End().Y());
+            trk_end_z.push_back(trk.End().Z());
+
+            trk_start_dir_x.push_back(trk.StartDirection().X());
+            trk_start_dir_y.push_back(trk.StartDirection().Y());
+            trk_start_dir_z.push_back(trk.StartDirection().Z());
+            trk_end_dir_x.push_back(trk.EndDirection().X());
+            trk_end_dir_y.push_back(trk.EndDirection().Y());
+            trk_end_dir_z.push_back(trk.EndDirection().Z());
+        } //end loop through trks
         
-        trk_start_dir_x.push_back(trk.StartDirection().X());
-        trk_start_dir_y.push_back(trk.StartDirection().Y());
-        trk_start_dir_z.push_back(trk.StartDirection().Z());
-        trk_end_dir_x.push_back(trk.EndDirection().X());
-        trk_end_dir_y.push_back(trk.EndDirection().Y());
-        trk_end_dir_z.push_back(trk.EndDirection().Z());
-    } //end loop through trks
-    
+    }
     calculate_electron_direction(); 
     check_correct_primary_trk(event);
 
     auto const& clockData = art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(event);
-    auto tracklistHandle = event.getValidHandle<std::vector<recob::Track>>(fTrackModuleLabel);
-    art::FindManyP<recob::Hit> hitsFromTracks(tracklistHandle, event, fTrackModuleLabel);
+    // auto tracklistHandle = event.getValidHandle<std::vector<recob::Track>>(fTrackModuleLabel);
+    // art::FindManyP<recob::Hit> hitsFromTracks(tracklistHandle, event, fTrackModuleLabel);
     // art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
     
     // // look at gaushits FIXME:
@@ -447,7 +453,7 @@ void dune::PointResTree::reset_variables(){
     reco_e_en = truth_nu_en = truth_e_en = -10;
     nu_pdg = 0;
 
-    NParticles = NHits = NTrks = -1;
+    NParticles = NHits = NTrks = 0;
     charge_U = charge_V = charge_Z = charge_corrected = 0;
     charge_Z_dist.resize(20, 0);
     std::fill(charge_Z_dist.begin(), charge_Z_dist.end(), 0);
@@ -626,10 +632,10 @@ void dune::PointResTree::calculate_electron_energy(art::Event const& event){
     std::vector<double> hitPeakTimes;
     drift_time = 0.0;
     // Create FindManyP object to find hits associated with Tracks
-    auto tracklistHandle = event.getValidHandle<std::vector<recob::Track>>(fTrackModuleLabel);
-    art::FindManyP<recob::Hit> hitsFromTracks(tracklistHandle, event, fTrackModuleLabel);
+    auto tracklistHandle = event.getValidHandle<std::vector<recob::Track>>(primary_trk_label);
+    art::FindManyP<recob::Hit> hitsFromTracks(tracklistHandle, event, primary_trk_label);
     // hits in primary track:
-    auto hits_primary = hitsFromTracks.at(primary_trk_id); // pointers to hits
+    auto hits_primary = hitsFromTracks.at(primary_trk_idx); // pointers to hits
     // for(auto hit : hits_primary){
     //     std::cout<<detectorClockData.TPCTick2Time(hit->PeakTime()) << std::endl;
     // }

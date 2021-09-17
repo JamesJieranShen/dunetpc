@@ -115,7 +115,7 @@ physics:
 
       SimulationLabel:	   "largeant" #ES_gen
       HitsModuleLabel:	   "hitfd"
-      TrackModuleLabel:	   "pmtracktc"
+      TrackModuleLabel:	   ["pmtracktc", "pandoraTrack"]
       OpFlashLabel:        "opslicerDEF35QENonRefl2PE"
 	  HitToSpacePointLabel:"hitfd"
 
