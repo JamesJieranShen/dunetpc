@@ -151,10 +151,13 @@ namespace dune {
 			void endJob() override;
         
         private:
+            using XYZVector=ROOT::Math::XYZVector;
+
             //NOT IN TREE:
             genFinder* gf;
             std::string primary_trk_label;
             Int_t primary_trk_idx; // index of the primary track IN THE TRACK LABEL
+            XYZVector com_position;
 
             // art module labels
             std::string fSimulationLabel;
@@ -165,11 +168,10 @@ namespace dune {
 			std::string fHitToSpacePointLabel;
 
             // Tree & branches
-            using XYZVector=ROOT::Math::XYZVector;
             TH1D * hit_hist;
 			TH1D * good_hit_hist;
             TH1D * hit_distance;
-            TH1D * IDE_distance;
+            TH1D * trk_length_hist;
             TTree * tr;
             XYZVector truth_nu_dir, truth_e_dir;
             Double_t truth_nu_en, truth_e_en;
@@ -193,6 +195,7 @@ namespace dune {
             Int_t primary_trk_id;
 
             std::vector<Double_t> trk_length;
+            std::vector<Double_t> trk_charge;
             std::vector<Double_t> trk_start_x, trk_start_y, trk_start_z;
             std::vector<Double_t> trk_end_x, trk_end_y, trk_end_z;
             std::vector<Double_t> trk_start_dir_x, trk_start_dir_y, trk_start_dir_z;
@@ -204,8 +207,8 @@ namespace dune {
             void writeMCTruths_marley(art::Event const&);
             void writeMCTruths_largeant(art::Event const&);
             void calculate_electron_energy(art::Event const&);
-            void check_correct_primary_trk(art::Event const&);
             void calculate_electron_direction();
+            void get_primary_track();
             Bool_t distance_cut(art::Event const&, recob::Hit const&, std::vector<art::Ptr<recob::SpacePoint>>);
 
             /* Function to write hit as a distance of truth distance. */
@@ -239,7 +242,7 @@ void dune::PointResTree::beginJob(){
     hit_hist = tfs->make<TH1D>("hit_hist", "Hit Amplitudes", 100, 0, 50);
 	good_hit_hist = tfs->make<TH1D>("good_hit_hist", "Hit Amplitude with associated IDE", 100, 0, 50);
     hit_distance = tfs->make<TH1D>("hit_distance", "Distance from hit to start position of electron", 100, 0, 400);
-    IDE_distance = tfs->make<TH1D>("IDE_distance", "Distance from IDE to start position of electron", 100, 0, 400);
+    trk_length_hist = tfs->make<TH1D>("trk_length_hist", "Length of Tracks", 100, 0, 50);
 
     tr = tfs->make<TTree>("tr", "tr");
 
@@ -273,6 +276,7 @@ void dune::PointResTree::beginJob(){
     tr->Branch("primary_trk_id", &primary_trk_id);
 
     tr->Branch("trk_length", &trk_length);
+    tr->Branch("trk_charge", &trk_charge);
     tr->Branch("trk_start_x", &trk_start_x);
     tr->Branch("trk_start_y", &trk_start_y);
     tr->Branch("trk_start_z", &trk_start_z);
@@ -325,20 +329,27 @@ void dune::PointResTree::analyze(art::Event const& event){
         writeMCTruths_largeant(event);
 
     // get track info
+    // determine primary track: IF pandora, choose longest track
+    // IF PMA, use nearest neighbor
+    primary_trk_label="NA";
     Double_t max_trk_length = 0;
     for(std::string track_label:fTrackModuleLabel){
         auto trk_list = event.getValidHandle<std::vector<recob::Track>>(track_label);
         NTrks += trk_list->size();
+        art::FindManyP<recob::Hit> hitsFromTracks(trk_list, event, track_label);
+
         for(int i = 0; i < (int)trk_list->size(); i++){// using index loop to get track idx
             recob::Track const& trk = trk_list->at(i);
             trk_length.push_back(trk.Length());
-            if(trk.Length() > max_trk_length){
+            trk_length_hist->Fill(trk.Length());
+            if(track_label=="pandoraTrack" && trk.Length() > max_trk_length){
                 max_trk_length = trk.Length();
                 primary_trk_id = trk_length.size() - 1; // most recent entry
                 primary_trk_label = track_label;
                 primary_trk_idx = i;
             }
             
+
             // double distance = sqrt(pow(trk.Start().X() - truth_e_position.X(), 2) +
             //                         pow(trk.Start().Y() - truth_e_position.Y(), 2) + 
             //                         pow(trk.Start().Z() - truth_e_position.Z(), 2));
@@ -356,12 +367,27 @@ void dune::PointResTree::analyze(art::Event const& event){
             trk_end_dir_x.push_back(trk.EndDirection().X());
             trk_end_dir_y.push_back(trk.EndDirection().Y());
             trk_end_dir_z.push_back(trk.EndDirection().Z());
-        } //end loop through trks
-        
-    }
-    calculate_electron_direction(); 
-    check_correct_primary_trk(event);
 
+            // loop through all charges associated with this track to accumulate charge
+            auto hits = hitsFromTracks.at(i);
+            float q = 0;
+            for(auto hit: hits){
+                if(hit->View() == geo::kZ){
+                    q += hit->Integral();
+                }
+            }
+            trk_charge.push_back(q);
+
+        } //end loop through trks
+    }// loop through track labels
+
+    if(NTrks!=0 && primary_trk_id == -1){ // tracks exist yet primary track not initialized, meaning all tracks are pmtrack
+        get_primary_track();
+
+    }
+    //std::cout << std::distance(trk_charge.begin(),std::max_element(trk_charge.begin(), trk_charge.end()))<<std::endl;
+    //std::cout << primary_trk_id << std::endl;
+    calculate_electron_direction(); 
     auto const& clockData = art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(event);
     // auto tracklistHandle = event.getValidHandle<std::vector<recob::Track>>(fTrackModuleLabel);
     // art::FindManyP<recob::Hit> hitsFromTracks(tracklistHandle, event, fTrackModuleLabel);
@@ -465,6 +491,7 @@ void dune::PointResTree::reset_variables(){
     truth_charge_deposition = 0;
 
     trk_length.clear();
+    trk_charge.clear();
     trk_start_x.clear();
     trk_start_y.clear();
     trk_start_z.clear();
@@ -534,11 +561,9 @@ void dune::PointResTree::writeMCTruths_largeant(art::Event const& event){
     auto particleHandle
 				= event.getValidHandle<std::vector<simb::MCParticle>> (fSimulationLabel);
 	NParticles = 0;
-	//art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
-	//std::cout<<pi_serv->GetSetOfTrackIds().size() << std::endl;
+
 
     for (auto const& particle : (*particleHandle)) {
-		//simb::MCTruth truth = pi_serv->TrackIdToMCTruth(particle.TrackId());
         
 		if(gf->get_gen(particle.TrackId())!="generator") continue; // do not track radiologicals
 		// neutrino
@@ -569,8 +594,7 @@ void dune::PointResTree::writeMCTruths_largeant(art::Event const& event){
             truth_e_dir/=particle.P();
             truth_e_position = particle.Trajectory().Position(0).Vect();
 			NParticles++;
-			//std::cout<<"Particle trackID: " << particle.TrackId() << std::endl;
-			//std::cout<<"Particle origin: " << truth.Origin() << std::endl;;
+
         }
     }//endfor
 
@@ -579,15 +603,10 @@ void dune::PointResTree::writeMCTruths_largeant(art::Event const& event){
         auto const TDCIDEs = channel.TDCIDEMap();
         for(auto const& TDCIDE: TDCIDEs){
             auto simIDEs = TDCIDE.second;
-                for(auto& IDE:simIDEs){
-                    // simb::MCTruth truth = pi_serv->TrackIdToMCTruth(IDE.trackID);
-		            // if(truth.Origin() == simb::kSingleParticle) continue; // do not track radiologicals
-                    truth_en_deposition+=IDE.energy;
-                    truth_charge_deposition+=IDE.numElectrons;
-                    //XYZVector IDE_position(IDE.x, IDE.y, IDE.z);
-                    //IDE_distance->Fill((IDE_position-truth_e_position).R());
-
-                }
+            for(auto& IDE:simIDEs){
+                truth_en_deposition+=IDE.energy;
+                truth_charge_deposition+=IDE.numElectrons;
+            }
         }
     }
 	if(NParticles!=1)
@@ -608,7 +627,7 @@ void dune::PointResTree::calculate_electron_energy(art::Event const& event){
     // use collection plane charge for reconstruction
     Double_t charge_raw = charge_Z;
     // drift correction
-    if(NTrks == 0){ // no tracks found, do not do drift correction
+    if(NTrks == 0 || primary_trk_id == -1){ // no tracks found, do not do drift correction
         charge_corrected = charge_raw;
         return;
     }
@@ -667,15 +686,6 @@ void dune::PointResTree::calculate_electron_energy(art::Event const& event){
 
 
 /**
- * Using backtrackers to determine if the correct electron track is selected.
- * Sets correct_trk. Assumes NTrk, track directions, and primary_trk_id is set.
- * */
-void dune::PointResTree::check_correct_primary_trk(art::Event const& event){
-    //TODO: complete method
-}
-
-
-/**
  * Reads the track direction information, calculate the direction of the primary track.
  * Sets reco_e_dir and reco_e_position. Assumes NTrk, track directions, and primary_trk_id is set.
  * */
@@ -685,19 +695,23 @@ void dune::PointResTree::calculate_electron_direction(){
     // std::cerr << "Vector size: " << trk_start_x.size() << std::endl;
     // std::cerr << "Primary Index:" << primary_trk_id << std::endl;
     if (primary_trk_id < 0) return; // if no trk is in reco, do nothing
+    // double dist_thresh = 400;
     using XYZVector=ROOT::Math::XYZVector;
+        //reset primary position after index update
+    XYZVector primary_start(trk_start_x.at(primary_trk_id),
+                            trk_start_y.at(primary_trk_id),
+                            trk_start_z.at(primary_trk_id));
+    
+    XYZVector primary_end(      trk_end_x.at(primary_trk_id),
+                                trk_end_y.at(primary_trk_id),
+                                trk_end_z.at(primary_trk_id));
     XYZVector primary_forward(  trk_start_dir_x.at(primary_trk_id),
                                 trk_start_dir_y.at(primary_trk_id),
                                 trk_start_dir_z.at(primary_trk_id));
     XYZVector primary_backward( -trk_end_dir_x.at(primary_trk_id),
                                 -trk_end_dir_y.at(primary_trk_id),
                                 -trk_end_dir_z.at(primary_trk_id));
-    XYZVector primary_start(    trk_start_x.at(primary_trk_id),
-                                trk_start_y.at(primary_trk_id),
-                                trk_start_z.at(primary_trk_id));
-    XYZVector primary_end(      trk_end_x.at(primary_trk_id),
-                                trk_end_y.at(primary_trk_id),
-                                trk_end_z.at(primary_trk_id));
+
     
 	
 	Double_t sum_cos_forward = 0.0;
@@ -709,6 +723,11 @@ void dune::PointResTree::calculate_electron_direction(){
     {
 		if(i==primary_trk_id) continue; // don't include primary track
         current_trk.SetXYZ(trk_start_x.at(i), trk_start_y.at(i), trk_start_z.at(i));
+        //if(trk_charge[i]<100) continue;
+        // if((current_trk-com_position).R() > dist_thresh) {
+        //     //std::cout<<(current_trk-com_position).R()<<std::endl;
+        //     continue; // if track too far away, don't include
+        // }
         difference_start = current_trk-primary_start;
         difference_end = current_trk - primary_end;
         sum_cos_forward += ROOT::Math::VectorUtil::CosTheta(difference_start, primary_forward);
@@ -744,13 +763,50 @@ void dune::PointResTree::calculate_electron_direction(){
 
 
 /**
+ * Assuming all tracks have no length-wise significance, determine the primary track.
+ * */
+void dune::PointResTree::get_primary_track(){
+    primary_trk_label="pmtracktc";
+
+    Double_t com_thresh=45000; //cm
+    Double_t com_x = 0;
+    Double_t com_y = 0;
+    Double_t com_z = 0;
+    Double_t length_sum = 0;
+    for (int i = 0; i < NTrks; i++){
+        com_x += trk_start_x[i]*trk_length[i];
+        com_y += trk_start_y[i]*trk_length[i];
+        com_z += trk_start_z[i]*trk_length[i];
+        length_sum += trk_length[i];
+    }
+    com_position.SetXYZ(com_x/length_sum, 
+                            com_y/length_sum, 
+                            com_z/length_sum);
+
+    double max_trk_length = 0;
+    for(int i = 0; i < NTrks; i++){
+        double distance = sqrt(pow(trk_start_x[i] - com_position.X(), 2) +
+                                pow(trk_start_y[i] - com_position.Y(), 2) + 
+                                pow(trk_start_z[i] - com_position.Z(), 2));
+        if(trk_length[i] > max_trk_length &&
+            distance < com_thresh){
+            max_trk_length = trk_length[i];
+            primary_trk_id = i;
+        }
+    } 
+    primary_trk_idx = primary_trk_id; // since there will be only one product
+    
+}
+
+
+/**
  * Determine if a hit should be included in the energy sum.
  * Apply distance cut to hits with associated spacepoints, 2D cut (WireID and time) for hits without spacepoints.
  * @return True if should be cut, false if should be included.
  * */
 Bool_t dune::PointResTree::distance_cut(art::Event const& event, recob::Hit const& hit, std::vector<art::Ptr<recob::SpacePoint>> spacepoints){
     if(primary_trk_id<0) return kFALSE; // don't cut anything if there are no tracks
-    double dist_th = 14.0 * 10; // 14 is radiation length
+    double dist_th = 14.0 * 5; // 14 is radiation length
     Double_t distance = 0;
     //art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
     //auto const& clockData = art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(event);
@@ -776,20 +832,6 @@ Bool_t dune::PointResTree::distance_cut(art::Event const& event, recob::Hit cons
         distance = sqrt(distance);
     }
     hit_distance->Fill(distance);
-
-    bool isSupernova = false;
-    //auto const trk_IDEs = bt->HitToTrackIDEs(clockData, hit);
-    // for(auto trk_IDE : trk_IDEs){
-    //     int trackID = trk_IDE.trackID;
-    //     simb::MCTruth truth = pi_serv->TrackIdToMCTruth(trackID);
-    //     if(truth.Origin() != simb::kSingleParticle){
-    //         isSupernova = true;
-    //         break;
-    //     }
-    //}
-    if (isSupernova){
-        IDE_distance->Fill(distance);
-    }
 
     return(distance > dist_th);
 
