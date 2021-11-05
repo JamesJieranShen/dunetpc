@@ -15,6 +15,7 @@ dunefd_horizdrift_spacepointsolver:
     @table::standard_spacepointsolver
     WireIntersectThreshold: 0.3
     WireIntersectThresholdDriftDir: 0.3
+    MaxIterationsReg:   200
 }
 
 END_PROLOG
