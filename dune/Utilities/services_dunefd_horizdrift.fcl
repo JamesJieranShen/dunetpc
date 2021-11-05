@@ -89,4 +89,9 @@ dunefd_reco_services: {
     PhotonBackTrackerService: @local::dunefd_photonbacktrackerservice
 }
 
+dunefd_reco_services_no_noise: {
+    @table::dunefd_reco_services
+}
+dunefd_reco_services_no_noise.SignalShapingServiceDUNE.NoiseFactVec: [[ 0.0, 0.0, 0.0, 0.0 ], [ 0.0, 0.0, 0.0, 0.0 ], [ 0.0, 0.0, 0.0, 0.0 ]]
+
 END_PROLOG
