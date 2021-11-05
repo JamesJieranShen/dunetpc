@@ -18,7 +18,15 @@ physics.producers.energyrecnumu.WireLabel:    "caldata"
 physics.producers.energyrecnue.WireLabel:     "caldata"
 physics.producers.energyrecnc.WireLabel:      "caldata"
 
-#physics.reco: [
-#      "caldata","gaushit" #, "spsolve","hitfd", "linecluster","trajcluster","pmtracktc","pmtracktccalo","pmtracktcpid","ophitDEF35QENonRefl2PE","opflashDEF35QENonRefl2PE","opslicerDEF35QENonRefl2PE","rns"
-#]
+physics.producers.pandora.EnableMCParticles:    true
+physics.producers.pandora.BackTrackerModuleLabel:    'elecDrift'
+physics.producers.pandora.SimChannelModuleLabel:     'elecDrift'
+physics.producers.pandora.HitFinderModuleLabel:     'hitfd'
+physics.producers.pandora.GeneratorModuleLabel:     'generator'
+# services.BackTrackerService.BackTracker.SimChannelModuleLabel: "elecDrift"
+services.IFDH: {}
+# physics.producers.hitfd:             @local::dunefd_hitfinderfd
+# physics.reco: [
+#      "caldata","gaushit", "spsolve","hitfd", "linecluster","trajcluster","pmtracktc","pmtracktccalo","pmtracktcpid","ophitDEF35QENonRefl2PE","opflashDEF35QENonRefl2PE","opslicerDEF35QENonRefl2PE","rns"
+# ]
 

@@ -1,7 +1,7 @@
 <pandora>
     <!-- GLOBAL SETTINGS -->
     <IsMonitoringEnabled>true</IsMonitoringEnabled>
-    <ShouldDisplayAlgorithmInfo>false</ShouldDisplayAlgorithmInfo>
+    <ShouldDisplayAlgorithmInfo>true</ShouldDisplayAlgorithmInfo>
     <SingleHitTypeClusteringMode>true</SingleHitTypeClusteringMode>
 
     <!-- ALGORITHM SETTINGS -->
@@ -14,7 +14,7 @@
     </algorithm>
 
     <!-- TwoDReconstruction -->
-    <algorithm type = "LArClusteringParent">
+    <!-- <algorithm type = "LArClusteringParent">
         <algorithm type = "LArTrackClusterCreation" description = "ClusterFormation"/>
         <InputCaloHitListName>CaloHitListU</InputCaloHitListName>
         <ClusterListName>ClustersU</ClusterListName>
@@ -78,10 +78,45 @@
     <algorithm type = "LArTrackConsolidation">
         <algorithm type = "LArSimpleClusterCreation" description = "ClusterRebuilding"/>
     </algorithm>
-    <algorithm type = "LArHitWidthClusterMerging"/>
+    <algorithm type = "LArHitWidthClusterMerging"/> -->
 
+    <!-- 2D neutrino-induced event reconstruction, U View -->
+    <algorithm type = "LArClusteringParent">
+        <algorithm type = "LArCheatingClusterCreation" description = "ClusterFormation">
+            <CollapseToPrimaryMCParticles>false</CollapseToPrimaryMCParticles>
+            <MCParticleListName>Input</MCParticleListName>
+        </algorithm>
+        <InputCaloHitListName>CaloHitListU</InputCaloHitListName>
+        <ClusterListName>ClustersU</ClusterListName>
+        <ReplaceCurrentCaloHitList>false</ReplaceCurrentCaloHitList>
+        <ReplaceCurrentClusterList>true</ReplaceCurrentClusterList>
+    </algorithm>
+
+    <!-- 2D neutrino-induced event reconstruction, V View -->
+    <algorithm type = "LArClusteringParent">
+        <algorithm type = "LArCheatingClusterCreation" description = "ClusterFormation">
+            <CollapseToPrimaryMCParticles>false</CollapseToPrimaryMCParticles>
+            <MCParticleListName>Input</MCParticleListName>
+        </algorithm>
+        <InputCaloHitListName>CaloHitListV</InputCaloHitListName>
+        <ClusterListName>ClustersV</ClusterListName>
+        <ReplaceCurrentCaloHitList>false</ReplaceCurrentCaloHitList>
+        <ReplaceCurrentClusterList>true</ReplaceCurrentClusterList>
+    </algorithm>
+
+    <!-- 2D neutrino-induced event reconstruction, W View -->
+    <algorithm type = "LArClusteringParent">
+        <algorithm type = "LArCheatingClusterCreation" description = "ClusterFormation">
+            <CollapseToPrimaryMCParticles>false</CollapseToPrimaryMCParticles>
+            <MCParticleListName>Input</MCParticleListName>
+        </algorithm>
+        <InputCaloHitListName>CaloHitListW</InputCaloHitListName>
+        <ClusterListName>ClustersW</ClusterListName>
+        <ReplaceCurrentCaloHitList>false</ReplaceCurrentCaloHitList>
+        <ReplaceCurrentClusterList>true</ReplaceCurrentClusterList>
+    </algorithm>
     <!-- VertexAlgorithms -->
-    <algorithm type = "LArCutClusterCharacterisation">
+    <!-- <algorithm type = "LArCutClusterCharacterisation">
         <InputClusterListNames>ClustersU ClustersV ClustersW</InputClusterListNames>
         <MaxShowerLengthCut>500.</MaxShowerLengthCut>
         <VertexDistanceRatioCut>500.</VertexDistanceRatioCut>
@@ -117,7 +152,23 @@
     </algorithm>
     <algorithm type = "LArVertexSplitting">
         <InputClusterListNames>ClustersU ClustersV ClustersW</InputClusterListNames>
+    </algorithm> -->
+    
+
+    <!-- VertexAlgorithms -->
+    <algorithm type = "LArCheatingVertexCreation">
+        <OutputVertexListName>NeutrinoVertices3D</OutputVertexListName>
+        <ReplaceCurrentVertexList>true</ReplaceCurrentVertexList>
     </algorithm>
+    <algorithm type = "LArVertexSplitting">
+        <InputClusterListNames>ClustersU ClustersV ClustersW</InputClusterListNames>
+    </algorithm>
+
+    <!-- <algorithm type = "LArVisualMonitoring">
+        <ClusterListNames> ClustersU ClustersV ClustersW</ClusterListNames>
+        <VertexListNames> NeutrinoVertices3D </VertexListNames>
+        <ShowDetector>true</ShowDetector>
+    </algorithm> -->
 
     <!-- ThreeDTrackAlgorithms -->
     <algorithm type = "LArThreeDTransverseTracks">
@@ -393,4 +444,5 @@
         <CaloHitListNames>CaloHitListU CaloHitListV CaloHitListW CaloHitList2D</CaloHitListNames>
         <CurrentPfoListReplacement>NeutrinoParticles3D</CurrentPfoListReplacement>
     </algorithm>
+
 </pandora>

@@ -15,8 +15,9 @@ services.RecoDrawingOptions.ClusterModuleLabels:      ["trajcluster"]
 services.RecoDrawingOptions.ShowerModuleLabels:      ["trajcluster"]
 services.RecoDrawingOptions.OpFlashModuleLabels: ["opflashDEF35QENonRefl2PE"]
 services.RecoDrawingOptions.OpHitModuleLabels: ["ophitDEF35QENonRefl2PE"]
-services.RecoDrawingOptions.VertexModuleLabels: ["pmtracktc"]
-services.RecoDrawingOptions.TrackModuleLabels: ["pmtracktc"]
+services.RecoDrawingOptions.VertexModuleLabels: ["pandora"]
+services.RecoDrawingOptions.TrackModuleLabels: ["pandoraTrack", "pandoraShower"]
+services.RecoDrawingOptions.SpacePointModuleLabels: ["spsolve"]
 services.RecoDrawingOptions.DrawOpFlashes: 0
 
 services.RawDrawingOptions.RawDataLabels: ["daq"]
@@ -27,4 +28,4 @@ services.RawDrawingOptions.PedestalOption: 1
 # services.DetPedestalService.FixedDetPedestal.PedMeanV:  2350
 # services.DetPedestalService.FixedDetPedestal.PedMeanU:  2350
 
-services.RawDrawingOptions.TotalTicks:                6000
+services.RawDrawingOptions.TotalTicks:                4492

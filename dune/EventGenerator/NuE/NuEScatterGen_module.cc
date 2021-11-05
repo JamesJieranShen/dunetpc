@@ -141,6 +141,8 @@ void evgen::NuEScatterGen::produce(art::Event & e)
   truth.Add(parts[0]);
   truth.Add(parts[1]);
 
+  // SetNeutrino has incorrect behavior for NuEScatter as it sets the wrong lepton
+  truth.SetNeutrino(simb::kCC, simb::kElectronScattering, simb::kCCQE, 0, 0, 0, -1.0, -1.0, -1.0, -1.0);
   truthcol->push_back(truth);
 
   e.put(std::move(truthcol));
@@ -281,7 +283,6 @@ std::vector<simb::MCParticle> evgen::NuEScatterGen::GenerateEventKinematics(bool
   std::vector<simb::MCParticle> ret;
   ret.push_back(mcNu);
   ret.push_back(mcE);
-
   return ret;
 }
 
