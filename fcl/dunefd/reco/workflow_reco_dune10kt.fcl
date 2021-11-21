@@ -28,11 +28,14 @@ dunefd_horizdrift_producers:
   # convert raw::RawDigit to recob::wire
   wclsmcnfsp:        @local::dune10kt_mc_nfsp
   # actual hit finder
+  hitcheater:          @local::dunefd_hitcheater
   gaushit:            @local::dunefd_gaushitfinder
 
   # actual disambiguation
   spsolve:           @local::dunefd_horizdrift_spacepointsolver
+  #hitfd:             @local::dunefd_disambigcheat
   hitfd:             @local::dunefd_disambigfromsp
+
   # 2D clustering
   linecluster:        @local::dune35t_linecluster
   trajcluster:          @local::dunefdmc_trajcluster
@@ -77,7 +80,8 @@ dunefd_horizdrift_producers:
 dunefd_horizdrift_lowlevelreco: 
 [ 
     wclsmcnfsp,
-    gaushit
+    gaushit,
+    hitcheater
 ]
 
 dunefd_horizdrift_hitdisambiguation:
@@ -228,7 +232,7 @@ dunefd_horizdrift_producers.pmtrajfittcpid.TrackModuleLabel:        "pmtrajfittc
 dunefd_horizdrift_producers.linecluster.HitFinderModuleLabel:     "hitfd"
 
 #Pandora configurations
-dunefd_horizdrift_producers.pandora.HitFinderModuleLabel:         "linecluster"
+dunefd_horizdrift_producers.pandora.HitFinderModuleLabel:         "hitfd"
 dunefd_horizdrift_producers.pandoraTrack.PFParticleLabel:         "pandora"
 dunefd_horizdrift_producers.pandoraShower.PFParticleLabel:        "pandora"
 
