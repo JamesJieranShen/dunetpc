@@ -186,6 +186,8 @@ dunefd_disambigcheat:     @local::standard_disambigcheat
 dunefd_gaushitfinder:     @local::dune35t_gaushitfinder
 dunefd_apahitfinder:      @local::apa_hitfinder
 dunefd_hitcheater:	  @local::standard_hitcheater
+dunefd_hitcheater.G4ModuleLabel: 'elecDrift'
+
 dunefd_fasthitfinder:     @local::dune35t_fasthitfinder
 dunefd_clustercrawlerhit: @local::dune35t_clustercrawlerhit
 dunefd_hitfinderfd:       @local::dune35t_hitfinder35t
@@ -193,11 +195,17 @@ dunefd_hitfinderfd.DisambigAlg.DoCleanUpHits:  false
 dunefd_hitfinderfd.DisambigAlg.DistanceCutClu: 100
 
 # modify gauss threshold
-dunefd_gaushitfinder.HitFinderToolVec.CandidateHitsPlane0.RoiThreshold: 1.0
-dunefd_gaushitfinder.HitFinderToolVec.CandidateHitsPlane1.RoiThreshold: 1.0
-dunefd_gaushitfinder.HitFinderToolVec.CandidateHitsPlane2.RoiThreshold: 1.0
-# dunefd_gaushitfinder.PulseWidthCuts:       [1.0,  1.0,  1.0 ] # Minimum pulse width
+dunefd_gaushitfinder.HitFinderToolVec.CandidateHitsPlane0.RoiThreshold: 0.6
+dunefd_gaushitfinder.HitFinderToolVec.CandidateHitsPlane1.RoiThreshold: 0.6
+dunefd_gaushitfinder.HitFinderToolVec.CandidateHitsPlane2.RoiThreshold: 0.6
+#dunefd_gaushitfinder.PulseWidthCuts:       [1.0,  1.0,  1.0 ] # Minimum pulse width
 dunefd_gaushitfinder.PeakFitter:	@local::peakfitter_mrqdt
+dunefd_gaushitfinder.InitWidth: [6.0, 6.0, 6.0]
+dunefd_gaushitfinder.AreaNorms: [13.25, 13.25, 13.25]
+dunefd_gaushitfinder.MaxMultiHit: 4
+dunefd_gaushitfinder.Chi2NDF: 50
+dunefd_gaushitfinder.LongMaxHits: [ 25, 25, 25 ]
+dunefd_gaushitfinder.LongPulseWidth: [ 10, 10, 10 ]
 
 
 # gauss hit finder for VD module
