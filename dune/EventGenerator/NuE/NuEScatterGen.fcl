@@ -40,7 +40,7 @@ standard_nuescattergen_supernova:
    MinZ:         "0"     # min Z coordinate of generating volume
    MaxZ:         "1400"  # max Z coordinate of generating volume
    MinT:         "0"     # min time of generated event in ns
-   MaxT:         "1"     # max time of generated event in ns
+   MaxT:         "0"     # max time of generated event in ns
 
    IsSupernova:  "true"
    NNu:          "250"
