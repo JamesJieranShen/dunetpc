@@ -58,6 +58,7 @@
 #include "lardataobj/RecoBase/SpacePoint.h"
 #include "lardataobj/RecoBase/Track.h"
 #include "lardataobj/RecoBase/Hit.h"
+#include "lardataobj/RecoBase/Wire.h"
 #include "lardataobj/RawData/RawDigit.h"
 #include "lardataobj/RawData/raw.h"
 #include "lardataobj/RecoBase/OpFlash.h"
@@ -160,7 +161,10 @@ namespace dune {
             XYZVector com_position;
             std::vector<recob::Hit> hits_U, hits_V, hits_Z;
 
+            // operation flags
+            bool fCollectTracks;
             // art module labels
+            std::string fSimChannelModuleLabel;
             std::string fSimulationLabel;
 			std::vector<std::string> fTrackModuleLabel;
 			std::string fHitsModuleLabel;
@@ -212,7 +216,6 @@ namespace dune {
             void writeMCTruths_largeant(art::Event const&);
             void calculate_electron_energy(art::Event const&);
             void calculate_electron_direction();
-            void get_primary_track();
             Bool_t distance_cut(art::Event const&, recob::Hit const&, std::vector<art::Ptr<recob::SpacePoint>>);
             long search_closest(const std::vector<recob::Hit>& sorted_hit_list, recob::Hit c_hit);
 
@@ -235,11 +238,13 @@ dune::PointResTree::PointResTree(fhicl::ParameterSet const& parameterSet)
 }
 
 void dune::PointResTree::reconfigure(fhicl::ParameterSet const& parameterSet){
+    fSimChannelModuleLabel = parameterSet.get<std::string>("SimChannelModuleLabel");
     fSimulationLabel = parameterSet.get< std::string >("SimulationLabel");
 	fTrackModuleLabel = parameterSet.get< std::vector<std::string> >("TrackModuleLabel");
 	fHitsModuleLabel = parameterSet.get< std::string >("HitsModuleLabel");
 	fOpFlashLabel = parameterSet.get< std::string >("OpFlashLabel");
 	fHitToSpacePointLabel = parameterSet.get<std::string>("HitToSpacePointLabel");
+    fCollectTracks = parameterSet.get<bool>("CollectTracks");
 }
 
 void dune::PointResTree::beginJob(){
@@ -309,21 +314,6 @@ void dune::PointResTree::endJob(){
 
 
 void dune::PointResTree::analyze(art::Event const& event){
-    // geo::GeometryCore const& geom = *(lar::providerFrom<geo::Geometry>());
-    // std::cout<<"Number of Cryostat: "<<geom.Ncryostats() << std::endl;
-    // for(size_t cstat = 0; cstat < geom.Ncryostats(); ++cstat){
-    //     for(size_t tpc = 0; tpc < geom.Cryostat(cstat).NTPC(); ++tpc) {
-    //         std::cout<<"TPC "<< tpc << std::endl;
-    //         const geo::TPCGeo& tpcgeom = geom.Cryostat(cstat).TPC(tpc);
-    //         std::cout<<"\tDriftDirection: "<<tpcgeom.DriftDirection()<<std::endl;
-    //         int nplane = tpcgeom.Nplanes();
-    //         for(int plane = 0; plane < nplane; ++plane) {
-    //             const geo::PlaneGeo& pgeom = tpcgeom.Plane(plane);
-    //             std::cout<<"\tPlane "<< plane << " X offset: "
-    //             << pgeom.GetCenter().X() << std::endl;
-    //         }
-    //     }
-    // }
 
     // ana begin
     reset_variables();
@@ -352,82 +342,62 @@ void dune::PointResTree::analyze(art::Event const& event){
         writeMCTruths_marley(event);
     if(fSimulationLabel == "largeant")
         writeMCTruths_largeant(event);
+    if(fCollectTracks){
+        // get track info
+        // determine primary track: IF pandora, choose longest track
+        if(DEBUG_MSG)
+            std::cout<<"Getting Tracks..."<<std::endl;
+        primary_trk_label="NA";
+        Double_t max_trk_weight = 0;
+        for(std::string track_label:fTrackModuleLabel){
+            auto trk_list = event.getValidHandle<std::vector<recob::Track>>(track_label);
+            NTrks += trk_list->size();
+            art::FindManyP<recob::Hit> hitsFromTracks(trk_list, event, track_label);
 
-    // get track info
-    // determine primary track: IF pandora, choose longest track
-    // IF PMA, use nearest neighbor
-    if(DEBUG_MSG)
-        std::cout<<"Getting Tracks..."<<std::endl;
-    primary_trk_label="NA";
-    Double_t max_trk_length = 0;
-    for(std::string track_label:fTrackModuleLabel){
-        auto trk_list = event.getValidHandle<std::vector<recob::Track>>(track_label);
-        NTrks += trk_list->size();
-        art::FindManyP<recob::Hit> hitsFromTracks(trk_list, event, track_label);
-
-        for(int i = 0; i < (int)trk_list->size(); i++){// using index loop to get track idx
-            recob::Track const& trk = trk_list->at(i);
-            trk_length.push_back(trk.Length());
-            trk_length_hist->Fill(trk.Length());
-            if(track_label=="pandoraTrack" && trk.Length() > max_trk_length){
-                max_trk_length = trk.Length();
-                primary_trk_id = trk_length.size() - 1; // most recent entry
-                primary_trk_label = track_label;
-                primary_trk_idx = i;
-            }
-            
-
-            // double distance = sqrt(pow(trk.Start().X() - truth_e_position.X(), 2) +
-            //                         pow(trk.Start().Y() - truth_e_position.Y(), 2) + 
-            //                         pow(trk.Start().Z() - truth_e_position.Z(), 2));
-            // std::cout<<distance<<std::endl;
-            trk_start_x.push_back(trk.Start().X());
-            trk_start_y.push_back(trk.Start().Y());
-            trk_start_z.push_back(trk.Start().Z());
-            trk_end_x.push_back(trk.End().X());
-            trk_end_y.push_back(trk.End().Y());
-            trk_end_z.push_back(trk.End().Z());
-
-            trk_start_dir_x.push_back(trk.StartDirection().X());
-            trk_start_dir_y.push_back(trk.StartDirection().Y());
-            trk_start_dir_z.push_back(trk.StartDirection().Z());
-            trk_end_dir_x.push_back(trk.EndDirection().X());
-            trk_end_dir_y.push_back(trk.EndDirection().Y());
-            trk_end_dir_z.push_back(trk.EndDirection().Z());
-
-            // loop through all charges associated with this track to accumulate charge
-            auto hits = hitsFromTracks.at(i);
-            float q = 0;
-            for(auto hit: hits){
-                if(hit->View() == geo::kZ){
-                    q += hit->Integral();
+            for(int i = 0; i < (int)trk_list->size(); i++){// using index loop to get track idx
+                recob::Track const& trk = trk_list->at(i);
+                trk_length.push_back(trk.Length());
+                trk_length_hist->Fill(trk.Length());
+                Double_t trk_weight = trk.Length() * (track_label=="pandoraShower" ? 10.0 : 1.0); // prioritize showers
+                if(trk_weight > max_trk_weight){
+                    max_trk_weight = trk_weight;
+                    primary_trk_id = trk_length.size() - 1; // most recent entry
+                    primary_trk_label = track_label;
+                    primary_trk_idx = i;
                 }
-            }
-            trk_charge.push_back(q);
 
-        } //end loop through trks
-    }// loop through track labels
+                trk_start_x.push_back(trk.Start().X());
+                trk_start_y.push_back(trk.Start().Y());
+                trk_start_z.push_back(trk.Start().Z());
+                trk_end_x.push_back(trk.End().X());
+                trk_end_y.push_back(trk.End().Y());
+                trk_end_z.push_back(trk.End().Z());
 
-    if(NTrks!=0 && primary_trk_id == -1){ // tracks exist yet primary track not initialized, meaning all tracks are pmtrack
-        get_primary_track();
+                trk_start_dir_x.push_back(trk.StartDirection().X());
+                trk_start_dir_y.push_back(trk.StartDirection().Y());
+                trk_start_dir_z.push_back(trk.StartDirection().Z());
+                trk_end_dir_x.push_back(trk.EndDirection().X());
+                trk_end_dir_y.push_back(trk.EndDirection().Y());
+                trk_end_dir_z.push_back(trk.EndDirection().Z());
+
+                // loop through all charges associated with this track to accumulate charge
+                auto hits = hitsFromTracks.at(i);
+                float q = 0;
+                for(auto hit: hits){
+                    if(hit->View() == geo::kZ){
+                        q += hit->Integral();
+                    }
+                }
+                trk_charge.push_back(q);
+
+            } //end loop through trks
+        }// loop through track labels
+        //std::cout << std::distance(trk_charge.begin(),std::max_element(trk_charge.begin(), trk_charge.end()))<<std::endl;
+        //std::cout << primary_trk_id << std::endl;
+        calculate_electron_direction(); 
 
     }
-    //std::cout << std::distance(trk_charge.begin(),std::max_element(trk_charge.begin(), trk_charge.end()))<<std::endl;
-    //std::cout << primary_trk_id << std::endl;
-    calculate_electron_direction(); 
     auto const& clockData = art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(event);
-    // auto tracklistHandle = event.getValidHandle<std::vector<recob::Track>>(fTrackModuleLabel);
-    // art::FindManyP<recob::Hit> hitsFromTracks(tracklistHandle, event, fTrackModuleLabel);
-    // art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
-    
-    // // look at gaushits FIXME:
-    // auto gaushit_handle = event.getValidHandle<std::vector<recob::Hit>>("gaushit");
-    // for(int i = 0; i < (int)gaushit_handle->size(); i++){
-    //     auto const hit = gaushit_handle->at(i);
-    //     if(hit.View() == geo::kU || hit.View() == geo::kV)
-    //         std::cout<<(hit.WireID().TPC%2) << std::endl;
-    // }
-
     // get hit info
     if(DEBUG_MSG)
         std::cout<<"Getting Hits..."<<std::endl;
@@ -466,8 +436,9 @@ void dune::PointResTree::analyze(art::Event const& event){
         if(hit->View() == geo::kZ) uncut_charge += hit->Integral();
         // for collection plane, apply distance cut
         if(hit->View() == geo::kZ){
-            auto spacepoints = dune_ana::DUNEAnaHitUtils::GetSpacePoints(hit, event, 
-                    fHitsModuleLabel, fHitToSpacePointLabel);
+            // auto spacepoints = dune_ana::DUNEAnaHitUtils::GetSpacePoints(hit, event, 
+            //         fHitsModuleLabel, fHitToSpacePointLabel);
+            std::vector<art::Ptr<recob::SpacePoint>> spacepoints; 
             NHits_Z++;
             if(spacepoints.size()) NspHits_Z++;
             write_multi_distance(event, *hit, spacepoints);
@@ -479,6 +450,7 @@ void dune::PointResTree::analyze(art::Event const& event){
                 continue;
             }
             else charge_Z+=hit->Integral();
+            charge_Z+=hit->Integral();
         }
     } //end loop through hits
     // sort hit arrays
@@ -509,6 +481,18 @@ void dune::PointResTree::analyze(art::Event const& event){
     calculate_electron_energy(event);
     
     delete gf;
+
+    //loop through wires
+    // debugging, clear the hit charge sum and use wire sum instead.
+    charge_U = charge_V = charge_Z = 0.0;
+    auto wireHandle = event.getValidHandle<std::vector<recob::Wire>>("caldata");
+    for(auto const & wire : *wireHandle){
+        auto signal = wire.Signal();
+        auto wire_sum = std::accumulate(signal.begin(), signal.end(), 0.0);
+        if(wire.View() == geo::kU) charge_U += wire_sum;
+        if(wire.View() == geo::kV) charge_V += wire_sum;
+        if(wire.View() == geo::kZ) charge_Z += wire_sum;
+    }
     tr->Fill();
 } //analyze
 
@@ -645,7 +629,7 @@ void dune::PointResTree::writeMCTruths_largeant(art::Event const& event){
         }
     }//endfor
 
-    auto channel_list = event.getValidHandle<std::vector<sim::SimChannel>>("elecDrift");
+    auto channel_list = event.getValidHandle<std::vector<sim::SimChannel>>(fSimChannelModuleLabel);
     for(auto const& channel:(*channel_list)){
         auto const TDCIDEs = channel.TDCIDEMap();
         for(auto const& TDCIDE: TDCIDEs){
@@ -810,43 +794,6 @@ void dune::PointResTree::calculate_electron_direction(){
         reco_e_position = primary_start;
     }
 
-}
-
-
-/**
- * Assuming all tracks have no length-wise significance, determine the primary track.
- * */
-void dune::PointResTree::get_primary_track(){
-    primary_trk_label="pandoraShower";
-
-    Double_t com_thresh=45000; //cm
-    Double_t com_x = 0;
-    Double_t com_y = 0;
-    Double_t com_z = 0;
-    Double_t length_sum = 0;
-    for (int i = 0; i < NTrks; i++){
-        com_x += trk_start_x[i]*trk_length[i];
-        com_y += trk_start_y[i]*trk_length[i];
-        com_z += trk_start_z[i]*trk_length[i];
-        length_sum += trk_length[i];
-    }
-    com_position.SetXYZ(com_x/length_sum, 
-                            com_y/length_sum, 
-                            com_z/length_sum);
-
-    double max_trk_length = 0;
-    for(int i = 0; i < NTrks; i++){
-        double distance = sqrt(pow(trk_start_x[i] - com_position.X(), 2) +
-                                pow(trk_start_y[i] - com_position.Y(), 2) + 
-                                pow(trk_start_z[i] - com_position.Z(), 2));
-        if(trk_length[i] > max_trk_length &&
-            distance < com_thresh){
-            max_trk_length = trk_length[i];
-            primary_trk_id = i;
-        }
-    } 
-    primary_trk_idx = primary_trk_id; // since there will be only one product
-    
 }
 
 

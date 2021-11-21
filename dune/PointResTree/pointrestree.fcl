@@ -112,12 +112,13 @@ physics:
       # the names you see here with the reconfigure method in
       # PointResTree.cxx. You will want to add/remove/rename the
       # example parameters below to suit your task.
-
+      SimChannelModuleLabel: "elecDrift"
       SimulationLabel:	   "largeant" #ES_gen
       HitsModuleLabel:	   "hitfd"
-      TrackModuleLabel:	   ["pmtracktc", "pandoraTrack"]
+      TrackModuleLabel:	   ["pandoraShower", "pandoraTrack"]
       OpFlashLabel:        "opslicerDEF35QENonRefl2PE"
 	  HitToSpacePointLabel:"hitfd"
+      CollectTracks:        true
 
     }
   }
