@@ -152,7 +152,7 @@ namespace dune {
 			void endJob() override;
         
         private:
-            using XYZVector=ROOT::Math::XYZVector;
+            using XYZVector=TVector3;
 
             //NOT IN TREE:
             genFinder* gf;
@@ -473,7 +473,7 @@ void dune::PointResTree::analyze(art::Event const& event){
     // std::cout<<"Spacepoint reco hits / total hits: " << NspHits_Z/NHits_Z << std::endl;
     // std::cout<<NHits_Z/NHits<< std::endl;
     //hit_distance->Fill(NspHits_Z/NHits_Z);
-	reco_distance = (truth_e_position - reco_e_position).R();
+	reco_distance = (truth_e_position - reco_e_position).Mag();
 
     
     if(DEBUG_MSG)
@@ -558,7 +558,7 @@ void dune::PointResTree::writeMCTruths_marley(art::Event const& event){
             truth_nu_dir.SetXYZ(neutrino.Px(),
                                 neutrino.Py(),
                                 neutrino.Pz());
-            truth_nu_dir/=neutrino.P();
+            truth_nu_dir.SetMag(1.0);
         }
     }
 
@@ -571,7 +571,7 @@ void dune::PointResTree::writeMCTruths_marley(art::Event const& event){
             truth_e_dir.SetXYZ( particle.Px(),
                                 particle.Py(),
                                 particle.Pz());
-            truth_e_dir/=particle.P();
+            truth_e_dir.SetMag(1.0);
         }
     }
     if (!found_nu)
@@ -613,7 +613,7 @@ void dune::PointResTree::writeMCTruths_largeant(art::Event const& event){
             truth_nu_dir.SetXYZ(particle.Px(),
                                 particle.Py(),
                                 particle.Pz());
-            truth_nu_dir/=particle.P();
+            truth_nu_dir.SetMag(1.0);
         }
 		// electron
         if ( particle.Process() == "primary" && particle.PdgCode() == 11 ) {
@@ -622,7 +622,7 @@ void dune::PointResTree::writeMCTruths_largeant(art::Event const& event){
             truth_e_dir.SetXYZ( particle.Px(),
                                 particle.Py(),
                                 particle.Pz());
-            truth_e_dir/=particle.P();
+            truth_e_dir.SetMag(1.0);
             truth_e_position = particle.Trajectory().Position(0).Vect();
 			NParticles++;
 
@@ -731,7 +731,7 @@ void dune::PointResTree::calculate_electron_direction(){
     // std::cerr << "Primary Index:" << primary_trk_id << std::endl;
     if (primary_trk_id < 0) return; // if no trk is in reco, do nothing
     // double dist_thresh = 400;
-    using XYZVector=ROOT::Math::XYZVector;
+    using XYZVector=TVector3;
         //reset primary position after index update
     XYZVector primary_start(trk_start_x.at(primary_trk_id),
                             trk_start_y.at(primary_trk_id),
@@ -816,7 +816,7 @@ Bool_t dune::PointResTree::distance_cut(art::Event const& event, recob::Hit cons
             auto pos = XYZVector(spacepoint->XYZ()[0],
                                 spacepoint->XYZ()[1],
                                 spacepoint->XYZ()[2]);
-            distance += (pos - reco_e_position).R();
+            distance += (pos - reco_e_position).Mag();
         }
         distance /= spacepoints.size();
     }else{ // no spacepoint found, do 2D reconstruction (X, Z)
@@ -849,7 +849,7 @@ void dune::PointResTree::write_multi_distance(art::Event const& event, recob::Hi
             auto pos = XYZVector(spacepoint->XYZ()[0],
                                 spacepoint->XYZ()[1],
                                 spacepoint->XYZ()[2]);
-            distance += (pos - truth_e_position).R();
+            distance += (pos - truth_e_position).Mag();
         }
         distance /= spacepoints.size();
     }else{ // no spacepoint found, do 2D reconstruction (X, Z)
