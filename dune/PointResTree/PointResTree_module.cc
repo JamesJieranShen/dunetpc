@@ -74,8 +74,6 @@
 #include "larsim/MCCheater/ParticleInventoryService.h"
 #include "dune/AnaUtils/DUNEAnaHitUtils.h"
 
-// ROOT includes
-
 #include "TH1.h"
 #include "TH2.h"
 #include "TVector3.h"
@@ -94,8 +92,6 @@
 #include "Math/Vector3D.h"
 #include "TFile.h"
 #include "TPrincipal.h"
-
-// C++ includes
 
 #include <vector>
 #include <string>
@@ -314,7 +310,6 @@ void dune::PointResTree::endJob(){
 
 
 void dune::PointResTree::analyze(art::Event const& event){
-
     // ana begin
     reset_variables();
     gf = new genFinder();
@@ -323,7 +318,6 @@ void dune::PointResTree::analyze(art::Event const& event){
     std::vector<art::Handle<std::vector<simb::MCTruth>>> mcHandles;
     event.getManyByType(mcHandles);
     std::vector<std::pair<int, std::string>> track_id_to_label;
-
     for (auto const &mcHandle : mcHandles)
     {
         const std::string &sModuleLabel = mcHandle.provenance()->moduleLabel();
@@ -397,7 +391,7 @@ void dune::PointResTree::analyze(art::Event const& event){
         calculate_electron_direction(); 
 
     }
-    auto const& clockData = art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(event);
+    //auto const& clockData = art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(event);
     // get hit info
     if(DEBUG_MSG)
         std::cout<<"Getting Hits..."<<std::endl;
@@ -407,65 +401,34 @@ void dune::PointResTree::analyze(art::Event const& event){
     auto const detectorPropertiesData = 
             art::ServiceHandle<detinfo::DetectorPropertiesService const>() -> DataFor(event);
 	art::ServiceHandle<cheat::BackTrackerService> bt;
+    auto hit_to_sp = art::FindManyP<recob::SpacePoint>(hit_handle, event, fHitToSpacePointLabel);
     float NHits_Z = 0;
     float NspHits_Z = 0;
     NHits = hit_list.size();
     double uncut_charge = 0;
-
     for(int i = 0; i<NHits; i++){
         auto const hit = hit_list.at(i);
         //if(hit->PeakAmplitude()<3.0) continue;
         
-        
-        auto const trk_IDEs = bt->HitToTrackIDEs(clockData, hit);
-        //if(hit->View() == geo::kZ){
-            hit_hist->Fill(hit->PeakAmplitude());
-            if(trk_IDEs.size() != 0) {
-				good_hit_hist->Fill(hit->PeakAmplitude());
-			}
-
-        //}
-
         // put hits in repsective vectors
-        if(hit->View() == geo::kU) hits_U.push_back(*hit);
-        if(hit->View() == geo::kV) hits_V.push_back(*hit);
-        if(hit->View() == geo::kZ) hits_Z.push_back(*hit);
         // for induction planes, just sum all hits (not used)
         if(hit->View() == geo::kU) charge_U += hit->Integral();
         if(hit->View() == geo::kV) charge_V += hit->Integral();
         if(hit->View() == geo::kZ) uncut_charge += hit->Integral();
         // for collection plane, apply distance cut
         if(hit->View() == geo::kZ){
-            // auto spacepoints = dune_ana::DUNEAnaHitUtils::GetSpacePoints(hit, event, 
-            //         fHitsModuleLabel, fHitToSpacePointLabel);
-            std::vector<art::Ptr<recob::SpacePoint>> spacepoints; 
+
+            auto spacepoints = hit_to_sp.at(i);
             NHits_Z++;
-            if(spacepoints.size()) NspHits_Z++;
+            if(spacepoints.size()!=0) NspHits_Z++;
             write_multi_distance(event, *hit, spacepoints);
             if(distance_cut(event, *hit, spacepoints)){
-                // for(auto trkide : trk_IDEs){
-                //     auto particle = pi_serv->TrackIdToParticle(trkide.trackID);
-                //     std::cout<<"pdg:\t" << particle.PdgCode() << "\tProcess:\t" << particle.Process() << std::endl;
-                // }
                 continue;
             }
             else charge_Z+=hit->Integral();
             charge_Z+=hit->Integral();
         }
     } //end loop through hits
-    // sort hit arrays
-    auto hit_comp = [](recob::Hit a, recob::Hit b){
-        return (a.PeakTime() < b.PeakTime());
-    };
-    std::sort(hits_U.begin(), hits_U.end(), hit_comp);
-    std::sort(hits_V.begin(), hits_V.end(), hit_comp);
-    std::sort(hits_Z.begin(), hits_Z.end(), hit_comp);
-    for(auto u_hit : hits_U){
-        auto z_hit = hits_Z.at(search_closest(hits_Z, u_hit));
-        auto v_hit = hits_V.at(search_closest(hits_V, u_hit));
-        closest_hit_UV->Fill(u_hit.PeakTime() - v_hit.PeakTime());
-        closest_hit_UZ->Fill(u_hit.PeakTime() - z_hit.PeakTime());
-    }
 
     if(DEBUG_MSG)
         std::cout<<"Done looping through hits"<<std::endl;
@@ -479,20 +442,8 @@ void dune::PointResTree::analyze(art::Event const& event){
     if(DEBUG_MSG)
         std::cout<<"Calculate Electron Energy"<<std::endl;
     calculate_electron_energy(event);
-    
-    delete gf;
 
-    //loop through wires
-    // debugging, clear the hit charge sum and use wire sum instead.
-    charge_U = charge_V = charge_Z = 0.0;
-    auto wireHandle = event.getValidHandle<std::vector<recob::Wire>>("caldata");
-    for(auto const & wire : *wireHandle){
-        auto signal = wire.Signal();
-        auto wire_sum = std::accumulate(signal.begin(), signal.end(), 0.0);
-        if(wire.View() == geo::kU) charge_U += wire_sum;
-        if(wire.View() == geo::kV) charge_V += wire_sum;
-        if(wire.View() == geo::kZ) charge_Z += wire_sum;
-    }
+    delete gf;
     tr->Fill();
 } //analyze
 
@@ -812,13 +763,9 @@ Bool_t dune::PointResTree::distance_cut(art::Event const& event, recob::Hit cons
 
     if(spacepoints.size()){
         // average of all spacepoint recos
-        for(auto spacepoint:spacepoints){
-            auto pos = XYZVector(spacepoint->XYZ()[0],
-                                spacepoint->XYZ()[1],
-                                spacepoint->XYZ()[2]);
-            distance += (pos - reco_e_position).Mag();
-        }
-        distance /= spacepoints.size();
+        auto spacepoint = spacepoints.at(0);
+        auto pos = XYZVector(spacepoint->XYZ());
+        distance += (pos - reco_e_position).Mag();
     }else{ // no spacepoint found, do 2D reconstruction (X, Z)
         geo::GeometryCore const& geom = *(lar::providerFrom<geo::Geometry>());
         auto const detProperties = art::ServiceHandle<detinfo::DetectorPropertiesService>()->DataFor(event);
@@ -845,13 +792,9 @@ void dune::PointResTree::write_multi_distance(art::Event const& event, recob::Hi
 
     if(spacepoints.size()){
         // average of all spacepoint recos
-        for(auto spacepoint:spacepoints){
-            auto pos = XYZVector(spacepoint->XYZ()[0],
-                                spacepoint->XYZ()[1],
-                                spacepoint->XYZ()[2]);
-            distance += (pos - truth_e_position).Mag();
-        }
-        distance /= spacepoints.size();
+        auto spacepoint = spacepoints.at(0);
+        auto pos = XYZVector(spacepoint->XYZ());
+        distance += (pos - reco_e_position).Mag();
     }else{ // no spacepoint found, do 2D reconstruction (X, Z)
         geo::GeometryCore const& geom = *(lar::providerFrom<geo::Geometry>());
         auto const detProperties = art::ServiceHandle<detinfo::DetectorPropertiesService>()->DataFor(event);
