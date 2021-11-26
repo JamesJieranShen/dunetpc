@@ -115,9 +115,11 @@ physics:
       SimChannelModuleLabel: "elecDrift"
       SimulationLabel:	   "largeant" #ES_gen
       HitsModuleLabel:	   "hitfd"
-      TrackModuleLabel:	   ["pandoraShower", "pandoraTrack"]
+      #TrackModuleLabel:	   ["pandoraShower", "pandoraTrack"]
+      TrackModuleLabel:	   ["pmtracktc"]
       OpFlashLabel:        "opslicerDEF35QENonRefl2PE"
 	  HitToSpacePointLabel:"hitfd"
+      SpacePointModuleLabel:    "spsolve"
       CollectTracks:        true
 
     }

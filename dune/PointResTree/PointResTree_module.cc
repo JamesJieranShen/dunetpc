@@ -94,10 +94,13 @@
 #include "TPrincipal.h"
 
 #include <vector>
+#include <queue>
 #include <string>
 #include <iostream>
 #include <fstream>
 
+using XYZVector = TVector3;
+using track_loc = std::pair<std::string, size_t>; // <ModuleLabel, idx> of a track.
 namespace dune {
     struct genFinder{
     private:
@@ -148,14 +151,14 @@ namespace dune {
 			void endJob() override;
         
         private:
-            using XYZVector=TVector3;
+            //using XYZVector=TVector3;
 
             //NOT IN TREE:
             genFinder* gf;
-            std::string primary_trk_label;
-            Int_t primary_trk_idx; // index of the primary track IN THE TRACK LABEL
+            track_loc primary_trk_loc;
             XYZVector com_position;
             std::vector<recob::Hit> hits_U, hits_V, hits_Z;
+            bool has_sp_vertex;
 
             // operation flags
             bool fCollectTracks;
@@ -166,15 +169,13 @@ namespace dune {
 			std::string fHitsModuleLabel;
 			std::string fOpFlashLabel;
             std::string fHitFdModuleLabel;
+            std::string fSpacePointModuleLabel;
 			std::string fHitToSpacePointLabel;
 
+            // histograms
+            TH1F * vertex_reco_distance;
+
             // Tree & branches
-            TH1D * hit_hist;
-			TH1D * good_hit_hist;
-            TH1D * hit_distance;
-            TH1D * trk_length_hist;
-            TH1D * closest_hit_UV;
-            TH1D * closest_hit_UZ;
 
             TTree * tr;
             XYZVector truth_nu_dir, truth_e_dir;
@@ -214,7 +215,7 @@ namespace dune {
             void calculate_electron_direction();
             Bool_t distance_cut(art::Event const&, recob::Hit const&, std::vector<art::Ptr<recob::SpacePoint>>);
             long search_closest(const std::vector<recob::Hit>& sorted_hit_list, recob::Hit c_hit);
-
+            XYZVector find_vertex_sp(art::Event const&);
             /* Function to write hit as a distance of truth distance. */
             void write_multi_distance(art::Event const&, recob::Hit const&, std::vector<art::Ptr<recob::SpacePoint>>);
             
@@ -241,16 +242,13 @@ void dune::PointResTree::reconfigure(fhicl::ParameterSet const& parameterSet){
 	fOpFlashLabel = parameterSet.get< std::string >("OpFlashLabel");
 	fHitToSpacePointLabel = parameterSet.get<std::string>("HitToSpacePointLabel");
     fCollectTracks = parameterSet.get<bool>("CollectTracks");
+    fSpacePointModuleLabel = parameterSet.get<std::string>("SpacePointModuleLabel");
 }
 
 void dune::PointResTree::beginJob(){
     art::ServiceHandle<art::TFileService> tfs;
-    hit_hist = tfs->make<TH1D>("hit_hist", "Hit Amplitudes", 100, 0, 50);
-	good_hit_hist = tfs->make<TH1D>("good_hit_hist", "Hit Amplitude with associated IDE", 100, 0, 50);
-    hit_distance = tfs->make<TH1D>("hit_distance", "Distance from hit to start position of electron", 100, 0, 400);
-    trk_length_hist = tfs->make<TH1D>("trk_length_hist", "Length of Tracks", 100, 0, 50);
-    closest_hit_UV = tfs->make<TH1D>("closest_hit_UV", "time difference between collection and U plane hits", 100, -5, 5);
-    closest_hit_UZ = tfs->make<TH1D>("closest_hit_UZ", "time difference between collection and V plane hits", 100, -5, 5);
+
+    vertex_reco_distance = tfs->make<TH1F>("vertex_reco_distance", "Distance between reconstructed vertex (vis SP) and true vertex", 1000, 0, 1000);
 
     tr = tfs->make<TTree>("tr", "tr");
 
@@ -336,30 +334,40 @@ void dune::PointResTree::analyze(art::Event const& event){
         writeMCTruths_marley(event);
     if(fSimulationLabel == "largeant")
         writeMCTruths_largeant(event);
+    
+    // use spacepoint info to reconstruct an approximate vertex
+    auto sp_vertex = find_vertex_sp(event);
+    auto sp_distance_th = 200; // if track is further away from sp_vertex than this, it gets thrown out
+
     if(fCollectTracks){
         // get track info
         // determine primary track: IF pandora, choose longest track
         if(DEBUG_MSG)
             std::cout<<"Getting Tracks..."<<std::endl;
-        primary_trk_label="NA";
         Double_t max_trk_weight = 0;
+        int trk_count = 0;
         for(std::string track_label:fTrackModuleLabel){
             auto trk_list = event.getValidHandle<std::vector<recob::Track>>(track_label);
-            NTrks += trk_list->size();
             art::FindManyP<recob::Hit> hitsFromTracks(trk_list, event, track_label);
-
+            trk_count += trk_list->size();
             for(int i = 0; i < (int)trk_list->size(); i++){// using index loop to get track idx
                 recob::Track const& trk = trk_list->at(i);
-                trk_length.push_back(trk.Length());
-                trk_length_hist->Fill(trk.Length());
+                XYZVector trk_start(trk.Start().X(), trk.Start().Y(), trk.Start().Z());
+                XYZVector trk_end(trk.End().X(), trk.End().Y(), trk.End().Z());
+                // throw away bad tracks
+                if(has_sp_vertex &&
+                    (trk_start - sp_vertex).Mag() > sp_distance_th &&
+                    (trk_end - sp_vertex).Mag() > sp_distance_th
+                ) continue;
+
                 Double_t trk_weight = trk.Length() * (track_label=="pandoraShower" ? 10.0 : 1.0); // prioritize showers
                 if(trk_weight > max_trk_weight){
                     max_trk_weight = trk_weight;
-                    primary_trk_id = trk_length.size() - 1; // most recent entry
-                    primary_trk_label = track_label;
-                    primary_trk_idx = i;
+                    primary_trk_id = trk_length.size(); // most recent entry
+                    primary_trk_loc = track_loc(track_label, i);
                 }
-
+                // write track info
+                trk_length.push_back(trk.Length());
                 trk_start_x.push_back(trk.Start().X());
                 trk_start_y.push_back(trk.Start().Y());
                 trk_start_z.push_back(trk.Start().Z());
@@ -386,6 +394,23 @@ void dune::PointResTree::analyze(art::Event const& event){
 
             } //end loop through trks
         }// loop through track labels
+        NTrks = trk_length.size();
+        if(DEBUG_MSG){
+            std::cout<<"Number of Tracks cut: " << trk_count - NTrks << std::endl;
+            std::cout<<"NTrks: "<< NTrks << std::endl;
+            std::cout<< "SP Vertex Loc: " << sp_vertex.X() <<" "<< sp_vertex.Y() <<" "<< sp_vertex.Z() << std::endl;
+            if(NTrks==0) std::cout<<"No Tracks FOUND!!" << std::endl;
+            else
+            {    
+                std::cout<<"Primary Track Start: " << trk_start_x.at(primary_trk_id) << " "
+                    << trk_start_y.at(primary_trk_id) << " "
+                    << trk_start_z.at(primary_trk_id) << std::endl;
+                    std::cout<<"Primary Track End: " << trk_end_x[primary_trk_id] << " "
+                    << trk_end_y[primary_trk_id] << " "
+                    << trk_end_z[primary_trk_id] << std::endl;
+            }
+        }
+        
         //std::cout << std::distance(trk_charge.begin(),std::max_element(trk_charge.begin(), trk_charge.end()))<<std::endl;
         //std::cout << primary_trk_id << std::endl;
         calculate_electron_direction(); 
@@ -403,13 +428,19 @@ void dune::PointResTree::analyze(art::Event const& event){
 	art::ServiceHandle<cheat::BackTrackerService> bt;
     auto hit_to_sp = art::FindManyP<recob::SpacePoint>(hit_handle, event, fHitToSpacePointLabel);
     float NHits_Z = 0;
-    float NspHits_Z = 0;
     NHits = hit_list.size();
     double uncut_charge = 0;
+    // double max_amplitude = 0.;
+    // int brightest_hit_idx = -1;
     for(int i = 0; i<NHits; i++){
         auto const hit = hit_list.at(i);
+        // if(hit->PeakAmplitude() > max_amplitude){
+        //     max_amplitude = hit->PeakAmplitude();
+        //     brightest_hit_idx = i;
+        // }
+
+
         //if(hit->PeakAmplitude()<3.0) continue;
-        
         // put hits in repsective vectors
         // for induction planes, just sum all hits (not used)
         if(hit->View() == geo::kU) charge_U += hit->Integral();
@@ -420,7 +451,6 @@ void dune::PointResTree::analyze(art::Event const& event){
 
             auto spacepoints = hit_to_sp.at(i);
             NHits_Z++;
-            if(spacepoints.size()!=0) NspHits_Z++;
             write_multi_distance(event, *hit, spacepoints);
             if(distance_cut(event, *hit, spacepoints)){
                 continue;
@@ -430,13 +460,18 @@ void dune::PointResTree::analyze(art::Event const& event){
         }
     } //end loop through hits
 
+    
+
+
+    
     if(DEBUG_MSG)
         std::cout<<"Done looping through hits"<<std::endl;
     cut_charge_loss = charge_Z/uncut_charge;
     // std::cout<<"Spacepoint reco hits / total hits: " << NspHits_Z/NHits_Z << std::endl;
     // std::cout<<NHits_Z/NHits<< std::endl;
     //hit_distance->Fill(NspHits_Z/NHits_Z);
-	reco_distance = (truth_e_position - reco_e_position).Mag();
+    if(NTrks != 0)
+	    reco_distance = (truth_e_position - reco_e_position).Mag();
 
     
     if(DEBUG_MSG)
@@ -457,9 +492,12 @@ void dune::PointResTree::reset_variables(){
     truth_nu_dir.SetXYZ(-2, -2, -2);
     truth_e_dir.SetXYZ(-2, -2, -2);
     reco_e_dir.SetXYZ(-2, -2, -2);
+    reco_e_position.SetXYZ(-2, -2, -2);
     
     reco_e_en = truth_nu_en = truth_e_en = -10;
     nu_pdg = 0;
+    has_sp_vertex = false;
+    primary_trk_loc = track_loc("NA", -1);
 
     NParticles = NHits = NTrks = 0;
     charge_U = charge_V = charge_Z = charge_corrected = 0;
@@ -633,6 +671,8 @@ void dune::PointResTree::calculate_electron_energy(art::Event const& event){
     std::vector<double> hitPeakTimes;
     drift_time = 0.0;
     // Create FindManyP object to find hits associated with Tracks
+    auto primary_trk_label = primary_trk_loc.first;
+    auto primary_trk_idx = primary_trk_loc.second;
     auto tracklistHandle = event.getValidHandle<std::vector<recob::Track>>(primary_trk_label);
     art::FindManyP<recob::Hit> hitsFromTracks(tracklistHandle, event, primary_trk_label);
     // hits in primary track:
@@ -676,13 +716,13 @@ void dune::PointResTree::calculate_electron_energy(art::Event const& event){
  * Sets reco_e_dir and reco_e_position. Assumes NTrk, track directions, and primary_trk_id is set.
  * */
 void dune::PointResTree::calculate_electron_direction(){
-    // std::cerr << "Daughter Flipping" << std::endl;
-    // std::cerr << "NTrk: " << NTrks << std::endl;
-    // std::cerr << "Vector size: " << trk_start_x.size() << std::endl;
-    // std::cerr << "Primary Index:" << primary_trk_id << std::endl;
+    // std::cout << "Daughter Flipping" << std::endl;
+    // std::cout << "NTrk: " << NTrks << std::endl;
+    // std::cout << "Vector size: " << trk_start_x.size() << std::endl;
+    // std::cout << "Primary Index:" << primary_trk_id << std::endl;
     if (primary_trk_id < 0) return; // if no trk is in reco, do nothing
     // double dist_thresh = 400;
-    using XYZVector=TVector3;
+    // using XYZVector=TVector3;
         //reset primary position after index update
     XYZVector primary_start(trk_start_x.at(primary_trk_id),
                             trk_start_y.at(primary_trk_id),
@@ -776,7 +816,6 @@ Bool_t dune::PointResTree::distance_cut(art::Event const& event, recob::Hit cons
         distance = std::pow(pos.X() - reco_e_position.X(), 2)+std::pow(pos.Z() - reco_e_position.Z(), 2);
         distance = sqrt(distance);
     }
-    hit_distance->Fill(distance);
 
     return(distance > dist_th);
 
@@ -836,4 +875,70 @@ long dune::PointResTree::search_closest(const std::vector<recob::Hit>& sorted_hi
     }
 
     return iter_geq - sorted_hit_list.begin();
+}
+
+/**
+ * @brief Determine the vertex of the SN event using reconstructed spacepoints
+ * Goes through all the spacepoints, select the top 10 spacepoints ranked by 
+ * associated z-view hits' amplitude. It then tries to select one of the ten,
+ * hopefully in the vinicinity of the truth vertex.
+ * @return XYZVector result, vector of the position.
+ */
+XYZVector dune::PointResTree::find_vertex_sp(art::Event const& event) 
+{
+    auto sp_handle = event.getValidHandle<std::vector<recob::SpacePoint>>(fSpacePointModuleLabel);
+    auto sp_to_hit = art::FindManyP<recob::Hit>(sp_handle, event, fHitToSpacePointLabel);
+    int N_spacepoint = sp_handle->size();
+    // Using a priority queue to get the top k nmber of spacepoints. Runtime is O(NlogK)
+    using AVGAMP_SP = std::pair<double, recob::SpacePoint>;
+    std::priority_queue<AVGAMP_SP, std::vector<AVGAMP_SP>, std::greater<AVGAMP_SP>> sp_brightness_queue;
+    size_t queue_size = 10; // number of spacepoints to keep
+    for (int i = 0; i < N_spacepoint; i++){
+        auto hits = sp_to_hit.at(i);
+        double avg_amplitude = 0;
+        for(auto hit : hits){
+            // avg_amplitude += hit->PeakAmplitude();
+            if(hit->View() == geo::kZ) avg_amplitude = hit->PeakAmplitude();
+        }
+        // avg_amplitude /= hits.size();
+        if(sp_brightness_queue.size()<queue_size){
+            sp_brightness_queue.push(AVGAMP_SP(avg_amplitude, sp_handle->at(i)));
+        }
+        else if(sp_brightness_queue.top().first < avg_amplitude){
+            sp_brightness_queue.pop();
+            sp_brightness_queue.push(AVGAMP_SP(avg_amplitude, sp_handle->at(i)));
+        }
+    }
+    std::vector<recob::SpacePoint> brightest_sp;
+    while(!sp_brightness_queue.empty()){
+        auto current = sp_brightness_queue.top().second;
+        brightest_sp.push_back(current);
+        sp_brightness_queue.pop();
+    }
+    // selects a spacepoint that is close to most of the other spacepoints.
+    // In the case of a spacepoint caused by something other than the SN stub,
+    // it should be far away from the majority of the other hits.
+    double min_nearest = 1e9;
+    recob::SpacePoint vertex;
+    for(auto sp : brightest_sp){
+        double nearest = 1e9;
+        // double nearest = 0;
+        XYZVector p1(sp.XYZ());
+        for(auto other_sp : brightest_sp){
+            XYZVector p2(other_sp.XYZ());
+            if (p1==p2) continue;
+            auto dist = (p1 - p2).Mag();
+            nearest = std::min(dist, nearest);
+            nearest += dist;
+        }
+        if(nearest < min_nearest){
+            min_nearest = nearest;
+            vertex = sp;
+            has_sp_vertex = true;
+        }
+    }
+    XYZVector res(vertex.XYZ());
+    if(has_sp_vertex)
+        vertex_reco_distance->Fill((res - truth_e_position).Mag());
+    return res;
 }
