@@ -17,6 +17,8 @@
 #include "art/Framework/Principal/Event.h"
 //LARSOFT
 #include "lardataobj/RecoBase/Hit.h"
+#include "lardataobj/RecoBase/SpacePoint.h"
+#include "lardata/DetectorInfoServices/DetectorPropertiesService.h"
 //DUNE
 #include "dune/AnaUtils/DUNEAnaUtilsBase.h"
 
