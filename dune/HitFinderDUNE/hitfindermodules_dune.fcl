@@ -195,9 +195,9 @@ dunefd_hitfinderfd.DisambigAlg.DoCleanUpHits:  false
 dunefd_hitfinderfd.DisambigAlg.DistanceCutClu: 100
 
 # modify gauss threshold
-dunefd_gaushitfinder.HitFinderToolVec.CandidateHitsPlane0.RoiThreshold: 0.6
-dunefd_gaushitfinder.HitFinderToolVec.CandidateHitsPlane1.RoiThreshold: 0.6
-dunefd_gaushitfinder.HitFinderToolVec.CandidateHitsPlane2.RoiThreshold: 0.6
+# dunefd_gaushitfinder.HitFinderToolVec.CandidateHitsPlane0.RoiThreshold: 0.6
+# dunefd_gaushitfinder.HitFinderToolVec.CandidateHitsPlane1.RoiThreshold: 0.6
+# dunefd_gaushitfinder.HitFinderToolVec.CandidateHitsPlane2.RoiThreshold: 0.6
 #dunefd_gaushitfinder.PulseWidthCuts:       [1.0,  1.0,  1.0 ] # Minimum pulse width
 dunefd_gaushitfinder.PeakFitter:	@local::peakfitter_mrqdt
 dunefd_gaushitfinder.InitWidth: [6.0, 6.0, 6.0]

@@ -10,10 +10,10 @@ physics.trigger_paths: [ simulate ]
 services.DetPedestalService: @local::dune_fixedpeds
 
 # DetSim flags.
-physics.producers.daq.NoiseOn:     false
+physics.producers.daq.NoiseOn:     true
 physics.producers.daq.PedestalOn:  true
 physics.producers.daq.DistortOn:   false
-physics.producers.daq.SuppressOn:  false
+physics.producers.daq.SuppressOn:  true
 physics.producers.daq.SimChannelLabel: "elecDrift"
 
 # DetSim services.
@@ -24,6 +24,7 @@ services.PedestalAdditionService:  @local::padprovided
 services.AdcDistortService:        @local::stuckbits
 services.AdcSuppressService:       @local::zslegacy
 services.AdcCompressService:       @local::cmpblock
+#services.AdcCompressService:       @local::cmpreplace
 
 # services.AdcSuppressService.AdcThreshold: 2
 # Data driven noise: tuned with ProtoDUNE-SP run4696 data
