@@ -1,5 +1,3 @@
-add_subdirectory(legacy)
-add_subdirectory(SN_Pointing)
 # Install fcl files in /job subdirectory.
 
 install_fhicl()
