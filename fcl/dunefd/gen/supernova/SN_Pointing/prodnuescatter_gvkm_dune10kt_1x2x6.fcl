@@ -77,8 +77,9 @@ services:
 
 physics.producers.generator:@local::standard_nuescattergen_supernova
 physics.producers.generator.NNu: "1"
-physics.producers.generator.EventRateFileName: "root://fndca1.fnal.gov:1094//pnfs/fnal.gov/usr/dune/persistent/users/jierans/flat_rates.root"
-#physics.producers.generator.EventRateFileName: "root://fndca1.fnal.gov:1094//pnfs/fnal.gov/usr/dune/persistent/users/jierans/flat_electron_energy_ES_rate.root"
+# physics.producers.generator.EventRateFileName: "/cvmfs/larsoft.opensciencegrid.org/products/larsoft_data/v1_02_01/SupernovaNeutrinos/gvkm_xscn_weighted_nue_spectrum.root"
+# physics.producers.generator.EventRateFileName: "root://fndca1.fnal.gov:1094//pnfs/fnal.gov/usr/dune/persistent/users/jierans/flat_electron_energy_ES_rate.root"
+physics.producers.generator.EventRateFileName: "root://fndca1.fnal.gov:1094//pnfs/fnal.gov/usr/dune/persistent/users/jierans/supernova_nue_rates.root"
 
 physics.producers.generator.MinEnu: "0.010"
 #physics.producers.generator.MaxEnu: "0.005"
