@@ -278,6 +278,7 @@ std::vector<simb::MCParticle> evgen::NuEScatterGen::GenerateEventKinematics(bool
   simb::MCParticle mcNu(0, flav, "primary", 0, 0, 1);
   mcNu.AddTrajectoryPoint(vtx, nu4d);
   simb::MCParticle mcE(1, 11, "primary", 0, eMass, 1);
+  mcNu.AddDaughter(mcE.TrackId());
   mcE.AddTrajectoryPoint(vtx, e4d);
 
   std::vector<simb::MCParticle> ret;
