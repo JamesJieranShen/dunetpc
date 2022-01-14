@@ -25,7 +25,7 @@ simple_plugin(PointResTree "module"
         dune_AnaUtils
 )
 
-	install_headers()
-	install_fhicl()
-	install_source()
-	install_scripts()
+install_headers()
+install_fhicl()
+install_source()
+install_scripts()
