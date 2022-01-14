@@ -4,7 +4,7 @@ physics.producers.marley.marley_parameters.source:
 {
   type:      "tgraph"
   neutrino:  "ve"
-  tfile:     "gvkm_xscn_weighted_nue_spectrum.root"
+  tfile:     "gvkm_nue_spectrum.root"
   namecycle: "NueSpectrum"
 }
 
@@ -16,4 +16,9 @@ physics.producers.marley.marley_parameters.source.Emax: 100
 #  check_active: true
 #  #seed: 47373
 #}
-
+# physics.producers.marley.marley_parameters.direction: {
+#     x: -0.973993
+#     y: -0.079770
+#     z: 0.2120710
+# }
+physics.producers.marley.marley_parameters.direction: "isotropic"
