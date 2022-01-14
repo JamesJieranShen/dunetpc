@@ -33,6 +33,8 @@ table_fragment_begin
     pathPrepend(FW_SEARCH_PATH, /cvmfs/dune.osgstorage.org/pnfs/fnal.gov/usr/dune/persistent/stash/)
     pathPrepend(FHICL_FILE_PATH, .:./job)
     pathPrepend(PYTHONPATH, ${DUNETPC_FQ_DIR}/bin)
+    # Flux files
+    pathPrepend(FW_SEARCH_PATH, ${MRB_TOP}/data)
     # WireCellData
     #envSet(WIRECELL_PATH, ${DUNE_PARDATA_DIR}/WireCellData)
     #pathPrepend(WIRECELL_PATH, ${UPS_PROD_DIR}/wire-cell-cfg)
