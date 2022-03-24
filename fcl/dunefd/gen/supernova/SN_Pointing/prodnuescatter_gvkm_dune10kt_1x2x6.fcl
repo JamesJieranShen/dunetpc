@@ -79,7 +79,7 @@ physics.producers.NuEScatter:@local::standard_nuescattergen_supernova
 physics.producers.NuEScatter.NNu: "1"
 # physics.producers.NuEScatter.EventRateFileName: "/cvmfs/larsoft.opensciencegrid.org/products/larsoft_data/v1_02_01/SupernovaNeutrinos/gvkm_xscn_weighted_nue_spectrum.root"
 # physics.producers.NuEScatter.EventRateFileName: "root://fndca1.fnal.gov:1094//pnfs/fnal.gov/usr/dune/persistent/users/jierans/flat_electron_energy_ES_rate.root"
-physics.producers.NuEScatter.EventRateFileName: "root://fndca1.fnal.gov:1094//pnfs/fnal.gov/usr/dune/persistent/users/jierans/supernova_nue_rates.root"
+physics.producers.NuEScatter.EventRateFileName: "root://fndca1.fnal.gov:1094//pnfs/fnal.gov/usr/dune/persistent/users/jierans/SN_fluxes/supernova_nue_rates.root"
 
 physics.producers.NuEScatter.MinEnu: "0.010"
 #physics.producers.NuEScatter.MaxEnu: "0.005"

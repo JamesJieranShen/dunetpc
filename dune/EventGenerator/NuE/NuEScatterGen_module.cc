@@ -1,3 +1,4 @@
+#include <TVector3.h>
 #include <string>
 #include <iostream>
 #include <sstream>
@@ -60,6 +61,11 @@ private:
 
   bool fIsSupernova;
   int fNNu; // number of neutrinos to generate per supernova
+
+  bool fUseFixedDirection;
+  double fXDir;
+  double fYDir;
+  double fZDir;
 
   // Event rate distributions in energy for each flavor
   TF1 *fNueE;
@@ -170,6 +176,11 @@ void evgen::NuEScatterGen::reconfigure(fhicl::ParameterSet const & p)
   fIsSupernova = p.get<bool>("IsSupernova");
   fNNu = p.get<int>("NNu");
 
+  fUseFixedDirection = p.get<bool>("UseFixedDirection");
+  fXDir = p.get<double>("XDir");
+  fYDir = p.get<double>("YDir");
+  fZDir = p.get<double>("ZDir");
+
   fEventRateFileName = p.get<std::string>("EventRateFileName");
 
   return;
@@ -215,10 +226,17 @@ std::vector<simb::MCParticle> evgen::NuEScatterGen::GenerateEventKinematics(bool
     flav = -16;
     Enu = fNutaubarE->GetRandom(fMinEnu,fMaxEnu);
   }
-
+  // Use specified direction from fcl file:
+  if(fUseFixedDirection){
+    fNuDir.SetX(fXDir);
+    fNuDir.SetY(fYDir);
+    fNuDir.SetZ(fZDir);
+    
+    fNuDir.SetMag(1.0);
+  }
   // Throw a random neutrino direction if we're not generating events for
   // a supernova.  Then, generate a neutrino direction only once / supernova
-  if (fNuDir.Mag() == 0 || !fIsSupernova || isNewNu){
+  else if (fNuDir.Mag() == 0 || !fIsSupernova || isNewNu){
     double nuCos = fRand->Uniform(-1,1);
     double nuPhi = fRand->Uniform(0,2*TMath::Pi());
     fNuDir.SetX(sqrt(1-nuCos*nuCos)*sin(nuPhi));
