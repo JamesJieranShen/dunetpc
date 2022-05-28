@@ -81,7 +81,7 @@ physics.producers.NuEScatter.NNu: "1"
 # physics.producers.NuEScatter.EventRateFileName: "root://fndca1.fnal.gov:1094//pnfs/fnal.gov/usr/dune/persistent/users/jierans/flat_electron_energy_ES_rate.root"
 physics.producers.NuEScatter.EventRateFileName: "root://fndca1.fnal.gov:1094//pnfs/fnal.gov/usr/dune/persistent/users/jierans/SN_fluxes/supernova_nue_rates.root"
 
-physics.producers.NuEScatter.MinEnu: "0.010"
+physics.producers.NuEScatter.MinEnu: "0.001"
 #physics.producers.NuEScatter.MaxEnu: "0.005"
 # Fix generating volume to the middle of a tpc
 #physics.producers.NuEScatter.MinX:         "175"  # min X coordinate of generating volume
