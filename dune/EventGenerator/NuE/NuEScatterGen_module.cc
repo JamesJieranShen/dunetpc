@@ -253,6 +253,9 @@ std::vector<simb::MCParticle> evgen::NuEScatterGen::GenerateEventKinematics(bool
 
   // ga, gv depend on whether we're scattering nue-e or numu/nutau-e
   double ga = abs(flav)==12 ? 0.5 : -0.5;
+  if(flav < 0) {
+    ga *= -1;
+  }
   double gv = abs(flav)==12 ? 2*fWMA+0.5 : 2*fWMA-0.5;
   fdsigdT->SetParameter(0,gv);
   fdsigdT->SetParameter(1,ga);
